@@ -1,0 +1,13 @@
+[Unit]
+Description=BMI270 backpack posture monitor
+After=bluetooth.service
+Wants=bluetooth.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/bmi270_backpack/bmi270_backpack.py --config /etc/bmi270_backpack.json
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

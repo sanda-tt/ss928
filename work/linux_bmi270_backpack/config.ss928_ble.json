@@ -1,0 +1,16 @@
+{
+  "device": {
+    "backend": "i2c",
+    "i2c_bus": 0,
+    "i2c_addr": "0x68",
+    "config_blob": "auto",
+    "init_sensor": true,
+    "sample_hz": 50.0
+  },
+  "output": {
+    "console_hz": 2.0,
+    "ble_enabled": true,
+    "ble_hz": 10.0,
+    "ble_name": "BMI270-Backpack"
+  }
+}

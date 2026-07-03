@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HLK-LD2417 雷达上位机</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./parser.js"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <div>
+          <h1>HLK-LD2417 雷达上位机</h1>
+          <p>UART 115200 8N1 · 探测扇区 ±60° · 65ms 扫描</p>
+        </div>
+      </div>
+      <div class="status-strip">
+        <span id="serialSupport" class="badge neutral">检测中</span>
+        <span id="connectionState" class="badge">未连接</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="radar-area" aria-label="扇形雷达图">
+        <canvas id="radarCanvas"></canvas>
+        <div class="radar-readout">
+          <div>
+            <span>目标</span>
+            <strong id="targetCount">0</strong>
+          </div>
+          <div>
+            <span>最高速度</span>
+            <strong id="maxSpeedReadout">0.0 km/h</strong>
+          </div>
+          <div>
+            <span>最近距离</span>
+            <strong id="nearestReadout">-- m</strong>
+          </div>
+        </div>
+      </section>
+
+      <aside class="control-area">
+        <section class="panel controls">
+          <div class="panel-title">
+            <h2>串口</h2>
+            <span id="frameRate">0 fps</span>
+          </div>
+          <div class="button-row">
+            <button id="connectButton" class="primary">连接</button>
+            <button id="disconnectButton">断开</button>
+            <button id="demoButton">演示</button>
+          </div>
+          <label class="field">
+            <span>波特率</span>
+            <select id="baudRate">
+              <option value="9600">9600</option>
+              <option value="19200">19200</option>
+              <option value="38400">38400</option>
+              <option value="57600">57600</option>
+              <option value="115200" selected>115200</option>
+              <option value="230400">230400</option>
+              <option value="256000">256000</option>
+              <option value="460800">460800</option>
+              <option value="921600">921600</option>
+            </select>
+          </label>
+          <p id="statusText" class="status-text">等待连接。</p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">
+            <h2>映射</h2>
+            <span>协议字段</span>
+          </div>
+          <label class="field range-field">
+            <span>最大距离 <output id="rangeValue">100 m</output></span>
+            <input id="maxRange" type="range" min="2" max="100" step="1" value="100" />
+          </label>
+          <label class="field range-field">
+            <span>左来向角度 <output id="leftAngleValue">-30°</output></span>
+            <input id="leftAngle" type="range" min="-60" max="0" step="1" value="-30" />
+          </label>
+          <label class="field range-field">
+            <span>右来向角度 <output id="rightAngleValue">30°</output></span>
+            <input id="rightAngle" type="range" min="0" max="60" step="1" value="30" />
+          </label>
+          <label class="field check-field">
+            <input id="useYAxisDistance" type="checkbox" checked />
+            <span>距离字段按 y 坐标换算</span>
+          </label>
+          <div class="legend">
+            <span class="legend-dot slow"></span><span>低速</span>
+            <span class="legend-dot medium"></span><span>中速</span>
+            <span class="legend-dot fast"></span><span>高速</span>
+          </div>
+        </section>
+
+        <section class="panel target-panel">
+          <div class="panel-title">
+            <h2>目标</h2>
+            <span id="parserStats">0 帧</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>来向</th>
+                  <th>距离</th>
+                  <th>速度</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody id="targetTable">
+                <tr>
+                  <td colspan="5" class="empty">暂无目标</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel log-panel">
+          <div class="panel-title">
+            <h2>原始帧</h2>
+            <button id="clearLogButton" class="small">清空</button>
+          </div>
+          <pre id="rawLog"></pre>
+        </section>
+      </aside>
+    </main>
+  </body>
+</html>

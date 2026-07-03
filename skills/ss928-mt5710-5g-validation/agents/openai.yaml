@@ -1,0 +1,5 @@
+interface:
+  display_name: "SS928 MT5710 5G Validation"
+  short_description: "Test MT5710 5G data, voice, GNSS"
+  brand_color: "#2563EB"
+  default_prompt: "Use $ss928-mt5710-5g-validation to validate the SS928 MT5710 5G module on the board."

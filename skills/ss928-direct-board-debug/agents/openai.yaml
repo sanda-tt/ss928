@@ -1,0 +1,4 @@
+interface:
+  display_name: "SS928 Direct Board Debug"
+  short_description: "SSH/SFTP debug flow for SS928 boards"
+  default_prompt: "Use $ss928-direct-board-debug to connect to the SS928 board, upload files, run checks, and summarize the logs."

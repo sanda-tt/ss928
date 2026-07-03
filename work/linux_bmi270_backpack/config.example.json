@@ -1,0 +1,44 @@
+{
+  "device": {
+    "backend": "auto",
+    "iio_path": "auto",
+    "i2c_bus": 0,
+    "i2c_addr": "0x68",
+    "config_blob": "auto",
+    "init_sensor": true,
+    "sample_hz": 50.0
+  },
+  "filter": {
+    "gyro_alpha": 0.98,
+    "linear_acc_deadband_mps2": 0.18,
+    "stationary_accel_tolerance_g": 0.06,
+    "stationary_gyro_dps": 3.0,
+    "stationary_hold_s": 0.45,
+    "velocity_damping_per_s": 0.15,
+    "max_speed_mps": 8.0
+  },
+  "thresholds": {
+    "pitch_forward_deg": 35.0,
+    "pitch_backward_deg": -35.0,
+    "roll_left_deg": -45.0,
+    "roll_right_deg": 45.0,
+    "tilt_hold_s": 0.8,
+    "impact_g": 2.8,
+    "freefall_g": 0.35,
+    "freefall_hold_s": 0.25,
+    "speed_warn_mps": 2.5,
+    "speed_hold_s": 1.0,
+    "alert_cooldown_s": 3.0
+  },
+  "output": {
+    "console_hz": 5.0,
+    "ble_enabled": true,
+    "ble_hz": 10.0,
+    "ble_name": "BMI270-Backpack",
+    "alert_file": "",
+    "alert_active_value": "1",
+    "alert_inactive_value": "0",
+    "alert_pulse_ms": 300,
+    "alert_command": []
+  }
+}
