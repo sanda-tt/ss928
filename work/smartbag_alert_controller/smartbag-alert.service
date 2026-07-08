@@ -1,0 +1,16 @@
+[Unit]
+Description=SS928 SmartBag alert controller
+After=bluetooth.service dbus.service
+Wants=bluetooth.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/smartbag_alert/controller
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/sh /root/smartbag_alert/controller/start_ss928_smartbag_alert.sh
+Restart=always
+RestartSec=3
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

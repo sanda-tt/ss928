@@ -53,11 +53,4 @@
     </view>
   </view>
 
-  <view class="smartbag-debug-entry" bind:tap="openFeature" data-route="/pages/monitor/index">
-    <view class="smartbag-debug-entry__main">
-      <view class="smartbag-debug-entry__title">SS928-SmartBag 调试入口</view>
-      <view class="smartbag-debug-entry__subtitle">连接报警主控，测试 L1-L4 / R1-R4 震动和语音</view>
-    </view>
-    <view class="smartbag-debug-entry__action">进入</view>
-  </view>
 </view>

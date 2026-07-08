@@ -6,11 +6,19 @@ clips through the existing `/opt/sample/audio/sample_audio 2` path.
 
 ## Board Paths
 
-Copy this directory to:
+Integrated board root:
 
 ```text
-/root/smartbag_alert/controller
+/root/smartbag_alert/
+  controller/
+  intelligent_bag/models/yolo11s.om
+  audio/
+  config/smartbag.env
 ```
+
+`intelligent_bag/models/yolo11s.om` is the deployed OM model source. The old
+`/opt/sample/yolov8/yolov8n.om` path is only a factory sample compatibility
+path and is not treated as the source model for SmartBag.
 
 Put audio files here:
 
@@ -65,6 +73,34 @@ python3 smartbag_alert_controller.py \
 
 The controller appends `--side left|right --emit-alert-jsonl` to each detector
 command if those options are not already present.
+
+For the deployed OM package, use `om_alert_bridge.py` when the detector runner
+emits JSONL or simple `level=1..4` text:
+
+```sh
+python3 om_alert_bridge.py \
+  --side left \
+  --model /root/smartbag_alert/intelligent_bag/models/yolo11s.om \
+  --runner "/path/to/your_detector"
+```
+
+The bridge keeps the OM model path explicit and emits `vision_alert` JSONL for
+the controller. Raw bbox output from the factory YOLO sample is not converted
+to danger levels unless `--sample-detection-alerts` is set for development-only
+smoke testing.
+
+## Boot Service
+
+Install and enable:
+
+```sh
+cp /root/smartbag_alert/controller/smartbag-alert.service /etc/systemd/system/smartbag-alert.service
+systemctl daemon-reload
+systemctl enable smartbag-alert.service
+systemctl restart smartbag-alert.service
+```
+
+Runtime configuration lives in `/root/smartbag_alert/config/smartbag.env`.
 
 For a hardware precheck only:
 

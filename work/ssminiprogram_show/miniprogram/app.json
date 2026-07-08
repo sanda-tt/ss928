@@ -1,0 +1,20 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/tracks/index",
+    "pages/placeholder/index",
+    "pages/index/index",
+    "pages/monitor/index",
+    "pages/example/index"
+  ],
+  "window": {
+    "backgroundColor": "#F3F5F7",
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#F3F5F7",
+    "navigationBarTitleText": "智能安全背包",
+    "navigationBarTextStyle": "black"
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}
