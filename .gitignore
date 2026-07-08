@@ -1,0 +1,26 @@
+# Keep only the known local-only material out of Git.
+
+# Local Codex / hidden workspace state.
+/.*
+!/.gitignore
+
+# Original SS928 materials bundle directories that should stay local.
+/[0-9][0-9]*/
+/补充资料/
+/在线仓库/
+
+# Local-only output subtree.
+/outputs/manual-20260603-smartbag/
+/outputs/manual-20260603-smartbag/**
+
+# Generated caches and runtime noise, including inside allowed trees.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.log
+tmp/
+
+# Build artifacts, including inside allowed trees.
+*.o
+*.obj
+*.exe
