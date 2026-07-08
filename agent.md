@@ -24,6 +24,7 @@
 本项目已有 skill 触发场景：
 
 - `skills/ss928-direct-board-debug/SKILL.md`：只要需要直接连接 SS928/HiEuler Pi 板子调试，就必须先用。包括 SSH/SFTP、上传文件、运行板端命令、启动或停止程序、查看日志、BMI270/BLE/外设板端联调、确认 `root@192.168.1.168` 在线状态。默认先做只读探测，优先以太网 SSH，串口只作为 SSH 失败或看启动日志时的后备。
+- `skills/ss928-max98357-audio-playback/SKILL.md`: use when the user provides MP3/WAV or other audio and wants playback through the 40Pin MAX98357 I2S amplifier. It prepares `audio_chn0.aac` plus 48k stereo PCM, sets Pin12/Pin38/Pin40 I2S pinmux, and reuses `/opt/sample/audio/sample_audio 2`; for board upload or SSH playback, pair it with `ss928-direct-board-debug` first.
 - `skills/ss928-mt5710-5g-validation/SKILL.md`：测试或排查 TD Tech `MT5710/MT571X` 5G RedCap 模组时使用。包括 USB 枚举、`/dev/ttyUSB1` PCUI AT 指令、SIM/APN、蜂窝拨号、互联网连通、语音呼叫、GNSS/定位状态和 MT5710 专属问题。
 - `skills/miniprogram-development/SKILL.md`：开发、修改、调试、预览、发布微信小程序时使用。包括页面、组件、`tabBar`、路由、图标资源、`project.config.json`、`appid`、真机预览、WeChat Developer Tools、`miniprogram-ci`、CloudBase/云开发相关流程。
 - `skills/wechat-miniprogram-native/SKILL.md`：原生 JavaScript 微信小程序实现细节时使用，尤其是性能、包体、`setData` 数据路径、WXML/WXSS、原生组件兼容和避免 TypeScript/Taro/Uni-app 等跨端框架。
@@ -334,3 +335,29 @@ SDK 补丁：
 - 已验证不可用：当前 `MT5710_CN V100R001C00B095` Mini-PCIe 固件对 `AT^GNSSENABLE`、`AT^GNSSGETINFO`、`AT^GNSSGETNMEA` 以及常见 `CGPS/CGNS/QGPS` 命令均返回不支持，`/dev/ttyUSB3` 也无 NMEA 输出；定位/GNSS 目前按固件或产品变体限制处理。
 - 踩坑：不要固定写死 `usb0`，本次实际 NCM 网口为 `enx7ecca5347f7b`；无天线时 `^HCSQ` 曾只有约 `-126 dBm` 且无法稳定注册，装天线后约 `-91 dBm` 并成功驻网拨号；不要把 RM500U/Quectel 命令直接套到 MT5710。
 - SIM/APN 规则：当前实测是移动卡 `cmnet`；后续换电信普通数据卡优先用 `ctnet`，换联通普通数据卡优先用 `3gnet`，物联网卡或专网卡必须以运营商下发 APN 为准；APN 属于 SIM/套餐属性，不属于 MT5710 模组固定属性。
+
+### work/imu_fall_detector
+
+- Goal: pure Python IMU fall/impact detector for SS928 Linux integration. Input is timestamp plus ax/ay/az in g and gx/gy/gz in deg/s.
+- Algorithm: threshold + finite state machine with NORMAL, POSSIBLE_FALL, IMPACT, POSTURE_CHANGED, FALL_CONFIRMED, and IMPACT_ONLY. It uses a sliding-window filter, resultant acceleration, resultant gyro, vector jerk, stationary detection, and posture-angle change from the gravity vector.
+- Key files: `work/imu_fall_detector/imu_fall_detector.py` is the importable module; `run_detector.py` reads CSV or JSONL stdin and prints compact JSON events; `config.example.json` contains tunable 50 Hz thresholds; `tests/` uses stdlib unittest.
+- Integration note: construct `ImuSample(t, ax, ay, az, gx, gy, gz)` in the main program and call `FallImpactDetector.update(sample)`. Normal frames return `[]`; transition frames return JSON-serializable event dicts. Use `event_to_json(event)` for JSONL output.
+- Verification on 2026-07-05: `python -B -m unittest discover -s work/imu_fall_detector/tests` passed 6 tests; `python -B work/imu_fall_detector/run_detector.py --simulate` emitted POSSIBLE_FALL -> IMPACT -> POSTURE_CHANGED -> FALL_CONFIRMED JSON events.
+- Tuning caution: defaults are starting thresholds only. Re-tune with real mounting orientation, normal impacts, and real fall-like data before relying on alert behavior.
+
+### skills/ss928-max98357-audio-playback
+
+- Goal: preserve the verified flow from user MP3 to SS928 MPP sample-compatible audio, board upload, 40Pin I2S pinmux, and MAX98357 speaker playback.
+- Key files: `skills/ss928-max98357-audio-playback/SKILL.md`; `scripts/prepare_audio.py` generates `audio_chn0.aac`, 48k/16bit/stereo PCM, and `play_hint.txt`; UI metadata is in `agents/openai.yaml`.
+- Verified path: local `test.mp3` was about 9 seconds at 16 kHz mono. After conversion and upload to `/root/max98357_i2s_test`, running the Pin12 `I2S_BCLK`, Pin38 `I2S_WS`, Pin40 `I2S_SD_TX`, and Pin7 `I2S_MCLK` pinmux commands plus `/opt/sample/audio/sample_audio 2` produced audible output on the MAX98357 speaker.
+- Pitfalls: missing ALSA soundcards and missing `aplay` are not blockers for this path. The official sample may print `set inner audio codec ok`; that was present in the successful run. Do not upload MP3 directly to `sample_audio 2`; it expects `audio_chn0.aac` in the current directory.
+
+### work/dx_gp21_tracker + work/ssminiprogram tracks
+
+- 目标：把补充资料里的 DX-GP21-A GNSS 模块接到 SS928 40Pin UART4，板端读取 NMEA、保存 WGS84 轨迹，并通过微信小程序 BLE 近场查看实时位置和历史轨迹。
+- 推荐接线：DX-GP21-A 底板 `VDD` 接 40Pin Pin2/Pin4 的 5V，`GND` 接任意 GND，`TXD` 接 Pin10 `UART4_RXD`，`RXD` 接 Pin8 `UART4_TXD`；首版不接 `1PPS`、`ON/OFF`、`VBAT`。若是裸模块 `VCC` 只能接 3.3V，不能接 5V。
+- 关键文件：`work/dx_gp21_tracker/dx_gp21_tracker.py` 是 stdlib Python 板端服务；`config.ss928_uart4.json` 固定 `/dev/ttyAMA4`、115200、`DX-GP21-Track`；`start_ss928_gnss_track.sh` 设置 `bspmm 0x102F0134 0x1201` 和 `0x102F0138 0x1201`；`README.md` 写明接线、NMEA 验证和 USB-TTL fallback。
+- 小程序方案：复用 `work/ssminiprogram/miniprogram/pages/tracks` 的 Nordic UART Service 页面，扫描名加入 `DX-GP21-Track`，命令协议为 `TL` 轨迹列表、`TG <i> <offset>` 分页轨迹、`TF 1/0` 实时位置、`TS` 状态。轨迹点仍按现有工具从 WGS84 转 GCJ-02 后绘制到微信地图。
+- 40Pin 占用：`40pin_usage.md` 已记录 Pin8/Pin10 为 `UART4` 给 DX-GP21-A 使用；后续不要再把 60GHz 雷达或其他 UART4 外设同时接到这组脚，除非明确切换硬件方案。
+- 验证结果：本地 `python -B -m unittest discover -s work/dx_gp21_tracker/tests` 通过 5 个测试；小程序 `track-utils.test.js` 通过；`node --check pages/tracks/index.js` 和 `sh -n start_ss928_gnss_track.sh` 通过。板端 SSH 只读探测确认 `/dev/ttyAMA4`、`bspmm`、Python 3.10、BlueZ controller 和 `dbus/gi` 可用；上传到 `/root/dx_gp21_tracker` 后，板端单测、脚本语法和 `--simulate --once --no-ble` 协议帧也通过。
+- 未验证项：尚未接实物 DX-GP21-A 做真实 NMEA 和室外 fix 验证。接线后先运行 `timeout 10 python3 dx_gp21_tracker.py --config config.ss928_uart4.json --no-ble --dump-nmea`，看到 `$GNGGA`/`$GNRMC` 后再启动 BLE；陶瓷/无源天线输出 `ANTENNA OPEN` 不必直接判故障。

@@ -10,6 +10,7 @@ Nordic UART Service using BlueZ.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import os
@@ -53,12 +54,25 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "velocity_damping_per_s": 0.15,
         "max_speed_mps": 8.0,
     },
+    "posture": {
+        "enabled": False,
+        "roll_zero_deg": 0.0,
+        "pitch_zero_deg": 0.0,
+        "yaw_zero_deg": 0.0,
+    },
     "thresholds": {
+        "tilt_enabled": True,
         "pitch_forward_deg": 35.0,
         "pitch_backward_deg": -35.0,
         "roll_left_deg": -45.0,
         "roll_right_deg": 45.0,
         "tilt_hold_s": 0.8,
+        "hunch_enabled": True,
+        "hunch_pitch_deg": -15.5,
+        "hunch_hold_s": 3.0,
+        "hunch_max_gyro_dps": 30.0,
+        "hunch_accel_min_g": 0.75,
+        "hunch_accel_max_g": 1.25,
         "impact_g": 2.8,
         "freefall_g": 0.35,
         "freefall_hold_s": 0.25,
@@ -76,6 +90,36 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "alert_inactive_value": "0",
         "alert_pulse_ms": 300,
         "alert_command": [],
+    },
+    "calibration": {
+        "data_dir": "/root/bmi270_calibration",
+        "modes": {
+            "straight": {
+                "label": "straight standing with backpack",
+                "prefix": "straight",
+                "duration_s": 15.0,
+            },
+            "hunch": {
+                "label": "hunched standing with backpack",
+                "prefix": "hunch",
+                "duration_s": 15.0,
+            },
+            "straight_walk": {
+                "label": "normal standing and walking",
+                "prefix": "straight_walk",
+                "duration_s": 30.0,
+            },
+            "hunch_walk": {
+                "label": "hunched walking",
+                "prefix": "hunch_walk",
+                "duration_s": 30.0,
+            },
+            "bend_pickup": {
+                "label": "bend, pick up, adjust backpack",
+                "prefix": "bend_pickup",
+                "duration_s": 30.0,
+            },
+        },
     },
 }
 
@@ -133,6 +177,33 @@ def wrap_pi(value: float) -> float:
     while value < -math.pi:
         value += 2.0 * math.pi
     return value
+
+
+def wrap_deg(value: float) -> float:
+    while value > 180.0:
+        value -= 360.0
+    while value < -180.0:
+        value += 360.0
+    return value
+
+
+def apply_posture_correction(state: Dict[str, Any], cfg: Dict[str, Any]) -> Dict[str, Any]:
+    posture = cfg.get("posture", {})
+    if not bool(posture.get("enabled", False)):
+        return state
+
+    corrected = dict(state)
+    raw_roll = float(state.get("roll_deg", 0.0))
+    raw_pitch = float(state.get("pitch_deg", 0.0))
+    raw_yaw = float(state.get("yaw_deg", 0.0))
+    corrected["raw_roll_deg"] = raw_roll
+    corrected["raw_pitch_deg"] = raw_pitch
+    corrected["raw_yaw_deg"] = raw_yaw
+    corrected["roll_deg"] = wrap_deg(raw_roll - float(posture.get("roll_zero_deg", 0.0)))
+    corrected["pitch_deg"] = raw_pitch - float(posture.get("pitch_zero_deg", 0.0))
+    corrected["yaw_deg"] = wrap_deg(raw_yaw - float(posture.get("yaw_zero_deg", 0.0)))
+    corrected["posture_corrected"] = True
+    return corrected
 
 
 def parse_int(value: Any) -> int:
@@ -599,58 +670,86 @@ class AnomalyDetector:
 
     def update(self, state: Dict[str, Any]) -> List[Dict[str, Any]]:
         th = self.cfg["thresholds"]
-        now = state["t_mono"]
-        checks = [
-            (
-                "TILT_FORWARD",
-                state["pitch_deg"] > float(th["pitch_forward_deg"]),
-                float(th["tilt_hold_s"]),
-                2,
-                "pitch too far forward",
-            ),
-            (
-                "TILT_BACKWARD",
-                state["pitch_deg"] < float(th["pitch_backward_deg"]),
-                float(th["tilt_hold_s"]),
-                2,
-                "pitch too far backward",
-            ),
-            (
-                "ROLL_LEFT",
-                state["roll_deg"] < float(th["roll_left_deg"]),
-                float(th["tilt_hold_s"]),
-                2,
-                "roll too far left",
-            ),
-            (
-                "ROLL_RIGHT",
-                state["roll_deg"] > float(th["roll_right_deg"]),
-                float(th["tilt_hold_s"]),
-                2,
-                "roll too far right",
-            ),
-            (
-                "IMPACT",
-                state["accel_g"] > float(th["impact_g"]),
-                0.0,
-                3,
-                "large impact acceleration",
-            ),
-            (
-                "FREEFALL",
-                state["accel_g"] < float(th["freefall_g"]),
-                float(th["freefall_hold_s"]),
-                3,
-                "low-g/freefall detected",
-            ),
-            (
-                "SPEED_WARN",
-                state["speed_mps"] > float(th["speed_warn_mps"]),
-                float(th["speed_hold_s"]),
-                1,
-                "estimated speed above threshold",
-            ),
-        ]
+        checks = []
+
+        if bool(th.get("hunch_enabled", True)):
+            accel_g = float(state.get("accel_g", 0.0))
+            gyro_dps = float(state.get("gyro_dps", 0.0))
+            hunch_active = (
+                state["pitch_deg"] < float(th.get("hunch_pitch_deg", -15.5))
+                and gyro_dps <= float(th.get("hunch_max_gyro_dps", 30.0))
+                and accel_g >= float(th.get("hunch_accel_min_g", 0.75))
+                and accel_g <= float(th.get("hunch_accel_max_g", 1.25))
+            )
+            checks.append(
+                (
+                    "HUNCH",
+                    hunch_active,
+                    float(th.get("hunch_hold_s", 3.0)),
+                    2,
+                    "sustained hunched backpack posture",
+                )
+            )
+
+        if bool(th.get("tilt_enabled", True)):
+            checks.extend(
+                [
+                    (
+                        "TILT_FORWARD",
+                        state["pitch_deg"] > float(th["pitch_forward_deg"]),
+                        float(th["tilt_hold_s"]),
+                        2,
+                        "pitch too far forward",
+                    ),
+                    (
+                        "TILT_BACKWARD",
+                        state["pitch_deg"] < float(th["pitch_backward_deg"]),
+                        float(th["tilt_hold_s"]),
+                        2,
+                        "pitch too far backward",
+                    ),
+                    (
+                        "ROLL_LEFT",
+                        state["roll_deg"] < float(th["roll_left_deg"]),
+                        float(th["tilt_hold_s"]),
+                        2,
+                        "roll too far left",
+                    ),
+                    (
+                        "ROLL_RIGHT",
+                        state["roll_deg"] > float(th["roll_right_deg"]),
+                        float(th["tilt_hold_s"]),
+                        2,
+                        "roll too far right",
+                    ),
+                ]
+            )
+
+        checks.extend(
+            [
+                (
+                    "IMPACT",
+                    state["accel_g"] > float(th["impact_g"]),
+                    0.0,
+                    3,
+                    "large impact acceleration",
+                ),
+                (
+                    "FREEFALL",
+                    state["accel_g"] < float(th["freefall_g"]),
+                    float(th["freefall_hold_s"]),
+                    3,
+                    "low-g/freefall detected",
+                ),
+                (
+                    "SPEED_WARN",
+                    state["speed_mps"] > float(th["speed_warn_mps"]),
+                    float(th["speed_hold_s"]),
+                    1,
+                    "estimated speed above threshold",
+                ),
+            ]
+        )
 
         alerts: List[Dict[str, Any]] = []
         for code, active, hold_s, level, message in checks:
@@ -742,6 +841,213 @@ class AlertOutput:
             subprocess.Popen(self.command, env=env)
         except OSError as exc:
             print(f"WARN alert_command failed: {exc}", file=sys.stderr, flush=True)
+
+
+
+class CalibrationRecorder:
+    CSV_FIELDS = [
+        "wall_time",
+        "elapsed_s",
+        "mode",
+        "roll_deg",
+        "pitch_deg",
+        "yaw_deg",
+        "raw_roll_deg",
+        "raw_pitch_deg",
+        "raw_yaw_deg",
+        "speed_mps",
+        "accel_g",
+        "gyro_dps",
+        "stationary",
+        "ax_g",
+        "ay_g",
+        "az_g",
+        "gx_dps",
+        "gy_dps",
+        "gz_dps",
+        "alerts",
+    ]
+
+    def __init__(self, cfg: Dict[str, Any]):
+        cal_cfg = cfg.get("calibration", {})
+        self.data_dir = Path(str(cal_cfg.get("data_dir", "/root/bmi270_calibration")))
+        self.modes = dict(DEFAULT_CONFIG["calibration"]["modes"])
+        user_modes = cal_cfg.get("modes", {})
+        if isinstance(user_modes, dict):
+            for key, value in user_modes.items():
+                if isinstance(value, dict):
+                    merged = dict(self.modes.get(key, {}))
+                    merged.update(value)
+                    self.modes[key] = merged
+        self.file: Optional[Any] = None
+        self.writer: Optional[csv.DictWriter[Any]] = None
+        self.path: Optional[Path] = None
+        self.mode_key = ""
+        self.mode_label = ""
+        self.duration_s: Optional[float] = None
+        self.started_mono = 0.0
+        self.rows = 0
+        self.last_completed: Optional[Dict[str, Any]] = None
+
+    @property
+    def active(self) -> bool:
+        return self.file is not None and self.writer is not None and self.path is not None
+
+    def available_modes(self) -> List[str]:
+        return list(self.modes.keys())
+
+    def start(self, mode_key: str, duration_s: Optional[float] = None) -> Dict[str, Any]:
+        if self.active:
+            raise RuntimeError(f"already recording {self.mode_key}")
+        if mode_key not in self.modes:
+            raise RuntimeError("unknown mode " + mode_key)
+        mode = self.modes[mode_key]
+        prefix = str(mode.get("prefix") or mode_key)
+        default_duration = float(mode.get("duration_s") or 0.0)
+        duration = default_duration if duration_s is None else float(duration_s)
+        if duration <= 0.0:
+            duration = 0.0
+
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.path = self._next_path(prefix)
+        self.file = self.path.open("w", encoding="utf-8", newline="", buffering=1)
+        self.writer = csv.DictWriter(self.file, fieldnames=self.CSV_FIELDS)
+        self.writer.writeheader()
+        self.mode_key = mode_key
+        self.mode_label = str(mode.get("label") or mode_key)
+        self.duration_s = duration if duration > 0.0 else None
+        self.started_mono = time.monotonic()
+        self.rows = 0
+        self.last_completed = None
+        return self.status()
+
+    def stop(self, reason: str = "manual") -> Dict[str, Any]:
+        if not self.active:
+            raise RuntimeError("not recording")
+        assert self.file is not None and self.path is not None
+        elapsed = max(time.monotonic() - self.started_mono, 0.0)
+        summary = {
+            "active": False,
+            "mode": self.mode_key,
+            "label": self.mode_label,
+            "path": str(self.path),
+            "filename": self.path.name,
+            "rows": self.rows,
+            "elapsed_s": elapsed,
+            "duration_s": self.duration_s,
+            "reason": reason,
+        }
+        try:
+            self.file.flush()
+            os.fsync(self.file.fileno())
+        finally:
+            self.file.close()
+            self.file = None
+            self.writer = None
+            self.path = None
+            self.mode_key = ""
+            self.mode_label = ""
+            self.duration_s = None
+            self.started_mono = 0.0
+            self.rows = 0
+        self.last_completed = summary
+        return summary
+
+    def close_if_active(self, reason: str = "shutdown") -> Optional[Dict[str, Any]]:
+        if not self.active:
+            return None
+        return self.stop(reason)
+
+    def write_sample(self, state: Dict[str, Any], alerts: List[Dict[str, Any]]) -> None:
+        if not self.active:
+            return
+        assert self.writer is not None
+        alert_codes = [str(alert.get("code", "")) for alert in alerts if alert.get("code")]
+        row = {
+            "wall_time": f"{time.time():.3f}",
+            "elapsed_s": f"{max(time.monotonic() - self.started_mono, 0.0):.3f}",
+            "mode": self.mode_key,
+            "roll_deg": self._fmt(state.get("roll_deg")),
+            "pitch_deg": self._fmt(state.get("pitch_deg")),
+            "yaw_deg": self._fmt(state.get("yaw_deg")),
+            "raw_roll_deg": self._fmt(state.get("raw_roll_deg", state.get("roll_deg"))),
+            "raw_pitch_deg": self._fmt(state.get("raw_pitch_deg", state.get("pitch_deg"))),
+            "raw_yaw_deg": self._fmt(state.get("raw_yaw_deg", state.get("yaw_deg"))),
+            "speed_mps": self._fmt(state.get("speed_mps")),
+            "accel_g": self._fmt(state.get("accel_g")),
+            "gyro_dps": self._fmt(state.get("gyro_dps")),
+            "stationary": "1" if state.get("stationary") else "0",
+            "ax_g": self._fmt(state.get("ax_g")),
+            "ay_g": self._fmt(state.get("ay_g")),
+            "az_g": self._fmt(state.get("az_g")),
+            "gx_dps": self._fmt(state.get("gx_dps")),
+            "gy_dps": self._fmt(state.get("gy_dps")),
+            "gz_dps": self._fmt(state.get("gz_dps")),
+            "alerts": ";".join(alert_codes),
+        }
+        self.writer.writerow(row)
+        self.rows += 1
+
+    def tick(self) -> Optional[Dict[str, Any]]:
+        if not self.active or self.duration_s is None:
+            return None
+        if time.monotonic() - self.started_mono >= self.duration_s:
+            return self.stop("duration")
+        return None
+
+    def status(self) -> Dict[str, Any]:
+        if not self.active:
+            return {"active": False, "last_completed": self.last_completed}
+        assert self.path is not None
+        elapsed = max(time.monotonic() - self.started_mono, 0.0)
+        return {
+            "active": True,
+            "mode": self.mode_key,
+            "label": self.mode_label,
+            "path": str(self.path),
+            "filename": self.path.name,
+            "rows": self.rows,
+            "elapsed_s": elapsed,
+            "duration_s": self.duration_s,
+        }
+
+    def compact_status(self) -> Dict[str, Any]:
+        if self.active:
+            status = self.status()
+            return {
+                "a": 1,
+                "m": status["mode"],
+                "e": round(float(status["elapsed_s"]), 1),
+                "n": int(status["rows"]),
+                "d": round(float(status.get("duration_s") or 0.0), 1),
+                "f": status["filename"],
+            }
+        if self.last_completed:
+            return {
+                "a": 0,
+                "m": self.last_completed["mode"],
+                "e": round(float(self.last_completed["elapsed_s"]), 1),
+                "n": int(self.last_completed["rows"]),
+                "d": round(float(self.last_completed.get("duration_s") or 0.0), 1),
+                "f": self.last_completed["filename"],
+                "done": 1,
+            }
+        return {}
+
+    def _next_path(self, prefix: str) -> Path:
+        safe_prefix = re.sub(r"[^A-Za-z0-9_\-]+", "_", prefix).strip("_") or "capture"
+        for index in range(1, 1000):
+            path = self.data_dir / f"{safe_prefix}_{index:02d}.csv"
+            if not path.exists():
+                return path
+        return self.data_dir / f"{safe_prefix}_{int(time.time())}.csv"
+
+    @staticmethod
+    def _fmt(value: Any) -> str:
+        try:
+            return f"{float(value):.2f}"
+        except (TypeError, ValueError):
+            return ""
 
 
 class BleNusServer:
@@ -1050,7 +1356,11 @@ class BleNusServer:
             self.GLib.idle_add(self.mainloop.quit)
 
 
-def compact_frame(state: Dict[str, Any], alerts: List[Dict[str, Any]]) -> str:
+def compact_frame(
+    state: Dict[str, Any],
+    alerts: List[Dict[str, Any]],
+    recorder: Optional[CalibrationRecorder] = None,
+) -> str:
     frame = {
         "t": round(time.time(), 3),
         "r": round(state["roll_deg"], 1),
@@ -1067,9 +1377,63 @@ def compact_frame(state: Dict[str, Any], alerts: List[Dict[str, Any]]) -> str:
             round(state["gz_dps"], 1),
         ],
     }
+    if state.get("posture_corrected"):
+        frame["raw"] = [round(float(state.get("raw_roll_deg", 0.0)), 1), round(float(state.get("raw_pitch_deg", 0.0)), 1)]
     if alerts:
         frame["al"] = [a["code"] for a in alerts]
+    if recorder is not None:
+        rec_status = recorder.compact_status()
+        if rec_status:
+            frame["rec"] = rec_status
     return json.dumps(frame, separators=(",", ":"), ensure_ascii=True)
+
+
+
+def format_calibration_start_response(status: Dict[str, Any]) -> str:
+    return (
+        "OK cal_start mode={mode} file={filename} duration={duration:.1f}"
+        .format(
+            mode=status.get("mode", ""),
+            filename=status.get("filename", ""),
+            duration=float(status.get("duration_s") or 0.0),
+        )
+    )
+
+
+def format_calibration_stop_response(status: Dict[str, Any]) -> str:
+    return (
+        "OK cal_stop mode={mode} file={filename} rows={rows} elapsed={elapsed:.1f} reason={reason}"
+        .format(
+            mode=status.get("mode", ""),
+            filename=status.get("filename", ""),
+            rows=int(status.get("rows") or 0),
+            elapsed=float(status.get("elapsed_s") or 0.0),
+            reason=status.get("reason", ""),
+        )
+    )
+
+
+def format_calibration_status_response(recorder: CalibrationRecorder) -> str:
+    status = recorder.status()
+    if status.get("active"):
+        return (
+            "OK cal_status active=1 mode={mode} file={filename} rows={rows} "
+            "elapsed={elapsed:.1f} duration={duration:.1f}"
+            .format(
+                mode=status.get("mode", ""),
+                filename=status.get("filename", ""),
+                rows=int(status.get("rows") or 0),
+                elapsed=float(status.get("elapsed_s") or 0.0),
+                duration=float(status.get("duration_s") or 0.0),
+            )
+        )
+    last = status.get("last_completed")
+    if isinstance(last, dict):
+        return "OK cal_status active=0 last={filename} rows={rows}".format(
+            filename=last.get("filename", ""),
+            rows=int(last.get("rows") or 0),
+        )
+    return "OK cal_status active=0"
 
 
 def process_command(
@@ -1077,11 +1441,24 @@ def process_command(
     cfg: Dict[str, Any],
     estimator: MotionEstimator,
     ble: Optional[BleNusServer],
-) -> None:
+    recorder: Optional[CalibrationRecorder] = None,
+) -> str:
     cmd = text.strip()
+    try:
+        tokens = shlex.split(cmd)
+    except ValueError as exc:
+        tokens = []
+        response = f"ERR parse {exc}"
+    else:
+        response = ""
+
+    op = tokens[0].upper() if tokens else ""
     upper = cmd.upper()
-    response = ""
-    if upper in ("ZERO", "RESET"):
+    if response:
+        pass
+    elif not cmd:
+        response = "ERR empty command"
+    elif upper in ("ZERO", "RESET"):
         estimator.reset_velocity()
         estimator.reset_yaw()
         response = "OK zero"
@@ -1089,7 +1466,55 @@ def process_command(
         estimator.reset_velocity()
         response = "OK zero velocity"
     elif upper == "STATUS":
-        response = json.dumps(cfg["thresholds"], separators=(",", ":"), ensure_ascii=True)
+        response = json.dumps(
+            {"thresholds": cfg["thresholds"], "posture": cfg.get("posture", {})},
+            separators=(",", ":"),
+            ensure_ascii=True,
+        )
+    elif op in ("CAL_START", "CS"):
+        if recorder is None:
+            response = "ERR calibration unavailable"
+        elif len(tokens) < 2:
+            response = "ERR use CAL_START <mode> [duration=15] or CS <mode> 15"
+        else:
+            duration_s: Optional[float] = None
+            for token in tokens[2:]:
+                if token.startswith("duration="):
+                    value_text = token.split("=", 1)[1]
+                else:
+                    value_text = token
+                try:
+                    duration_s = float(value_text)
+                except ValueError:
+                    response = "ERR invalid duration"
+                    break
+            if not response:
+                try:
+                    response = format_calibration_start_response(recorder.start(tokens[1], duration_s))
+                except Exception as exc:
+                    response = f"ERR cal_start {exc}"
+    elif op in ("CAL_STOP", "CE"):
+        if recorder is None:
+            response = "ERR calibration unavailable"
+        else:
+            try:
+                response = format_calibration_stop_response(recorder.stop("manual"))
+            except Exception as exc:
+                response = f"ERR cal_stop {exc}"
+    elif op in ("CAL_STATUS", "C?"):
+        if recorder is None:
+            response = "ERR calibration unavailable"
+        else:
+            response = format_calibration_status_response(recorder)
+    elif op in ("CAL_MODES", "CM"):
+        if recorder is None:
+            response = "ERR calibration unavailable"
+        else:
+            parts = []
+            for key in recorder.available_modes():
+                mode = recorder.modes[key]
+                parts.append(f"{key}:{float(mode.get('duration_s') or 0.0):.0f}")
+            response = "OK cal_modes " + ",".join(parts)
     elif upper.startswith("SET "):
         payload = cmd[4:].strip()
         if "=" not in payload:
@@ -1097,24 +1522,32 @@ def process_command(
         else:
             key, value_text = payload.split("=", 1)
             key = key.strip()
-            value = float(value_text.strip())
-            updated = False
-            for section in ("thresholds", "filter"):
-                if key in cfg[section]:
-                    cfg[section][key] = value
-                    updated = True
-                    response = f"OK {key}={value}"
-                    break
-            if not updated:
-                response = f"ERR unknown key {key}"
+            try:
+                value = float(value_text.strip())
+            except ValueError:
+                response = "ERR value must be numeric"
+            else:
+                updated = False
+                for section in ("thresholds", "filter", "posture"):
+                    if key in cfg[section]:
+                        cfg[section][key] = value
+                        updated = True
+                        response = f"OK {key}={value}"
+                        break
+                if not updated:
+                    response = f"ERR unknown key {key}"
     elif upper == "HELP":
-        response = "CMD: STATUS | ZERO | ZERO_V | SET pitch_forward_deg=40"
+        response = (
+            "CMD: STATUS | ZERO | ZERO_V | CM | CS <mode> 15 | CE | C? | "
+            "CAL_START <mode> duration=15 | CAL_STOP | SET hunch_pitch_deg=-15.5"
+        )
     else:
         response = "ERR unknown command; send HELP"
 
     print(f"CMD,{cmd},{response}", flush=True)
     if ble is not None:
         ble.send_line(response)
+    return response
 
 
 def print_iio_devices() -> None:
@@ -1205,6 +1638,7 @@ def run(args: argparse.Namespace) -> int:
     estimator = MotionEstimator(cfg)
     detector = AnomalyDetector(cfg)
     alert_output = AlertOutput(cfg)
+    calibration_recorder = CalibrationRecorder(cfg)
     commands: "queue.Queue[str]" = queue.Queue()
 
     ble: Optional[BleNusServer] = None
@@ -1245,6 +1679,7 @@ def run(args: argparse.Namespace) -> int:
         try:
             sample = imu.read()
             state = estimator.update(sample)
+            state = apply_posture_correction(state, cfg)
             alerts = detector.update(state)
         except Exception as exc:
             print(f"ERR read/process failed: {exc}", file=sys.stderr, flush=True)
@@ -1253,14 +1688,22 @@ def run(args: argparse.Namespace) -> int:
 
         while True:
             try:
-                process_command(commands.get_nowait(), cfg, estimator, ble)
+                process_command(commands.get_nowait(), cfg, estimator, ble, calibration_recorder)
             except queue.Empty:
                 break
 
         for alert in alerts:
             alert_output.emit(alert)
 
-        frame = compact_frame(state, alerts)
+        calibration_recorder.write_sample(state, alerts)
+        completed_capture = calibration_recorder.tick()
+        if completed_capture is not None:
+            response = format_calibration_stop_response(completed_capture)
+            print(f"CMD,AUTO_CAL_STOP,{response}", flush=True)
+            if ble is not None:
+                ble.send_line(response)
+
+        frame = compact_frame(state, alerts, calibration_recorder)
         now = time.monotonic()
         if now >= next_console:
             print(frame, flush=True)
@@ -1269,6 +1712,7 @@ def run(args: argparse.Namespace) -> int:
             ble.send_line(frame)
             next_ble = now + 1.0 / ble_hz
 
+    calibration_recorder.close_if_active("shutdown")
     if ble is not None:
         ble.stop()
     return 0

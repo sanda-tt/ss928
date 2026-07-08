@@ -1,0 +1,11 @@
+duration_seconds=2.236
+sleep_seconds=5
+timeout_seconds=13
+remote_dir=/root/smartbag_alert/audio/R4
+remote_command:
+cd /root/smartbag_alert/audio/R4 || exit 1
+bspmm 0x102F010C 0x1202
+bspmm 0x102F0108 0x1102
+bspmm 0x102F0104 0x1202
+bspmm 0x102F0110 0x1102
+{ sleep 5; printf '\n\n'; } | timeout 13 /opt/sample/audio/sample_audio 2

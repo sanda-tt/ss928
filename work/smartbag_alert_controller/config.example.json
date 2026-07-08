@@ -1,0 +1,9 @@
+{
+  "audio_root": "/root/smartbag_alert/audio",
+  "ble_name": "SS928-SmartBag",
+  "event_timeout_s": 1.0,
+  "pwm_period_ns": 1000000,
+  "detector_cwd": "/root/vision_obstacle_tracker",
+  "left_detector": "python3 vision_obstacle_tracker.py --camera-index 0 --no-display",
+  "right_detector": "python3 vision_obstacle_tracker.py --camera-index 1 --no-display"
+}

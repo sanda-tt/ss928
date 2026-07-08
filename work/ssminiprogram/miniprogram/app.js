@@ -1,7 +1,6 @@
-// app.js
 App({
   globalData: {
-    appName: "BMI270 姿态监控",
+    appName: "智能安全背包"
   },
-  onLaunch() {},
+  onLaunch() {}
 });

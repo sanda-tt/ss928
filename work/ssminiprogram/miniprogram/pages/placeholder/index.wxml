@@ -1,0 +1,67 @@
+<view wx:if="{{isAlertsMode}}" class="alarm-page">
+  <view wx:if="{{!isAlarmDetail}}" class="alarm-list">
+    <view class="alarm-list__header">
+      <view class="alarm-list__title">危险报警历史</view>
+      <view class="alarm-list__subtitle">报警记录 / 时间线</view>
+    </view>
+
+    <scroll-view class="alarm-history" scroll-y="true">
+      <view
+        class="alarm-card"
+        wx:for="{{alarmRecords}}"
+        wx:key="id"
+        bind:tap="openAlarmDetail"
+        data-id="{{item.id}}"
+      >
+        <view class="alarm-card__date">{{item.dateLabel}}日</view>
+        <view class="alarm-card__body">
+          <view class="alarm-card__title">{{item.typeText}}</view>
+          <view class="alarm-card__time">{{item.timeText}}</view>
+          <view class="alarm-card__location">{{item.locationText}}</view>
+        </view>
+        <view class="alarm-card__arrow">›</view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view wx:else class="alarm-detail">
+    <map
+      class="alarm-detail__map"
+      latitude="{{selectedAlarm.latitude}}"
+      longitude="{{selectedAlarm.longitude}}"
+      markers="{{alarmMarkers}}"
+      scale="15"
+    ></map>
+
+    <view class="alarm-detail__info">
+      <view class="alarm-detail__title">{{selectedAlarm.typeText}}</view>
+      <view class="alarm-detail__place">{{selectedAlarm.locationText}}</view>
+
+      <view class="alarm-detail__row">
+        <text class="alarm-detail__label">报警时间</text>
+        <text class="alarm-detail__value">{{selectedAlarm.timeDetail}}</text>
+      </view>
+      <view class="alarm-detail__row">
+        <text class="alarm-detail__label">报警地点</text>
+        <text class="alarm-detail__value">{{selectedAlarm.addressText}}</text>
+      </view>
+      <view class="alarm-detail__row">
+        <text class="alarm-detail__label">坐标</text>
+        <text class="alarm-detail__value">{{selectedAlarm.latitude}}, {{selectedAlarm.longitude}}</text>
+      </view>
+
+      <button class="alarm-detail__button" bind:tap="goAlarmList">返回历史</button>
+    </view>
+  </view>
+</view>
+
+<view wx:else class="placeholder">
+  <view class="placeholder__panel">
+    <view class="placeholder__icon">预</view>
+    <view class="placeholder__title">{{title}}</view>
+    <view class="placeholder__subtitle">{{subtitle}}</view>
+    <view class="placeholder__state">{{state}}</view>
+    <view class="placeholder__detail">{{detail}}</view>
+    <button class="placeholder__button" bind:tap="goHome">返回总览</button>
+  </view>
+</view>

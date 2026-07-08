@@ -8,10 +8,29 @@ PYTHON=${PYTHON:-python3}
 I2C_BUS=${I2C_BUS:-0}
 I2C_ADDR=${I2C_ADDR:-0x68}
 PINMUX_I2C0=${PINMUX_I2C0:-1}
-START_BLE_STACK=${START_BLE_STACK:-0}
+START_BLE_STACK=${START_BLE_STACK:-auto}
 RESET_BLE_STACK=${RESET_BLE_STACK:-0}
+USE_BLE_SH_DBUS=${USE_BLE_SH_DBUS:-0}
 
 echo "BMI270 wiring for this startup: SDA/SCL on SS928 I2C0, CSB high, SDO low, addr=$I2C_ADDR"
+
+have_hci()
+{
+  command -v btmgmt >/dev/null 2>&1 && btmgmt info 2>/dev/null | grep -q '^hci'
+}
+
+wait_for_hci()
+{
+  i=0
+  while [ "$i" -lt 150 ]; do
+    if have_hci; then
+      return 0
+    fi
+    sleep 0.2
+    i=$((i + 1))
+  done
+  return 1
+}
 
 if [ "$PINMUX_I2C0" = "1" ]; then
   if command -v bspmm >/dev/null 2>&1; then
@@ -24,12 +43,26 @@ if [ "$PINMUX_I2C0" = "1" ]; then
 fi
 
 if [ "$START_BLE_STACK" = "auto" ]; then
-  if command -v btmgmt >/dev/null 2>&1 && btmgmt info 2>/dev/null | grep -q '^hci'; then
+  if have_hci; then
     echo "Detected system BlueZ controller; skip ble.sh"
     START_BLE_STACK=0
   else
-    echo "No system BlueZ controller detected; use ble.sh"
-    START_BLE_STACK=1
+    echo "No system BlueZ controller detected; try loading ws73 BLE modules"
+    ble_dir=$(dirname "$BLE_SCRIPT")
+    if [ -f "$ble_dir/plat_soc.ko" ]; then
+      insmod "$ble_dir/plat_soc.ko" 2>/dev/null || true
+    fi
+    if [ -f "$ble_dir/ble_soc.ko" ]; then
+      insmod "$ble_dir/ble_soc.ko" 2>/dev/null || true
+    fi
+    sleep 1
+    if wait_for_hci; then
+      echo "System BlueZ controller appeared after module load; skip ble.sh"
+      START_BLE_STACK=0
+    else
+      echo "No controller after module load; use full ble.sh fallback"
+      START_BLE_STACK=1
+    fi
   fi
 fi
 
@@ -71,32 +104,51 @@ if [ "$START_BLE_STACK" = "1" ]; then
     system_value=$(grep -m 1 'DBUS_SYSTEM_BUS_ADDRESS=' "$tmp_log" | sed "s/^.*DBUS_SYSTEM_BUS_ADDRESS=//; s/${esc}.*$//" || true)
     rm -f "$tmp_log"
 
-    if [ -n "$session_value" ]; then
-      DBUS_SESSION_BUS_ADDRESS=$session_value
-      export DBUS_SESSION_BUS_ADDRESS
-      echo "Using DBUS_SESSION_BUS_ADDRESS from ble.sh"
-    else
-      echo "WARN: ble.sh did not print DBUS_SESSION_BUS_ADDRESS"
-    fi
+    if [ "$USE_BLE_SH_DBUS" = "1" ]; then
+      if [ -n "$session_value" ]; then
+        DBUS_SESSION_BUS_ADDRESS=$session_value
+        export DBUS_SESSION_BUS_ADDRESS
+        echo "Using DBUS_SESSION_BUS_ADDRESS from ble.sh"
+      else
+        echo "WARN: ble.sh did not print DBUS_SESSION_BUS_ADDRESS"
+      fi
 
-    if [ -n "$system_value" ]; then
-      DBUS_SYSTEM_BUS_ADDRESS=$system_value
-      export DBUS_SYSTEM_BUS_ADDRESS
-      echo "Using DBUS_SYSTEM_BUS_ADDRESS from ble.sh"
+      if [ -n "$system_value" ]; then
+        DBUS_SYSTEM_BUS_ADDRESS=$system_value
+        export DBUS_SYSTEM_BUS_ADDRESS
+        echo "Using DBUS_SYSTEM_BUS_ADDRESS from ble.sh"
+      else
+        echo "WARN: ble.sh did not print DBUS_SYSTEM_BUS_ADDRESS"
+      fi
     else
-      echo "WARN: ble.sh did not print DBUS_SYSTEM_BUS_ADDRESS"
+      echo "Ignoring ble.sh DBus exports; use system BlueZ DBus"
+      unset DBUS_SESSION_BUS_ADDRESS
+      unset DBUS_SYSTEM_BUS_ADDRESS
+      for p in $(ps -eo pid,args | awk '/[d]bus-daemon --config-file=\/usr\/share\/dbus-1\/session.conf/ {print $1}'); do
+        kill "$p" 2>/dev/null || true
+      done
+      for p in $(ps -eo pid,args | awk '/[b]luetoothd -n/ {print $1}'); do
+        kill "$p" 2>/dev/null || true
+      done
     fi
   else
     echo "WARN: $BLE_SCRIPT not found; assuming bluetoothd/dbus are already running"
   fi
 fi
 
+if wait_for_hci; then
+  echo "BLE controller is visible"
+else
+  echo "WARN: BLE controller still not visible before bluetoothctl"
+fi
+
 if command -v bluetoothctl >/dev/null 2>&1; then
-  printf 'power on\nquit\n' | bluetoothctl || true
+  printf 'power on
+quit
+' | bluetoothctl || true
 else
   echo "WARN: bluetoothctl not found; Python BLE registration will try current BlueZ state"
 fi
-
 exec "$PYTHON" "$SCRIPT_DIR/bmi270_backpack.py" \
   --config "$CONFIG" \
   --backend i2c \

@@ -1,123 +1,99 @@
-<view class="dashboard">
-  <view class="dashboard__header">
+<view class="page">
+  <view class="topbar">
     <view>
-      <view class="dashboard__title">BMI270 姿态监控</view>
-      <view class="dashboard__subtitle">{{deviceLabel}}</view>
+      <view class="title">BMI270 姿态采集</view>
+      <view class="subtitle">{{deviceLabel}}</view>
     </view>
-    <view class="dashboard__status dashboard__status--{{statusLevel}}">{{statusText}}</view>
+    <view class="status status--{{statusLevel}}">{{statusText}}</view>
   </view>
 
-  <view class="toolbar">
-    <button class="toolbar__button toolbar__button--primary" bindtap="startScan" loading="{{scanning}}" disabled="{{connecting}}">
-      {{scanButtonText}}
-    </button>
-    <button class="toolbar__button" wx:if="{{scanning}}" bindtap="stopScan">停止</button>
-    <button class="toolbar__button toolbar__button--danger" wx:if="{{connected}}" bindtap="disconnectDevice">断开</button>
+  <view class="mode-switch">
+    <button class="mode-switch__item mode-switch__item--active">采集校准</button>
+    <button class="mode-switch__item" bindtap="goMonitor">实时姿态</button>
   </view>
 
-  <view class="device-list" wx:if="{{hasDevices}}">
-    <view class="device-list__title">候选设备</view>
-    <view class="device-row" wx:for="{{devices}}" wx:key="deviceId">
-      <view class="device-row__main">
-        <view class="device-row__name">{{item.name}}</view>
-        <view class="device-row__meta">{{item.deviceId}} · RSSI {{item.rssi}}</view>
-      </view>
-      <button
-        class="device-row__button"
-        bindtap="connectFromTap"
-        data-device-id="{{item.deviceId}}"
-        data-device-name="{{item.name}}"
-        disabled="{{connecting || connected}}"
-      >
-        连接
-      </button>
+  <view class="panel connection-panel">
+    <view class="panel__head">
+      <view class="panel__title">连接</view>
+      <view class="panel__meta">{{targetName}}</view>
     </view>
+    <view class="toolbar">
+      <button class="button button--primary" bindtap="startScan" loading="{{scanning}}" disabled="{{connecting}}">{{scanButtonText}}</button>
+      <button class="button" wx:if="{{scanning}}" bindtap="stopScan">停止</button>
+      <button class="button button--danger" wx:if="{{connected}}" bindtap="disconnectDevice">断开</button>
+    </view>
+    <view class="device-list" wx:if="{{hasDevices}}">
+      <view class="device-row" wx:for="{{devices}}" wx:key="deviceId">
+        <view class="device-row__main">
+          <view class="device-row__name">{{item.name}}</view>
+          <view class="device-row__meta">{{item.deviceId}} · RSSI {{item.rssi}}</view>
+        </view>
+        <button class="device-row__button" bindtap="connectFromTap" data-device-id="{{item.deviceId}}" data-device-name="{{item.name}}" disabled="{{connecting || connected}}">连接</button>
+      </view>
+    </view>
+    <view class="empty" wx:if="{{scanning && !hasDevices}}">正在等待设备广播</view>
   </view>
 
-  <view class="empty-scan" wx:if="{{scanning && !hasDevices}}">
-    正在等待 {{targetName}}
-  </view>
-
-  <view class="pose-grid">
-    <view class="pose-metric">
-      <view class="pose-metric__label">ROLL</view>
-      <view class="pose-metric__value">{{frame.roll}}</view>
-      <view class="pose-metric__unit">deg</view>
+  <view class="panel">
+    <view class="panel__head">
+      <view class="panel__title">采集模式</view>
+      <view class="panel__meta">{{selectedMode.duration}} 秒</view>
     </view>
-    <view class="pose-metric pose-metric--pitch">
-      <view class="pose-metric__label">PITCH</view>
-      <view class="pose-metric__value">{{frame.pitch}}</view>
-      <view class="pose-metric__unit">deg</view>
-    </view>
-    <view class="pose-metric pose-metric--yaw">
-      <view class="pose-metric__label">YAW</view>
-      <view class="pose-metric__value">{{frame.yaw}}</view>
-      <view class="pose-metric__unit">deg</view>
-    </view>
-  </view>
-
-  <view class="attitude-panel">
-    <view class="attitude-panel__visual">
-      <view class="attitude-panel__sky"></view>
-      <view class="attitude-panel__ground"></view>
-      <view class="attitude-panel__horizon" style="{{horizonStyle}}"></view>
-      <view class="attitude-panel__body" style="{{bodyStyle}}">
-        <view class="attitude-panel__wing"></view>
-        <view class="attitude-panel__nose"></view>
-      </view>
-    </view>
-    <view class="attitude-panel__facts">
-      <view class="fact-row">
-        <text class="fact-row__label">速度</text>
-        <text class="fact-row__value">{{frame.speed}} m/s</text>
-      </view>
-      <view class="fact-row">
-        <text class="fact-row__label">加速度模长</text>
-        <text class="fact-row__value">{{frame.accelG}} g</text>
-      </view>
-      <view class="fact-row">
-        <text class="fact-row__label">角速度模长</text>
-        <text class="fact-row__value">{{frame.gyroDps}} deg/s</text>
-      </view>
-      <view class="fact-row">
-        <text class="fact-row__label">状态</text>
-        <text class="fact-row__value">{{frame.stationary}}</text>
+    <view class="capture-grid">
+      <view class="capture-card {{selectedModeKey === item.key ? 'capture-card--active' : ''}}" wx:for="{{modes}}" wx:key="key" bindtap="selectMode" data-key="{{item.key}}">
+        <view class="capture-card__title">{{item.title}}</view>
+        <view class="capture-card__detail">{{item.detail}}</view>
+        <view class="capture-card__foot">{{item.fileHint}} · {{item.duration}}s</view>
       </view>
     </view>
   </view>
 
-  <view class="data-panel">
-    <view class="data-row">
-      <text class="data-row__label">ACC XYZ(g)</text>
-      <text class="data-row__value">{{frame.ax}} / {{frame.ay}} / {{frame.az}}</text>
+  <view class="panel record-panel">
+    <view class="panel__head">
+      <view class="panel__title">采集</view>
+      <view class="panel__meta">{{recordFile}}</view>
     </view>
-    <view class="data-row">
-      <text class="data-row__label">GYRO XYZ(deg/s)</text>
-      <text class="data-row__value">{{frame.gx}} / {{frame.gy}} / {{frame.gz}}</text>
+    <view class="record-stats">
+      <view class="record-stat">
+        <view class="record-stat__label">模式</view>
+        <view class="record-stat__value">{{recordModeLabel}}</view>
+      </view>
+      <view class="record-stat">
+        <view class="record-stat__label">时长</view>
+        <view class="record-stat__value">{{recordElapsed}} / {{recordDuration}}s</view>
+      </view>
+      <view class="record-stat">
+        <view class="record-stat__label">行数</view>
+        <view class="record-stat__value">{{recordRows}}</view>
+      </view>
     </view>
-    <view class="data-row">
-      <text class="data-row__label">最近告警</text>
-      <text class="data-row__value data-row__value--alert">{{frame.alerts}}</text>
+    <view class="progress"><view class="progress__bar" style="{{recordProgressStyle}}"></view></view>
+    <view class="record-actions">
+      <button class="button button--primary" bindtap="startCapture" disabled="{{!connected || recording}}">开始</button>
+      <button class="button button--danger" bindtap="stopCapture" disabled="{{!connected || !recording}}">结束</button>
+      <button class="button" bindtap="sendStatus" disabled="{{!connected}}">状态</button>
     </view>
-    <view class="data-row">
-      <text class="data-row__label">最后更新</text>
-      <text class="data-row__value">{{frame.lastUpdate}}</text>
-    </view>
-    <view class="data-row">
-      <text class="data-row__label">帧数 / 频率</text>
-      <text class="data-row__value">{{frameCount}} / {{sampleHz}} Hz</text>
-    </view>
+    <view class="command-line">{{commandResponse}}</view>
+    <view class="saved-line">最近保存：{{lastCompleted}}</view>
   </view>
 
-  <view class="command-panel">
-    <view class="command-panel__buttons">
-      <button class="command-panel__button" bindtap="sendCommand" data-command="ZERO" disabled="{{!connected}}">ZERO</button>
-      <button class="command-panel__button" bindtap="sendCommand" data-command="STATUS" disabled="{{!connected}}">STATUS</button>
+  <view class="panel latest-panel">
+    <view class="panel__head">
+      <view class="panel__title">实时姿态</view>
+      <view class="panel__meta">{{sampleHz}} Hz</view>
     </view>
-    <view class="command-panel__response">{{commandResponse}}</view>
+    <view class="pose-mini">
+      <view class="pose-mini__item"><text>Roll</text><strong>{{latestPose.roll}}</strong></view>
+      <view class="pose-mini__item"><text>Pitch</text><strong>{{latestPose.pitch}}</strong></view>
+      <view class="pose-mini__item"><text>Yaw</text><strong>{{latestPose.yaw}}</strong></view>
+    </view>
+    <view class="data-row"><text>加速度</text><text>{{latestPose.accelG}} g</text></view>
+    <view class="data-row"><text>角速度</text><text>{{latestPose.gyroDps}} deg/s</text></view>
+    <view class="data-row"><text>状态</text><text>{{latestPose.stationary}}</text></view>
+    <view class="data-row"><text>更新</text><text>{{latestPose.lastUpdate}}</text></view>
   </view>
 
   <view class="log-panel" wx:if="{{logs.length}}">
-    <view class="log-panel__line" wx:for="{{logs}}" wx:key="*this">{{item}}</view>
+    <view class="log-line" wx:for="{{logs}}" wx:key="*this">{{item}}</view>
   </view>
 </view>

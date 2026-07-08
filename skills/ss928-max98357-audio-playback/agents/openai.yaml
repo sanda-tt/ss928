@@ -1,0 +1,4 @@
+interface:
+  display_name: "SS928 MAX98357 Audio Playback"
+  short_description: "Convert and play MP3 over I2S"
+  default_prompt: "Use $ss928-max98357-audio-playback to convert an MP3 and play it on the SS928 MAX98357 speaker."
