@@ -6,8 +6,6 @@
 
 # Original SS928 materials bundle directories that should stay local.
 /[0-9][0-9]*/
-/补充资料/
-/在线仓库/
 /初赛/
 
 # Local-only output subtree.
@@ -25,3 +23,28 @@ tmp/
 *.o
 *.obj
 *.exe
+
+# Publish these requested materials directories.
+!/01. 快速使用指南【必看】/
+!/01. 快速使用指南【必看】/**
+!/02. 硬件连接与功能测试/
+!/02. 硬件连接与功能测试/**
+!/07硬件资料/
+!/07硬件资料/**
+!/09. 进阶功能开发/
+!/09. 进阶功能开发/**
+!/10. 进阶综合案例/
+!/10. 进阶综合案例/**
+!/补充资料/
+!/补充资料/**
+!/在线仓库/
+!/在线仓库/**
+
+# Omit Linux system images, build trees, and board runtime payloads from the
+# otherwise published online-repository materials.
+/在线仓库/**/boardtools/
+/在线仓库/**/kernel/
+/在线仓库/**/rootfs/
+/在线仓库/**/uboot/
+/在线仓库/**/opt/Linux/
+/在线仓库/**/opt/Ubuntu/
