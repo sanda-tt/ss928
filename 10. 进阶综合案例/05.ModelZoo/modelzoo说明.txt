@@ -1,0 +1,3 @@
+1、model中为转化成功的om模型文件，可以快速开始
+
+2、mod使用可参考：https://gitee.com/hieulerpi/HiEuler_PI_ModelZoo

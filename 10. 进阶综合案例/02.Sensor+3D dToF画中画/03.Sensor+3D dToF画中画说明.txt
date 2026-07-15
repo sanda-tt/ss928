@@ -1,0 +1,5 @@
+1. 使用方式
+   替换【易百纳】Euler Pi 2.0\06. 开发板源码编译\03.MPP Sample例程包里面的dtof例程。
+
+2. Sensor 配置
+   默认出图使用 SONY_IMX347_SLAVE_MIPI_4M_30FPS_12BIT。

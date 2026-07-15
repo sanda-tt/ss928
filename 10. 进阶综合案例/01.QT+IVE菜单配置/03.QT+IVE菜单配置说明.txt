@@ -1,0 +1,13 @@
+1. QT移植
+   请参考：【易百纳】Euler Pi 2.0\09. 进阶功能开发\海思QT移植_以SS928为例.pdf
+
+2. linxfb 配置
+   QT+IVE案例中，linxfb大小已修改为 1920x540，起始位置为 (0, 540)，确保显示窗口正确。
+
+3. Sensor 配置
+   默认出图使用 SONY_IMX347_SLAVE_MIPI_4M_30FPS_12BIT，可在 pro 文件中修改 sensor 类型实现切换。
+
+4. DMA 优化
+   例程中每个过程中的图像都申请了MMZ内存，便于理解；实际使用可优化省略。
+   可通过命令查看每帧图像信息：
+       cat /proc/umap/media-mem
