@@ -1,0 +1,13 @@
+# 使用方法:
+<span style="font-size:26px;">获取角度的时候调用以下方法</span>
+![image.png](https://raw.gitcode.com/user-images/assets/9734398/eb88b3f4-3e70-489a-b5f9-45c3afdf6c79/image.png 'image.png')  
+<span style="color:#e60000;font-size:20px">注意一定要以一定的频率去执行，如打开一个定时器去执行代码，并且定时器的执行频率≥BMI270的采样率</span>
+![image.png](https://raw.gitcode.com/user-images/assets/9734398/7c9f883d-5093-4b6a-bdde-11c1162bd6d2/image.png 'image.png')
+<span style="color:#e60000;font-size:20px">以下代码打开了200Hz的定时器中断</span>  
+![image.png](https://raw.gitcode.com/user-images/assets/9734398/5ccb8332-56dd-4366-990c-f755d3ed99ae/image.png 'image.png')  
+<span style="color:#e60000;font-size:20px">因为在初始化的时候我的BMI270设置了陀螺仪和加速度计都为200Hz(该解算代码目前只可以进行同采样率的解算算出角度)</span>  
+<span style="color:#e60000;font-size:20px">(加速度计/陀螺仪)3dB自动增益抗混叠滤波器如果打开，硬件滤波器会根据的设置的采样率改变</span>
+![image.png](https://raw.gitcode.com/user-images/assets/9734398/d2032343-c0b8-4941-bff2-50b25c77a00e/image.png 'image.png')
+# 移植方法
+<span style="color:#e60000;font-size:20px">替换掉以下宏定义即可，给我提供一个SPI读写寄存器的接口</span>
+![image.png](https://raw.gitcode.com/user-images/assets/9734398/803e26fd-a321-4279-a320-7397ec99e907/image.png 'image.png')
