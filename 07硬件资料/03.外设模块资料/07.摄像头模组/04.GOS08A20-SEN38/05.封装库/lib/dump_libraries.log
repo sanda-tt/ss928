@@ -1,0 +1,145 @@
+(---------------------------------------------------------------------)
+(                                                                     )
+(    Dump Library Log                                                 )
+(                                                                     )
+(    Software Version : 17.2S071                                      )
+(    Date/Time        : Tue Mar 26 14:26:33 2024                      )
+(                                                                     )
+(---------------------------------------------------------------------)
+
+
+*** file: D:/板卡资料/资料-重新整理/G08A20-SEN38/G08A20-SEN38_v01_SMT.brd ***
+
+
+
+  *** Creating all device files (see create_devices.log) ***
+
+
+  *** Creating padstacks. ***
+
+  PAD100CIR100U being dumped.
+
+  SMD30S being dumped.
+
+  S_S0R55 being dumped.
+
+  PADREC1_8X1_5 being dumped.
+
+  SMD20S26PSH_L being dumped.
+
+  SMD20_50 being dumped.
+
+  SMD40_50 being dumped.
+
+  SMD20S26PSH_R being dumped.
+
+  SMD36_50 being dumped.
+
+  SMD28_32 being dumped.
+
+  SMD36_36 being dumped.
+
+  ID-BOARD being dumped.
+
+  PADREC0_3X1_25 being dumped.
+
+  BALL10S14 being dumped.
+
+  VIA10-BGA being dumped.
+
+  VIA8-16-BGA being dumped.
+
+  SMD18_20SH being dumped.
+
+  SMD_R630X205P0S40 being dumped.
+
+  PAD32CIR32U being dumped.
+
+  PAD103CIR83D being dumped.
+
+  SMD_R866X1221P0S40 being dumped.
+
+  PAD118CIR79D being dumped.
+
+  BALL40 being dumped.
+
+
+  *** Creating shape symbols (.dra and .ssm) ***
+
+  sh20q_lno_t being dumped.
+
+  sh20q_rno_t being dumped.
+
+  sh18_20rec being dumped.
+
+
+  *** Creating package symbols (.dra and .psm) ***
+
+  hsot23 being dumped.
+
+  hole100 being dumped.
+
+  hole_3 being dumped.
+
+  sot23-6b being dumped.
+
+  fpc30_05 being dumped.
+
+  stamp-1x3-80-32 being dumped.
+
+  stamp-2x3-80-32 being dumped.
+
+  id-board being dumped.
+
+  sr0603-tb being dumped.
+
+  sr0603-tc being dumped.
+
+  c0402 being dumped.
+
+  c0603 being dumped.
+
+  conn-smd_1_25-2p being dumped.
+
+  lens_socket-gs5 being dumped.
+
+  sot23 being dumped.
+
+  stp40 being dumped.
+
+  sc0402 being dumped.
+
+  hsc0402-hdtc being dumped.
+
+  sr0402 being dumped.
+
+  sr0603 being dumped.
+
+  bga92-25-0911b being dumped.
+
+
+  *** Creating mechanical symbols (.dra and .bsm) ***
+
+  ash-bin being dumped.
+
+  convey-direction20x2-a being dumped.
+
+
+  *** Creating format symbols (.dra and .osm) ***
+
+  esd-0303 being dumped.
+
+
+
+*********************** Summary *********************
+ERRORs reported:                           0
+
+Number of padstacks dumped:               23
+Number of package symbols dumped:         21
+Number of mechanical symbols dumped:       2
+Number of format symbols dumped:           1
+Number of shape symbols dumped:            3
+
+Total number of symbols dumped:           27
+*****************************************************
+

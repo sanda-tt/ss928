@@ -1,0 +1,41 @@
+(---------------------------------------------------------------------)
+(                                                                     )
+(    Create_devices LOG file                                          )
+(                                                                     )
+(    Drawing          : EB-IMX347-BC-429.brd                          )
+(    Software Version : 17.2S071                                      )
+(    Date/Time        : Tue Mar 19 15:57:50 2024                      )
+(                                                                     )
+(---------------------------------------------------------------------)
+
+
+
+Device file 'C:/Users/liuyudian/Desktop/lib/4header_0_lens_socket-m2-bvt_l.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_c0402_10uf10v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/30ps_imx274_0_fpc30_0r5_back_30.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/2p_0_mx1r25_smd2p_mx1r25_smd2p.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_c0402_100nf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_c0402_1uf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_c0402_47uf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_c0402_1nf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_c0402_10nf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/c_c0402_1uf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_r0402_22k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_r0402_470.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_r0402_1k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/imx347-lqr-c_1_imx347-lqr-c_imx.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/fetp-gsd_1_sot23_pmos-gsd.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/npn-bec_0_sot-23_mmbt3904lt1.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_0_sr0402_1k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_0_sr0402_1knc.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_0_sr0402_10knc.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/bl9193-25_0_sot-23-5_sgm2019-3.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/bl9193-25_0_sot-23-5_sgm2019-1.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/bl9193-25_0_sot-23-5_sgm2019-_1.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/mh_3mm_h2_1_d3_3a_mh_3mm.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_2_sr0402_10k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_0_sr0402_22r.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_0_sr0402_0r.txt': written successfully.
+
+  Created device files: 26
+

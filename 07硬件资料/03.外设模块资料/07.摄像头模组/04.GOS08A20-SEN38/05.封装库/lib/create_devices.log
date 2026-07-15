@@ -1,0 +1,51 @@
+(---------------------------------------------------------------------)
+(                                                                     )
+(    Create_devices LOG file                                          )
+(                                                                     )
+(    Drawing          : G08A20-SEN38_v01_SMT.brd                      )
+(    Software Version : 17.2S071                                      )
+(    Date/Time        : Tue Mar 26 14:26:34 2024                      )
+(                                                                     )
+(---------------------------------------------------------------------)
+
+
+
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_sc0402_100nf25v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/capnp_c0603_22uf10v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/c_sc0402_1uf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/capnp_sc0402_nc15k18pf50v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/capnp_4_c0402_10uf10v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/capnp_c0402_10uf10v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/capnp_sc0402_nc15k39pf50v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_sc0402_10nf50v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/irlml6401trpbf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r-0603_sr0402_nc15k30k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r-0603_sr0402_nc15k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r-0603_sr0603-tb_nc15k402k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r-0603_sr0603_nc15k301k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r-0603_sr0603-tc_nc15k301k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/tps79333_1_sot23-6b_lp5907mfx-2.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/tps79333_1_sot23-6b_lp5907mfx-1.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/tps79333_1_sot23-6b_lp5907mfx_1.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/capnp_sc0402_10nf50v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_hsc0402-hdtc_47uf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/capnp_6_sc0402_100nf25v.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/cap_sc0402_1uf.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/con1_id-board_con1.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/4header_conn-smd_1_25-2p_4hea.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/con3_hole_3_con3.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/tp_hole100_tp_10.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/30pm_imx274_0_fpc30_05_30pfpc.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/npn-bec_0_sot23_mmbt3904lt1.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r-0603_sr0402_15k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_sr0402_470r.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r-0603_sr0402_0r.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_sr0402_22k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_sr0402_0r.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/r_sr0402_1k.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/tp_stp40_tp_10.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/imx347-lqr-c_4_bga92-25-0911b_o.txt': written successfully.
+Device file 'C:/Users/liuyudian/Desktop/lib/lens_0_lens_socket-gs5_lens.txt': written successfully.
+
+  Created device files: 36
+
