@@ -1,0 +1,34 @@
+diff --git a/services/ipc_auth/include/policy_preset.h b/services/ipc_auth/include/policy_preset.h
+index db5d90d..9abdb8b 100644
+--- a/services/ipc_auth/include/policy_preset.h
++++ b/services/ipc_auth/include/policy_preset.h
+@@ -416,6 +416,19 @@ FeaturePolicy huksFeature[] = {
+     },
+ };
+ 
++FeaturePolicy dhcpclient[] = {
++    {
++        "dhcpclient",
++        {
++            {
++                .type = RANGE,
++                .uidMin = 0,
++                .uidMax = __INT_MAX__,
++            },
++        },
++    },
++};
++
+ static PolicySetting g_presetPolicies[] = {
+     {"permissionms", pmsFeature, 2},
+     {"abilityms", amsFeature, 2},
+@@ -441,7 +454,8 @@ static PolicySetting g_presetPolicies[] = {
+     {"wifisrvlite", wifiFeature, 3},
+     {"attest_service", devAttestFeature, 1},
+     {"dslm_service", dslmFeature, 1},
+-    {"huks_service", huksFeature, 1}
++    {"huks_service", huksFeature, 1},
++    {"dhcpclientlite", dhcpclient, 1}
+ };
+ 
+ static int g_presetPolicySize = sizeof(g_presetPolicies) / sizeof(PolicySetting);

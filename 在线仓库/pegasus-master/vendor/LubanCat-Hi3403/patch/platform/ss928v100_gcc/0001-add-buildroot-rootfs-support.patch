@@ -1,0 +1,772 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: hejiawencc <hjw0415@outlook.com>
+Date: Fri, 27 Mar 2026 15:03:41 +0800
+Subject: [PATCH 1/3] add-buildroot-rootfs-support
+
+---
+ .gitignore                                    |  17 +++
+ open_source/buildroot/Makefile                |  45 +++++++
+ open_source/buildroot/dl/.gitkeep             |   0
+ open_source/buildroot/overlay/etc/dhcpcd.conf |  54 ++++++++
+ open_source/buildroot/overlay/etc/fstab       |   9 ++
+ .../buildroot/overlay/etc/init.d/S99user      |  91 ++++++++++++++
+ .../overlay/etc/modprobe.d/blacklist.conf     |   2 +
+ .../buildroot/overlay/etc/network/interfaces  |  13 ++
+ open_source/buildroot/overlay/etc/shadow      |   9 ++
+ .../buildroot/overlay/etc/ssh/sshd_config     | 116 ++++++++++++++++++
+ .../etc/udev/rules.d/80-net-name-slot.rules   |  14 +++
+ .../buildroot/overlay/etc/wpa_supplicant.conf |   8 ++
+ open_source/buildroot/readme.txt              |   2 +
+ open_source/buildroot/ss928_lbc_defconfig     |  73 +++++++++++
+ open_source/linux/Makefile                    |  15 ++-
+ open_source/u-boot/Makefile                   |   2 +-
+ osdrv/Makefile                                |  66 +++++++++-
+ osdrv/tools/pc/rootfs_tools/mk-ext4-image.sh  |  19 +++
+ 18 files changed, 549 insertions(+), 6 deletions(-)
+ create mode 100644 .gitignore
+ create mode 100644 open_source/buildroot/Makefile
+ create mode 100644 open_source/buildroot/dl/.gitkeep
+ create mode 100644 open_source/buildroot/overlay/etc/dhcpcd.conf
+ create mode 100644 open_source/buildroot/overlay/etc/fstab
+ create mode 100755 open_source/buildroot/overlay/etc/init.d/S99user
+ create mode 100644 open_source/buildroot/overlay/etc/modprobe.d/blacklist.conf
+ create mode 100644 open_source/buildroot/overlay/etc/network/interfaces
+ create mode 100644 open_source/buildroot/overlay/etc/shadow
+ create mode 100644 open_source/buildroot/overlay/etc/ssh/sshd_config
+ create mode 100644 open_source/buildroot/overlay/etc/udev/rules.d/80-net-name-slot.rules
+ create mode 100644 open_source/buildroot/overlay/etc/wpa_supplicant.conf
+ create mode 100644 open_source/buildroot/readme.txt
+ create mode 100644 open_source/buildroot/ss928_lbc_defconfig
+ create mode 100755 osdrv/tools/pc/rootfs_tools/mk-ext4-image.sh
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 000000000..c5a4f9c9d
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,17 @@
++open_source/buildroot/buildroot-2024.02.10/
++open_source/buildroot/overlay/lib/firmware/
++open_source/buildroot/buildroot-2024.02.10.tar.gz
++open_source/linux/linux-6.6.y/
++open_source/linux/*.patch
++open_source/linux/linux-6.6.86.tar.gz
++open_source/u-boot/u-boot-2020.01/
++open_source/u-boot/u-boot-2020.01.tar.bz2
++open_source/trusted-firmware-a/arm-trusted-firmware-2.2/
++open_source/trusted-firmware-a/arm-trusted-firmware-2.2.tar.gz
++open_source/mbedtls/mbedtls-2.16.10.tar.gz
++osdrv/pub/
++osdrv/tools/pc/uboot_tools/ss928v100_reg_info.bin
++osdrv/components/boot/gsl
++osdrv/components/boot/image_map/
++osdrv/tools/pc/uboot_tools/
++/*.patch
+diff --git a/open_source/buildroot/Makefile b/open_source/buildroot/Makefile
+new file mode 100644
+index 000000000..b52d89bd4
+--- /dev/null
++++ b/open_source/buildroot/Makefile
+@@ -0,0 +1,45 @@
++BUILDROOT_TOP_DIR := $(shell pwd)
++
++ARCH ?= arm64
++RUN_JOBS ?= $(shell expr $(shell nproc) - 1)
++
++OSDRV_DIR ?= ../../osdrv
++OSDRV_CROSS ?= aarch64-openeuler-linux-gnu
++CROSS_COMPILE=$(OSDRV_CROSS)-
++
++BUILDROOT_VER ?= buildroot-2024.02.10
++
++all:
++	@echo "CROSS=$(CROSS)"
++	@echo "BUILDROOT_CFG=$(BUILDROOT_CFG)"
++
++	test -d $(BUILDROOT_VER) || (\
++		rm $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER) -rf ;\
++		tar xzf $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER).tar.gz -C $(BUILDROOT_TOP_DIR) ;\
++	);
++
++	test -d $(BUILDROOT_TOP_DIR)/dl && (\
++		rm -rf $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)/dl ;\
++		ln -sf $(BUILDROOT_TOP_DIR)/dl $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)/dl ;\
++	);
++
++	cp $(BUILDROOT_TOP_DIR)/$(BUILDROOT_CFG) $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)/configs/
++
++	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) $(BUILDROOT_CFG) -C $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)
++	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) source -C $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)
++	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -j$(RUN_JOBS) -C $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)
++
++	fakeroot tar xf $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)/output/images/rootfs.tar -C $(OSDRV_DIR)/pub/$(PUB_ROOTFS)
++	ln -sf /lib/firmware $(OSDRV_DIR)/pub/$(PUB_ROOTFS)/usr/lib/firmware 
++
++menuconfig:
++	cp -v $(BUILDROOT_TOP_DIR)/$(BUILDROOT_CFG) $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)/configs/
++	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) $(BUILDROOT_CFG) -C $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)
++	$(MAKE) menuconfig -C $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)
++	$(MAKE) savedefconfig -C $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)
++	cp -v $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)/configs/$(BUILDROOT_CFG) $(BUILDROOT_TOP_DIR)/$(BUILDROOT_CFG)
++
++clean:
++	$(MAKE) distclean -C $(BUILDROOT_TOP_DIR)/$(BUILDROOT_VER)
++
++distclean: clean
+diff --git a/open_source/buildroot/dl/.gitkeep b/open_source/buildroot/dl/.gitkeep
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/open_source/buildroot/overlay/etc/dhcpcd.conf b/open_source/buildroot/overlay/etc/dhcpcd.conf
+new file mode 100644
+index 000000000..4cbd09c46
+--- /dev/null
++++ b/open_source/buildroot/overlay/etc/dhcpcd.conf
+@@ -0,0 +1,54 @@
++# A sample configuration for dhcpcd.
++# See dhcpcd.conf(5) for details.
++
++# Allow users of this group to interact with dhcpcd via the control socket.
++#controlgroup wheel
++
++# Inform the DHCP server of our hostname for DDNS.
++#hostname
++
++# Use the hardware address of the interface for the Client ID.
++#clientid
++# or
++# Use the same DUID + IAID as set in DHCPv6 for DHCPv4 ClientID as per RFC4361.
++# Some non-RFC compliant DHCP servers do not reply with this set.
++# In this case, comment out duid and enable clientid above.
++duid
++
++# Persist interface configuration when dhcpcd exits.
++persistent
++
++# vendorclassid is set to blank to avoid sending the default of
++# dhcpcd-<version>:<os>:<machine>:<platform>
++vendorclassid
++
++# A list of options to request from the DHCP server.
++option domain_name_servers, domain_name, domain_search
++option classless_static_routes
++# Respect the network MTU. This is applied to DHCP routes.
++option interface_mtu
++
++# Request a hostname from the network
++option host_name
++
++# Most distributions have NTP support.
++#option ntp_servers
++
++# Rapid commit support.
++# Safe to enable by default because it requires the equivalent option set
++# on the server to actually work.
++option rapid_commit
++
++# A ServerID is required by RFC2131.
++require dhcp_server_identifier
++
++# Generate SLAAC address using the Hardware Address of the interface
++#slaac hwaddr
++# OR generate Stable Private IPv6 Addresses based from the DUID
++slaac private
++
++
++interface usb0
++static ip_address=192.168.137.100/24
++static routers=192.168.137.1
++static domain_name_servers=8.8.8.8 8.8.4.4
+diff --git a/open_source/buildroot/overlay/etc/fstab b/open_source/buildroot/overlay/etc/fstab
+new file mode 100644
+index 000000000..40f988ee9
+--- /dev/null
++++ b/open_source/buildroot/overlay/etc/fstab
+@@ -0,0 +1,9 @@
++# <file system> <mount pt>      <type>  <options>       <dump>  <pass>
++/dev/root       /               ext2    rw,noauto       0       1
++proc            /proc           proc    defaults        0       0
++devpts          /dev/pts        devpts  defaults,gid=5,mode=620,ptmxmode=0666   0   0
++tmpfs           /dev/shm        tmpfs   mode=1777       0       0
++tmpfs           /tmp            tmpfs   mode=1777       0       0
++tmpfs           /run            tmpfs   mode=0755,nosuid,nodev  0       0
++sysfs           /sys            sysfs   defaults        0       0
++debug			/sys/kernel/debug	debugfs	defaults	0	    0
+diff --git a/open_source/buildroot/overlay/etc/init.d/S99user b/open_source/buildroot/overlay/etc/init.d/S99user
+new file mode 100755
+index 000000000..2972d3208
+--- /dev/null
++++ b/open_source/buildroot/overlay/etc/init.d/S99user
+@@ -0,0 +1,91 @@
++#!/bin/bash
++#
++# user function
++#
++
++COMPATIBLE=$(strings /proc/device-tree/compatible)
++
++if [[ $COMPATIBLE =~ "lubancat,hi3403" ]]; then
++    CHIPNAME="hi3403"
++else
++    echo "board name error, please check dts or images!!!!!!!"
++fi
++
++_insmod ()
++{
++    ko_dir="/usr/lib/modules/"
++    ko_path=""
++
++    local mod_name="$1"
++    shift # Shift the first argument to get the rest
++
++    ko_path=$(find "$ko_dir" -name "$mod_name" -print -quit)
++
++    if [ -n "$ko_path" ]; then
++        echo "insmod $ko_path $*"
++        insmod "$ko_path" "$@"
++    else
++        echo "Error: Module '$mod_name' not found in $ko_dir"
++    fi
++}
++
++network_init()
++{
++    ethaddr1=$(ifconfig -a | grep "eth.*HWaddr" | awk '{print $5}')
++
++    if [ -f /etc/ethaddr.txt ]; then
++        ethaddr2=$(cat /etc/ethaddr.txt)
++        if [ "$ethaddr1" == "$ethaddr2" ]; then
++            echo "eth HWaddr cfg ok"
++        else
++            ifconfig eth0 down
++            ifconfig eth0 hw ether "$ethaddr2"
++        fi
++    else
++        echo "$ethaddr1" > /etc/ethaddr.txt
++    fi
++    ifconfig eth0 up
++
++    if [ "$CHIPNAME" == "hi3403" ]; then
++        echo "Set WIFI_PWR_EN(GPIO0_1) Enable"
++        gpioset gpiochip0 1=1
++        sleep 3s
++    fi
++
++    if ifconfig -a | grep -q wlan0; then
++        ifconfig wlan0 up
++        # wpa_supplicant -D nl80211 -i wlan0 -c /etc/wpa_supplicant.conf -B -d
++    fi
++}
++
++install_modules()
++{
++    if [ "$TOUCHSCREEN" = "EBF410655" ]; then
++        _insmod goodix_ts.ko invert_x=1 invert_y=1
++    fi
++}
++
++
++start() {
++    echo "Start run S99user"
++    install_modules
++    network_init &
++}
++
++stop() {
++    echo "OK"
++}
++
++case "$1" in
++    start)
++        start
++        ;;
++    stop)
++        stop
++        ;;
++    *)
++        echo "Usage: $0 {start|stop}"
++        exit 1
++esac
++
++exit $?
+diff --git a/open_source/buildroot/overlay/etc/modprobe.d/blacklist.conf b/open_source/buildroot/overlay/etc/modprobe.d/blacklist.conf
+new file mode 100644
+index 000000000..ee902115d
+--- /dev/null
++++ b/open_source/buildroot/overlay/etc/modprobe.d/blacklist.conf
+@@ -0,0 +1,2 @@
++# blacklist for modprobe auto load kernel modules
++blacklist goodix_ts
+\ No newline at end of file
+diff --git a/open_source/buildroot/overlay/etc/network/interfaces b/open_source/buildroot/overlay/etc/network/interfaces
+new file mode 100644
+index 000000000..8db4b6e8a
+--- /dev/null
++++ b/open_source/buildroot/overlay/etc/network/interfaces
+@@ -0,0 +1,13 @@
++# interface file generated by Embedfire
++
++auto lo
++iface lo inet loopback
++
++auto eth0
++iface eth0 inet dhcp
++
++auto usb0
++iface usb0 inet dhcp
++
++auto wlan0
++iface wlan0 inet dhcp
+diff --git a/open_source/buildroot/overlay/etc/shadow b/open_source/buildroot/overlay/etc/shadow
+new file mode 100644
+index 000000000..d3630e13a
+--- /dev/null
++++ b/open_source/buildroot/overlay/etc/shadow
+@@ -0,0 +1,9 @@
++root:$1$7WxyODZN$1Xji1F63Nhk8uW5voqQaj.:1::::::
++daemon:*:::::::
++bin:*:::::::
++sys:*:::::::
++sync:*:::::::
++mail:*:::::::
++www-data:*:::::::
++operator:*:::::::
++nobody:*:::::::
+diff --git a/open_source/buildroot/overlay/etc/ssh/sshd_config b/open_source/buildroot/overlay/etc/ssh/sshd_config
+new file mode 100644
+index 000000000..5d35f7282
+--- /dev/null
++++ b/open_source/buildroot/overlay/etc/ssh/sshd_config
+@@ -0,0 +1,116 @@
++#	$OpenBSD: sshd_config,v 1.104 2021/07/02 05:11:21 dtucker Exp $
++
++# This is the sshd server system-wide configuration file.  See
++# sshd_config(5) for more information.
++
++# This sshd was compiled with PATH=/bin:/sbin:/usr/bin:/usr/sbin
++
++# The strategy used for options in the default sshd_config shipped with
++# OpenSSH is to specify options with their default value where
++# possible, but leave them commented.  Uncommented options override the
++# default value.
++
++#Port 22
++#AddressFamily any
++#ListenAddress 0.0.0.0
++#ListenAddress ::
++
++#HostKey /etc/ssh/ssh_host_rsa_key
++#HostKey /etc/ssh/ssh_host_ecdsa_key
++#HostKey /etc/ssh/ssh_host_ed25519_key
++
++# Ciphers and keying
++#RekeyLimit default none
++
++# Logging
++#SyslogFacility AUTH
++#LogLevel INFO
++
++# Authentication:
++
++#LoginGraceTime 2m
++PermitRootLogin yes
++#StrictModes yes
++#MaxAuthTries 6
++#MaxSessions 10
++
++#PubkeyAuthentication yes
++
++# The default is to check both .ssh/authorized_keys and .ssh/authorized_keys2
++# but this is overridden so installations will only check .ssh/authorized_keys
++AuthorizedKeysFile	.ssh/authorized_keys
++
++#AuthorizedPrincipalsFile none
++
++#AuthorizedKeysCommand none
++#AuthorizedKeysCommandUser nobody
++
++# For this to work you will also need host keys in /etc/ssh/ssh_known_hosts
++#HostbasedAuthentication no
++# Change to yes if you don't trust ~/.ssh/known_hosts for
++# HostbasedAuthentication
++#IgnoreUserKnownHosts no
++# Don't read the user's ~/.rhosts and ~/.shosts files
++#IgnoreRhosts yes
++
++# To disable tunneled clear text passwords, change to no here!
++#PasswordAuthentication yes
++#PermitEmptyPasswords no
++
++# Change to no to disable s/key passwords
++#KbdInteractiveAuthentication yes
++
++# Kerberos options
++#KerberosAuthentication no
++#KerberosOrLocalPasswd yes
++#KerberosTicketCleanup yes
++#KerberosGetAFSToken no
++
++# GSSAPI options
++#GSSAPIAuthentication no
++#GSSAPICleanupCredentials yes
++
++# Set this to 'yes' to enable PAM authentication, account processing,
++# and session processing. If this is enabled, PAM authentication will
++# be allowed through the KbdInteractiveAuthentication and
++# PasswordAuthentication.  Depending on your PAM configuration,
++# PAM authentication via KbdInteractiveAuthentication may bypass
++# the setting of "PermitRootLogin prohibit-password".
++# If you just want the PAM account and session checks to run without
++# PAM authentication, then enable this but set PasswordAuthentication
++# and KbdInteractiveAuthentication to 'no'.
++#UsePAM no
++
++#AllowAgentForwarding yes
++#AllowTcpForwarding yes
++#GatewayPorts no
++#X11Forwarding no
++#X11DisplayOffset 10
++#X11UseLocalhost yes
++#PermitTTY yes
++#PrintMotd yes
++#PrintLastLog yes
++#TCPKeepAlive yes
++#PermitUserEnvironment no
++#Compression delayed
++#ClientAliveInterval 0
++#ClientAliveCountMax 3
++#UseDNS no
++#PidFile /var/run/sshd.pid
++#MaxStartups 10:30:100
++#PermitTunnel no
++#ChrootDirectory none
++#VersionAddendum none
++
++# no default banner path
++#Banner none
++
++# override default of no subsystems
++Subsystem	sftp	/usr/libexec/sftp-server
++
++# Example of overriding settings on a per-user basis
++#Match User anoncvs
++#	X11Forwarding no
++#	AllowTcpForwarding no
++#	PermitTTY no
++#	ForceCommand cvs server
+diff --git a/open_source/buildroot/overlay/etc/udev/rules.d/80-net-name-slot.rules b/open_source/buildroot/overlay/etc/udev/rules.d/80-net-name-slot.rules
+new file mode 100644
+index 000000000..27b15ef51
+--- /dev/null
++++ b/open_source/buildroot/overlay/etc/udev/rules.d/80-net-name-slot.rules
+@@ -0,0 +1,14 @@
++# do not edit this file, it will be overwritten on update
++
++ACTION!="add", GOTO="net_name_slot_end"
++SUBSYSTEM!="net", GOTO="net_name_slot_end"
++NAME!="", GOTO="net_name_slot_end"
++
++IMPORT{cmdline}="net.ifnames"
++ENV{net.ifnames}=="0", GOTO="net_name_slot_end"
++
++# NAME=="", ENV{ID_NET_NAME_ONBOARD}!="", NAME="$env{ID_NET_NAME_ONBOARD}"
++# NAME=="", ENV{ID_NET_NAME_SLOT}!="", NAME="$env{ID_NET_NAME_SLOT}"
++# NAME=="", ENV{ID_NET_NAME_PATH}!="", NAME="$env{ID_NET_NAME_PATH}"
++
++LABEL="net_name_slot_end"
+diff --git a/open_source/buildroot/overlay/etc/wpa_supplicant.conf b/open_source/buildroot/overlay/etc/wpa_supplicant.conf
+new file mode 100644
+index 000000000..f7bd488bf
+--- /dev/null
++++ b/open_source/buildroot/overlay/etc/wpa_supplicant.conf
+@@ -0,0 +1,8 @@
++ctrl_interface=/var/run/wpa_supplicant
++update_config=1
++
++network={
++        ssid="wifi_name"
++        psk="password_12345678"
++        key_mgmt=WPA-PSK
++}
+diff --git a/open_source/buildroot/readme.txt b/open_source/buildroot/readme.txt
+new file mode 100644
+index 000000000..c916c41a7
+--- /dev/null
++++ b/open_source/buildroot/readme.txt
+@@ -0,0 +1,2 @@
++需要下载源码包放入当前的目录：
++https://buildroot.org/downloads/buildroot-2024.02.10.tar.gz
+\ No newline at end of file
+diff --git a/open_source/buildroot/ss928_lbc_defconfig b/open_source/buildroot/ss928_lbc_defconfig
+new file mode 100644
+index 000000000..3bb704dbe
+--- /dev/null
++++ b/open_source/buildroot/ss928_lbc_defconfig
+@@ -0,0 +1,73 @@
++BR2_aarch64=y
++BR2_TOOLCHAIN_BUILDROOT_CXX=y
++BR2_PRIMARY_SITE="https://mirror.lzu.edu.cn/buildroot"
++BR2_GNU_MIRROR="https://mirrors.ustc.edu.cn/gnu"
++BR2_OPTIMIZE_3=y
++BR2_PER_PACKAGE_DIRECTORIES=y
++BR2_TARGET_GENERIC_HOSTNAME="lubancat"
++BR2_TARGET_GENERIC_ISSUE="Welcome to LubanCat"
++BR2_ROOTFS_DEVICE_CREATION_DYNAMIC_EUDEV=y
++BR2_TARGET_GENERIC_ROOT_PASSWD="root"
++BR2_SYSTEM_BIN_SH_BASH=y
++BR2_ROOTFS_OVERLAY="../overlay"
++BR2_PACKAGE_BUSYBOX_SHOW_OTHERS=y
++BR2_PACKAGE_BZIP2=y
++BR2_PACKAGE_PIGZ=y
++BR2_PACKAGE_XZ=y
++BR2_PACKAGE_ZIP=y
++BR2_PACKAGE_STRACE=y
++BR2_PACKAGE_STRESS_NG=y
++BR2_PACKAGE_MAKE=y
++BR2_PACKAGE_PKGCONF=y
++BR2_PACKAGE_E2FSPROGS=y
++BR2_PACKAGE_E2FSPROGS_RESIZE2FS=y
++BR2_PACKAGE_EXFAT=y
++BR2_PACKAGE_EXFAT_UTILS=y
++BR2_PACKAGE_EXFATPROGS=y
++BR2_PACKAGE_MTD=y
++BR2_PACKAGE_LINUX_FIRMWARE=y
++BR2_PACKAGE_LINUX_FIRMWARE_RTL_88XX_BT=y
++BR2_PACKAGE_LINUX_FIRMWARE_RTL_RTW88=y
++BR2_PACKAGE_LINUX_FIRMWARE_RTL_RTW89=y
++BR2_PACKAGE_DBUS_GLIB=y
++BR2_PACKAGE_EVTEST=y
++BR2_PACKAGE_I2C_TOOLS=y
++BR2_PACKAGE_MEMTESTER=y
++BR2_PACKAGE_MINICOM=y
++BR2_PACKAGE_PCIUTILS=y
++BR2_PACKAGE_USB_MODESWITCH=y
++BR2_PACKAGE_USBUTILS=y
++BR2_PACKAGE_LIBARCHIVE=y
++BR2_PACKAGE_LIBARCHIVE_BSDTAR=y
++BR2_PACKAGE_LIBARCHIVE_BSDCPIO=y
++BR2_PACKAGE_LIBARCHIVE_BSDCAT=y
++BR2_PACKAGE_LIBARCHIVE_BSDUNZIP=y
++BR2_PACKAGE_LIBTOMCRYPT=y
++BR2_PACKAGE_LIBGPIOD=y
++BR2_PACKAGE_LIBGPIOD_TOOLS=y
++BR2_PACKAGE_LIBCURL=y
++BR2_PACKAGE_LIBCURL_CURL=y
++BR2_PACKAGE_LIBCURL_TLS_NONE=y
++BR2_PACKAGE_LIBEVDEV=y
++BR2_PACKAGE_HAVEGED=y
++BR2_PACKAGE_BLUEZ5_UTILS=y
++BR2_PACKAGE_BLUEZ5_UTILS_CLIENT=y
++BR2_PACKAGE_BLUEZ5_UTILS_MONITOR=y
++BR2_PACKAGE_BLUEZ5_UTILS_TOOLS=y
++BR2_PACKAGE_BLUEZ5_UTILS_DEPRECATED=y
++BR2_PACKAGE_DHCPCD=y
++BR2_PACKAGE_ETHTOOL=y
++BR2_PACKAGE_IPERF3=y
++BR2_PACKAGE_IW=y
++BR2_PACKAGE_NTP=y
++BR2_PACKAGE_NTP_NTPDATE=y
++BR2_PACKAGE_OPENSSH=y
++BR2_PACKAGE_PPPD=y
++BR2_PACKAGE_PPPD_FILTER=y
++BR2_PACKAGE_WIRELESS_REGDB=y
++BR2_PACKAGE_WPA_SUPPLICANT=y
++BR2_PACKAGE_WPA_SUPPLICANT_CLI=y
++BR2_PACKAGE_FILE=y
++BR2_PACKAGE_HTOP=y
++BR2_PACKAGE_TAR=y
++BR2_PACKAGE_UTIL_LINUX_BINARIES=y
+diff --git a/open_source/linux/Makefile b/open_source/linux/Makefile
+index eaee1efa7..886ffb2e8 100644
+--- a/open_source/linux/Makefile
++++ b/open_source/linux/Makefile
+@@ -2,6 +2,7 @@ BUILD_DIR := $(shell pwd)
+ 
+ MAKE=make
+ CHIP ?= ss928v100
++RUN_JOBS?=$(shell expr $(shell nproc) - 1)
+ 
+ KERNEL_ORIGIN_VER:=linux-6.6.86
+ KERNEL_VER:=linux-6.6.y
+@@ -39,10 +40,22 @@ ifneq ($(BUILD_DIR)/$(KERNEL_VER), $(wildcard $(BUILD_DIR)/$(KERNEL_VER)))
+ 	@echo -e $(GREEN)"patching kernel..."  $(DONE)
+ 	pushd $(BUILD_DIR);mv $(KERNEL_ORIGIN_VER) $(KERNEL_VER);popd
+ 	pushd $(BUILD_DIR)/$(KERNEL_VER); patch -p1< ../$(KERNEL_ORIGIN_VER).patch;popd
++	pushd $(BUILD_DIR)/$(KERNEL_VER); patch -p1< ../0001-add-aic8800-wireless-and-bluetooth-driver.patch;popd
++	pushd $(BUILD_DIR)/$(KERNEL_VER); patch -p1< ../0002-fix-bsp_pwm-and-goodix-drivers.patch;popd
++	pushd $(BUILD_DIR)/$(KERNEL_VER); patch -p1< ../0003-add-lubancat-hi3403-board-dts-and-configs.patch;popd
+ endif
+ 	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) $(KERNEL_CFG)
+-	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) uImage
++	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) uImage -j$(RUN_JOBS)
+ 	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) scripts/module.lds
++	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) modules -j$(RUN_JOBS)
++	rm -rf $(OSDRV_DIR)/pub/ko
++	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) modules_install INSTALL_MOD_PATH=$(OSDRV_DIR)/pub/ko
++
++menuconfig:
++	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) $(KERNEL_CFG)
++	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) menuconfig
++	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) $(CROSS) savedefconfig
++	cp $(BUILD_DIR)/$(KERNEL_VER)/defconfig $(BUILD_DIR)/$(KERNEL_VER)/arch/$(ARCH_TYPE)/configs/$(KERNEL_CFG)
+ 
+ clean:
+ ifeq ($(BUILD_DIR)/$(KERNEL_VER), $(wildcard $(BUILD_DIR)/$(KERNEL_VER)))
+diff --git a/open_source/u-boot/Makefile b/open_source/u-boot/Makefile
+index e04c2a125..a29f68a2d 100644
+--- a/open_source/u-boot/Makefile
++++ b/open_source/u-boot/Makefile
+@@ -46,7 +46,7 @@ ifeq ($(shell find $(OSDRV_DIR)/tools/pc/uboot_tools -name "$(UBOOT_REG_BIN)"),
+ endif
+ 	cp $(OSDRV_DIR)/tools/pc/uboot_tools/$(UBOOT_REG_BIN) $(BUILD_DIR)/$(UBOOT_VER)/.reg
+ 	$(MAKE) -C $(BUILD_DIR)/$(UBOOT_VER) CROSS_COMPILE=$(OSDRV_CROSS)- $(UBOOT_CONFIG)
+-	$(MAKE) -C $(BUILD_DIR)/$(UBOOT_VER) CROSS_COMPILE=$(OSDRV_CROSS)-
++	$(MAKE) -C $(BUILD_DIR)/$(UBOOT_VER) CROSS_COMPILE=$(OSDRV_CROSS)- -j
+ 	$(MAKE) -C $(BUILD_DIR)/$(UBOOT_VER) CROSS_COMPILE=$(OSDRV_CROSS)- u-boot-z.bin
+ 
+ clean:
+diff --git a/osdrv/Makefile b/osdrv/Makefile
+index 5d8adbbb2..1e48a758b 100644
+--- a/osdrv/Makefile
++++ b/osdrv/Makefile
+@@ -19,6 +19,7 @@ endif
+ MAKE=make
+ LLVM ?= 0
+ export CHIP?=ss928v100
++export DDR_SIZE?=8GB
+ export OSDRV_CROSS ?= aarch64-openeuler-linux-gnu
+ export CROSS_COMPILE=$(OSDRV_CROSS)-
+ export BUILD :=all
+@@ -41,7 +42,11 @@ endif
+ ifeq ($(BOOT_MEDIA), emmc)
+ MEDIUM_FLAG = _emmc_
+ ifeq ($(CHIP),ss928v100)
+-REGBIN_XLSM ?= SS928V100_demo_8L_LPDDR4x_3733M-8GB_32bitx2-A55_1400M-emmc.xlsm
++ifeq ($(DDR_SIZE),4GB)
++REGBIN_XLSM ?= SS928V100_LubanCat_LPDDR4x_3733M-4GB_1rank_32bitx2-A55_1400M-emmc.xlsm
++else ifeq ($(DDR_SIZE),8GB)
++REGBIN_XLSM ?= SS928V100_LubanCat_LPDDR4x_3733M-8GB_2rank_32bitx2-A55_1400M-emmc.xlsm
++endif
+ endif
+ ifeq ($(CHIP),ss927v100)
+ REGBIN_XLSM ?= SS927V100_demo_8L_LPDDR4x_2666M-8GB_32bitx2-A55_1400M-eMMC.xlsm
+@@ -55,8 +60,12 @@ ifeq ($(CHIP),ss927v100)
+ REGBIN_XLSM ?= SS927V100_demo_8L_LPDDR4x_2666M-8GB_32bitx2-A55_1400M.xlsm
+ endif
+ 
+-export KERNEL_CFG:=$(CHIP)$(MEDIUM_FLAG)defconfig
++export KERNEL_CFG:=$(CHIP)_lbc$(MEDIUM_FLAG)defconfig
+ export UBOOT_CONFIG:=$(CHIP)$(MEDIUM_FLAG)defconfig
++export BUILDROOT_CFG=ss928_lbc_defconfig
++
++BUILDROOT_VER:=buildroot-2024.02.10
++BUILDROOT_DIR := $(OPEN_SOURCE)/buildroot
+ 
+ ATF_VER:=arm-trusted-firmware-2.2
+ ATF_TAR:=$(ATF_VER).tar.gz
+@@ -85,6 +94,8 @@ $(error )
+ endif
+ TARGET_XLSM := $(REGBIN_XLSM)
+ 
++export PUB_ROOTFS:=rootfs_$(ARCH_TYPE)
++
+ ifeq ($(LLVM), 1)
+ export PUB_IMAGE:=$(CHIP)$(MEDIUM_FLAG)image_musl
+ else
+@@ -103,9 +114,9 @@ DONE    = "\033[0m"
+ ##########################################################################################
+ #	set task
+ ##########################################################################################
+-all: prepare boot atf gslboot_build
++all: prepare boot atf gslboot_build rootfs_build
+ 
+-clean: boot_clean kernel_clean atf_clean gslboot_clean regbin_clean
++clean: boot_clean kernel_clean atf_clean gslboot_clean regbin_clean buildroot_clean
+ 
+ distclean: boot_distclean kernel_distclean atf_distclean gslboot_distclean regbin_distclean
+ 	rm $(OSDRV_DIR)/pub -rf
+@@ -168,6 +179,13 @@ atf_distclean:
+ ##########################################################################################
+ #task [2.1]	build kernel
+ ##########################################################################################
++kconfig:kernel_menuconfig
++
++kernel_menuconfig:
++	@echo -e $(GREEN)"--------- kernel menuconfig"  $(DONE)
++	$(MAKE) -C $(KERNEL_DIR) CHIP=$(CHIP) BOOT_MEDIA=$(BOOT_MEDIA) \
++				ARCH_TYPE=$(ARCH_TYPE) KERNEL_CFG=$(KERNEL_CFG) menuconfig
++
+ kernel: prepare
+ 	@echo -e $(GREEN)"---------task [2.1] build kernel"  $(DONE)
+ 	$(MAKE) -C $(KERNEL_DIR) CHIP=$(CHIP) BOOT_MEDIA=$(BOOT_MEDIA) LLVM=$(LLVM) \
+@@ -202,3 +220,43 @@ gslboot_clean:
+ 
+ gslboot_distclean: gslboot_clean
+ 
++##########################################################################################
++#task [4]	prepare rootfs
++##########################################################################################
++rootfs_prepare: prepare
++	@echo -e $(GREEN)"---------task [4] prepare rootfs "  $(DONE)
++ifeq ($(OSDRV_DIR)/pub/$(PUB_ROOTFS), $(wildcard $(OSDRV_DIR)/pub/$(PUB_ROOTFS)))
++	pushd $(OSDRV_DIR)/pub/$(PUB_ROOTFS); chmod +w usr/bin; chmod +w usr/sbin; chmod +w sbin; popd
++	rm $(OSDRV_DIR)/pub/$(PUB_ROOTFS)* -rf
++endif
++	mkdir $(OSDRV_DIR)/pub/$(PUB_ROOTFS) -p
++
++##########################################################################################
++#	build buildroot
++##########################################################################################
++bconfig: buildroot_menuconfig
++buildroot_menuconfig:
++	@echo -e $(GREEN)"--------- buildroot menuconfig "  $(DONE)
++	$(MAKE) -C $(BUILDROOT_DIR) BUILDROOT_CFG=$(BUILDROOT_CFG) menuconfig
++
++buildroot: prepare rootfs_prepare
++	@echo -e $(GREEN)"--------- build buildroot "  $(DONE)
++	$(MAKE) -C $(BUILDROOT_DIR) BUILDROOT_CFG=$(BUILDROOT_CFG) all
++
++buildroot_clean:
++	$(MAKE) -C $(BUILDROOT_DIR) clean
++
++##########################################################################################
++#task [5]	build rootfs image
++##########################################################################################
++rootfs_build: rootfs_prepare kernel buildroot
++	@echo -e $(GREEN)"---------task [5] build rootfs image"  $(DONE)
++	cp -rf $(OSDRV_DIR)/pub/ko/lib/modules $(OSDRV_DIR)/pub/$(PUB_ROOTFS)/usr/lib
++	ln -sf ../usr/lib/modules $(OSDRV_DIR)/pub/$(PUB_ROOTFS)/lib/modules
++	$(OSDRV_DIR)/tools/pc/rootfs_tools/mk-ext4-image.sh $(OSDRV_DIR)/pub/$(PUB_ROOTFS) $(OSDRV_DIR)/pub/$(PUB_IMAGE)/rootfs.ext4
++
++rootfs_clean:
++ifeq ($(OSDRV_DIR)/pub/$(PUB_ROOTFS), $(wildcard $(OSDRV_DIR)/pub/$(PUB_ROOTFS)))
++	pushd $(OSDRV_DIR)/pub/$(PUB_ROOTFS); chmod +w usr/bin; chmod +w usr/sbin; chmod +w sbin; popd
++endif
++	rm $(OSDRV_DIR)/pub/$(PUB_ROOTFS)/ -rf
+diff --git a/osdrv/tools/pc/rootfs_tools/mk-ext4-image.sh b/osdrv/tools/pc/rootfs_tools/mk-ext4-image.sh
+new file mode 100755
+index 000000000..c13e247d1
+--- /dev/null
++++ b/osdrv/tools/pc/rootfs_tools/mk-ext4-image.sh
+@@ -0,0 +1,19 @@
++#!/bin/bash -e
++
++TARGET_ROOTFS_DIR=$1
++ROOTFSIMAGE=$2
++
++echo Making rootfs!
++
++# Apparent size + maxium alignment(file_count * block_size) + maxium journal size
++IMAGE_SIZE_MB=$(( $(fakeroot du --apparent-size -sm ${TARGET_ROOTFS_DIR} | cut -f1) + \
++	$(fakeroot find ${TARGET_ROOTFS_DIR} | wc -l) * 4 / 1024 + 64 ))
++
++# Extra 10%
++IMAGE_SIZE_MB=$(( $IMAGE_SIZE_MB * 110 / 100 ))
++
++rm -rf ${ROOTFSIMAGE}
++
++fakeroot mkfs.ext4 -d ${TARGET_ROOTFS_DIR} ${ROOTFSIMAGE} ${IMAGE_SIZE_MB}M
++
++echo Rootfs Image: ${ROOTFSIMAGE} size: ${IMAGE_SIZE_MB}M
+-- 
+2.25.1
+

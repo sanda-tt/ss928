@@ -1,0 +1,652 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index c4b5cc2..20eca13 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -25,6 +25,7 @@ shared_library("setting") {
+     "setting/src/main/cpp/setting_wifi_ability_slice.cpp",
+     "setting/src/main/cpp/setting_wifi_input_password_ability_slice.cpp",
+     "setting/src/main/cpp/wpa_work.c",
++    "setting/src/main/cpp/setting_dhcp_ability_slice.cpp"
+   ]
+ 
+   deps = [
+@@ -38,6 +39,7 @@ shared_library("setting") {
+     "//foundation/graphic/surface_lite",
+     "//foundation/systemabilitymgr/samgr_lite/samgr:samgr",
+     "//third_party/wpa_supplicant/wpa_supplicant-2.9:wpa_supplicant",
++    "//foundation/communication/dhcp/frameworks/native:dhcp_client_sdk"
+   ]
+ 
+   include_dirs = [
+@@ -48,6 +50,7 @@ shared_library("setting") {
+     "//base/startup/init/interfaces/innerkits/include/syspara",
+     "//base/security/permission_lite/interfaces/kits",
+     "//third_party/wpa_supplicant/wpa_supplicant-2.9/src/common",
++    "//foundation/communication/dhcp/interfaces/kits/c"
+   ]
+ 
+   ldflags = [
+diff --git a/setting/src/main/cpp/app_ability_slice.cpp b/setting/src/main/cpp/app_ability_slice.cpp
+old mode 100644
+new mode 100755
+diff --git a/setting/src/main/cpp/app_info_ability_slice.cpp b/setting/src/main/cpp/app_info_ability_slice.cpp
+old mode 100644
+new mode 100755
+diff --git a/setting/src/main/cpp/main_ability_slice.cpp b/setting/src/main/cpp/main_ability_slice.cpp
+index f59d47b..73c6c7c 100755
+--- a/setting/src/main/cpp/main_ability_slice.cpp
++++ b/setting/src/main/cpp/main_ability_slice.cpp
+@@ -65,6 +65,11 @@ MainAbilitySlice::~MainAbilitySlice()
+         delete buttonAboutListener_;
+         buttonAboutListener_ = nullptr;
+     }
++
++    if (buttonDhcpListener_) {
++        delete buttonDhcpListener_;
++        buttonDhcpListener_ = nullptr;
++    }
+ }
+ 
+ void MainAbilitySlice::SetButtonListenerWifi(void)
+@@ -128,6 +133,21 @@ void MainAbilitySlice::SetButtonListenerAbout(void)
+     buttonAboutListener_ = new EventListener(onClick4, nullptr);
+ }
+ 
++void MainAbilitySlice::SetButtonListenerDhcp(void)
++{
++    auto onClick5 = [this](UIView& view, const Event& event) -> bool {
++        Want want1 = { nullptr };
++        AbilitySlice* nextSlice = AbilityLoader::GetInstance().GetAbilitySliceByName("SettingDhcpAbilitySlice");
++        if (nextSlice == nullptr) {
++            printf("[warning]undefined SettingDhcpAbilitySlice\n");
++        } else {
++            Present(*nextSlice, want1);
++        }
++        return true;
++    };
++    buttonDhcpListener_ = new EventListener(onClick5, nullptr);
++}
++
+ void MainAbilitySlice::SetHead(void)
+ {
+     auto toLaunher = [this] (UIView &view, const Event &event) -> bool {
+@@ -195,6 +215,29 @@ void MainAbilitySlice::SetWifiButtonView(void)
+     buttonView->Add(imageView);
+ }
+ 
++void MainAbilitySlice::SetDhcpButtonView(void)
++{
++    UIViewGroup* buttonView = new UIViewGroup();
++    buttonView->SetPosition(DHCP_BUTTON_X, DHCP_BUTTON_Y, DE_BUTTON_WIDTH, DE_BUTTON_HEIGHT);
++    buttonView->SetStyle(STYLE_BORDER_RADIUS, DE_BUTTON_RADIUS);
++    buttonView->SetStyle(STYLE_BACKGROUND_COLOR, DE_BUTTON_BACKGROUND_COLOR);
++    buttonView->SetTouchable(true);
++    buttonView->SetOnClickListener(buttonDhcpListener_);
++    scrollView_->Add(buttonView);
++
++    UILabel* lablelFontDhcp = new UILabel();
++    lablelFontDhcp->SetPosition(DE_TITLE_TEXT_X, DHCP_BUTTON_TEXT_DHCP_Y, DE_TITLE_TEXT_WIDTH, DE_TITLE_TEXT_HEIGHT);
++    lablelFontDhcp->SetText("DHCP");
++    lablelFontDhcp->SetFont(DE_FONT_OTF, DE_TITLE_TEXT_SIZE);
++    lablelFontDhcp->SetStyle(STYLE_TEXT_COLOR, DE_TITLE_TEXT_COLOR);
++    buttonView->Add(lablelFontDhcp);
++
++    UIImageView* imageView = new UIImageView();
++    imageView->SetPosition(DE_FORWARD_IMG_X, DE_FORWARD_IMG_Y, DE_FORWARD_IMG_WIDTH, DE_FORWARD_IMG_HEIGHT);
++    imageView->SetSrc(DE_IMAGE_FORWORD);
++    buttonView->Add(imageView);
++}
++
+ void MainAbilitySlice::SetAppButtonView(void)
+ {
+     UIViewGroup* buttonView = new UIViewGroup();
+@@ -307,9 +350,8 @@ void MainAbilitySlice::SetScrollView()
+     scrollView_->SetXScrollBarVisible(false);
+     scrollView_->SetYScrollBarVisible(false);
+     rootView_->Add(scrollView_);
+-    SetWifiButtonView();
+-    SetAppButtonView();
+     SetDisplayButtonView();
++    SetDhcpButtonView();
+     SetAboutButtonView();
+ }
+ 
+@@ -320,8 +362,10 @@ void MainAbilitySlice::OnStart(const Want& want)
+     SetButtonListenerApp();
+     SetButtonListenerDisplay();
+     SetButtonListenerAbout();
++    SetButtonListenerDhcp();
+     rootView_ = RootView::GetWindowRootView();
+     rootView_->SetPosition(DE_ROOT_X, DE_ROOT_Y, DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
++    rootView_->Resize(DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
+     rootView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_ROOT_BACKGROUND_COLOR);
+ 
+     SetHead();
+@@ -336,14 +380,17 @@ void MainAbilitySlice::OnInactive()
+ 
+ void MainAbilitySlice::OnActive(const Want& want)
+ {
+-    char buff[64] = {0};
+-    int ret = GetCurrentConnInfo(buff, sizeof(buff));
+-    if (ret == 0) {
+-        printf("##### SetText -> %s \n", buff);
+-        lablelFontSsid_->SetText(buff);
+-    } else {
+-        lablelFontSsid_->SetText("未连接");
++    if (lablelFontSsid_) {
++        char buff[64] = {0};
++        int ret = GetCurrentConnInfo(buff, sizeof(buff));
++        if (ret == 0) {
++            printf("##### SetText -> %s \n", buff);
++            lablelFontSsid_->SetText(buff);
++        } else {
++            lablelFontSsid_->SetText("未连接");
++        }
+     }
++
+     AbilitySlice::OnActive(want);
+ }
+ 
+@@ -356,4 +403,4 @@ void MainAbilitySlice::OnStop()
+ {
+     AbilitySlice::OnStop();
+ }
+-} // namespace OHOS
+\ No newline at end of file
++} // namespace OHOS
+diff --git a/setting/src/main/cpp/main_ability_slice.h b/setting/src/main/cpp/main_ability_slice.h
+index 75aee45..0fd1334 100755
+--- a/setting/src/main/cpp/main_ability_slice.h
++++ b/setting/src/main/cpp/main_ability_slice.h
+@@ -60,10 +60,12 @@ private:
+     void SetButtonListenerApp();
+     void SetButtonListenerDisplay();
+     void SetButtonListenerAbout();
++    void SetButtonListenerDhcp();
+     void SetAboutButtonView();
+     void SetAppButtonView();
+     void SetDisplayButtonView();
+     void SetWifiButtonView();
++    void SetDhcpButtonView();
+     void SetScrollView();
+     void SetHead();
+ 
+@@ -76,6 +78,7 @@ private:
+     EventListener* buttonDisplayListener_;
+     EventListener* buttonAboutListener_;
+     EventListener* buttonBackListener_;
++    EventListener* buttonDhcpListener_;
+ 
+     constexpr static int WIFI_BUTTON_X = 0;
+     constexpr static int WIFI_BUTTON_Y = 0;
+@@ -83,6 +86,10 @@ private:
+     constexpr static int WIFI_BUTTON_TEXT_SSID_X = 18;
+     constexpr static int WIFI_BUTTON_TEXT_SSID_Y = 45;
+ 
++    constexpr static int DHCP_BUTTON_X = 0;
++    constexpr static int DHCP_BUTTON_Y = 95;
++    constexpr static int DHCP_BUTTON_TEXT_DHCP_Y = 13;
++
+     constexpr static int APP_BUTTON_X = 0;
+     constexpr static int APP_BUTTON_Y = 95;
+ 
+diff --git a/setting/src/main/cpp/setting_about_ability_slice.cpp b/setting/src/main/cpp/setting_about_ability_slice.cpp
+index 089a9bd..1bdacfd 100755
+--- a/setting/src/main/cpp/setting_about_ability_slice.cpp
++++ b/setting/src/main/cpp/setting_about_ability_slice.cpp
+@@ -77,6 +77,8 @@ void SettingAboutAbilitySlice::SetHead()
+     headView_ = new UIViewGroup();
+     rootView_->Add(headView_);
+     headView_->SetPosition(DE_HEAD_X, DE_HEAD_Y, DE_HEAD_WIDTH, DE_HEAD_HEIGHT);
++    rootView_->Resize(DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
++    rootView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_ROOT_BACKGROUND_COLOR);
+     headView_->SetStyle(STYLE_BACKGROUND_OPA, 0);
+     headView_->SetTouchable(true);
+     headView_->SetOnClickListener(buttonBackListener_);
+@@ -126,7 +128,7 @@ void SettingAboutAbilitySlice::SetScroll()
+     scrollView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_SCROLL_COLOR);
+     scrollView_->SetPosition(DE_SCROLL_X, DE_SCROLL_Y, DE_SCROLL_WIDTH, DE_SCROLL_HEIGHT);
+     scrollView_->SetXScrollBarVisible(false);
+-    scrollView_->SetYScrollBarVisible(true);
++    scrollView_->SetYScrollBarVisible(false);
+     rootView_->Add(scrollView_);
+     for (int count = 0; count < SCROLL_ITEM_NUM; count++) {
+         SetScrollItem(count);
+diff --git a/setting/src/main/cpp/setting_dhcp_ability_slice.cpp b/setting/src/main/cpp/setting_dhcp_ability_slice.cpp
+new file mode 100644
+index 0000000..2595b1a
+--- /dev/null
++++ b/setting/src/main/cpp/setting_dhcp_ability_slice.cpp
+@@ -0,0 +1,235 @@
++/*
++ * Copyright (c) 2026 Huawei Device Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "setting_dhcp_ability_slice.h"
++#include <iostream>
++#include <thread>
++#include "gfx_utils/style.h"
++#include "dhcp_lite_c_client_api.h"
++
++namespace OHOS {
++REGISTER_AS(SettingDhcpAbilitySlice)
++static int g_DhcpStatus = 0;
++
++static void OnIpSuccessChanged(int status, const char *ifname, DhcpResult *result)
++{
++    printf("OnIpSuccessChanged, status = %d, ifname = %s, result ip= %s\n", status, ifname, result->strOptClientId);
++}
++
++static void OnIpFailChanged(int status, const char *ifname, const char *reason)
++{
++    printf("OnIpFailChanged, status = %d, ifname = %s, reason = %s\n", status, ifname, reason);
++}
++
++static ClientCallBack g_callback = {
++    OnIpSuccessChanged,
++    OnIpFailChanged,
++};
++
++bool DhcpBtnOnStateChangeListener::OnClick(UIView& view, const ClickEvent& event)
++{
++    int result = 0;
++    bool ret = myUiView->IsVisible();
++    if (ret == false) {
++        myUiView->SetVisible(true);
++        int ret = RegisterDhcpClientCallBack("eth0", &g_callback);
++        if (ret != DHCP_SUCCESS) {
++            printf("RegisterDhcpClientCallBack failed, ret = %d\n", ret);
++        }
++        RouterConfig config = {0};
++        strcpy(config.ifname, "eth0");
++        result = StartDhcpClient(config);
++        if (result != DHCP_SUCCESS) {
++            printf("StartDhcpClient failed, ret = %d\n", result);
++            g_DhcpStatus = 0;
++        } else {
++            g_DhcpStatus = 1;
++        }
++    } else {
++        myUiView->SetVisible(false);
++        result = StopDhcpClient("eth0", false);
++        if (result != DHCP_SUCCESS) {
++            printf("StopDhcpClient failed, ret = %d\n", result);
++            g_DhcpStatus = 1;
++        } else {
++            g_DhcpStatus = 0;
++        }
++    }
++    myUiView->Invalidate();
++    return true;
++}
++
++SettingDhcpAbilitySlice::SettingDhcpAbilitySlice()
++    : headView_(nullptr), toggleButtonView_(nullptr), scrollView_(nullptr), rootView_(nullptr),
++      changeListener_(nullptr), buttonBackListener_(nullptr)
++{
++    int taskPeriod = 5000;
++    Task::Init();
++    SetPeriod(taskPeriod);
++}
++
++SettingDhcpAbilitySlice::~SettingDhcpAbilitySlice()
++{
++    if (toggleButtonView_) {
++        DeleteChildren(toggleButtonView_);
++        toggleButtonView_ = nullptr;
++    }
++
++    if (scrollView_) {
++        DeleteChildren(scrollView_);
++        scrollView_ = nullptr;
++    }
++
++    if (headView_) {
++        DeleteChildren(headView_);
++        headView_ = nullptr;
++    }
++
++    if (changeListener_) {
++        delete changeListener_;
++        changeListener_ = nullptr;
++    }
++
++    if (buttonBackListener_) {
++        delete buttonBackListener_;
++        buttonBackListener_ = nullptr;
++    }
++}
++
++void SettingDhcpAbilitySlice::SetButtonListener(void)
++{
++    auto onClick = [this](UIView& view, const Event& event) -> bool {
++        Want want1 = { nullptr };
++        AbilitySlice* nextSlice = AbilityLoader::GetInstance().GetAbilitySliceByName("MainAbilitySlice");
++        if (nextSlice == nullptr) {
++            printf("[warning]undefined SettingDhcpAbilitySlice\n");
++        } else {
++            Present(*nextSlice, want1);
++        }
++        return true;
++    };
++    buttonBackListener_ = new EventListener(onClick, nullptr);
++}
++
++void SettingDhcpAbilitySlice::SetHead(void)
++{
++    headView_ = new UIViewGroup();
++    rootView_->Add(headView_);
++    headView_->SetPosition(DE_HEAD_X, DE_HEAD_Y, DE_HEAD_WIDTH, DE_HEAD_HEIGHT);
++    headView_->SetStyle(STYLE_BACKGROUND_OPA, 0);
++    headView_->SetTouchable(true);
++    headView_->SetOnClickListener(buttonBackListener_);
++
++    UIImageView* imageView = new UIImageView();
++    headView_->Add(imageView);
++    imageView->SetPosition(DE_HEAD_IMAGE_X, DE_HEAD_IMAGE_Y, DE_HEAD_IMAGE_WIDTH, DE_HEAD_IMAGE_HEIGHT);
++    imageView->SetSrc(DE_IMAGE_BACK);
++
++    UILabel* lablelFont = new UILabel();
++    lablelFont->SetPosition(DE_HEAD_TEXT_X, DE_HEAD_TEXT_Y, DE_HEAD_TEXT_WIDTH, DE_HEAD_TEXT_HEIGHT);
++    lablelFont->SetText("DHCP");
++    lablelFont->SetFont(DE_FONT_OTF, DE_HEAD_TEXT_SIZE);
++    lablelFont->SetStyle(STYLE_TEXT_COLOR, DE_HEAD_TEXT_COLOR);
++    headView_->Add(lablelFont);
++}
++
++void SettingDhcpAbilitySlice::SetToggleButton(void)
++{
++    toggleButtonView_ = new UIViewGroup();
++    toggleButtonView_->SetPosition(TOGGLE_X, TOGGLE_Y, DE_BUTTON_WIDTH, DE_BUTTON_HEIGHT);
++    toggleButtonView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_BUTTON_BACKGROUND_COLOR);
++    toggleButtonView_->SetStyle(STYLE_BACKGROUND_OPA, DE_OPACITY_ALL);
++    toggleButtonView_->SetStyle(STYLE_BORDER_RADIUS, DE_BUTTON_RADIUS);
++    rootView_->Add(toggleButtonView_);
++
++    auto lablelFont = new UILabel();
++    lablelFont->SetPosition(DE_TITLE_TEXT_X, DE_TITLE_TEXT_Y, DE_TITLE_TEXT_WIDTH, DE_TITLE_TEXT_HEIGHT);
++    lablelFont->SetText("DHCP");
++    lablelFont->SetFont(DE_FONT_OTF, DE_TITLE_TEXT_SIZE);
++    lablelFont->SetStyle(STYLE_TEXT_COLOR, DE_TITLE_TEXT_COLOR);
++    toggleButtonView_->Add(lablelFont);
++
++    UIToggleButton* togglebutton = new UIToggleButton();
++    changeListener_ = new DhcpBtnOnStateChangeListener(reinterpret_cast<UIView*>(scrollView_));
++    togglebutton->SetOnClickListener(changeListener_);
++    togglebutton->SetPosition(DE_TOGGLE_BUTTON_X, DE_TOGGLE_BUTTON_Y);
++    togglebutton->SetState(false);
++    scrollView_->SetVisible(false);
++
++    toggleButtonView_->Add(togglebutton);
++}
++
++void SettingDhcpAbilitySlice::SetUseDhcp(void)
++{
++    UILabel* lablelFont = new UILabel();
++    lablelFont->SetPosition(USE_DHCP_FONT_X, USE_DHCP_FONT_Y, DE_TITLE_TEXT_WIDTH, DE_TITLE_TEXT_HEIGHT);
++    lablelFont->SetText("DHCP信息");
++    lablelFont->SetFont(DE_FONT_OTF, DE_TITLE_TEXT_SIZE);
++    lablelFont->SetStyle(STYLE_TEXT_COLOR, DE_SUBTITLE_TEXT_COLOR);
++    rootView_->Add(lablelFont);
++}
++
++void SettingDhcpAbilitySlice::SetScrollDhcp(void)
++{
++    scrollView_ = new UIScrollView();
++    scrollView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_SCROLL_COLOR);
++    scrollView_->SetPosition(DE_SCROLL_X, SCROLL_DHCP_Y, DE_SCROLL_WIDTH, SCROLL_DHCP_HEIGHT);
++    scrollView_->SetXScrollBarVisible(false);
++    scrollView_->SetYScrollBarVisible(false);
++    rootView_->Add(scrollView_);
++}
++
++void SettingDhcpAbilitySlice::Callback()
++{
++    /*TODO*/
++}
++
++void SettingDhcpAbilitySlice::OnStart(const Want& want)
++{
++    AbilitySlice::OnStart(want);
++    rootView_ = RootView::GetWindowRootView();
++    rootView_->SetPosition(DE_ROOT_X, DE_ROOT_Y, DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
++    rootView_->Resize(DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
++    rootView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_ROOT_BACKGROUND_COLOR);
++    SetButtonListener();
++    SetHead();
++    // SetUseDhcp();
++    SetScrollDhcp();
++    SetToggleButton();
++
++    TaskExecute();
++    SetUIContent(rootView_);
++}
++
++void SettingDhcpAbilitySlice::OnInactive()
++{
++    AbilitySlice::OnInactive();
++}
++
++void SettingDhcpAbilitySlice::OnActive(const Want& want)
++{
++    AbilitySlice::OnActive(want);
++}
++
++void SettingDhcpAbilitySlice::OnBackground()
++{
++    AbilitySlice::OnBackground();
++}
++
++void SettingDhcpAbilitySlice::OnStop()
++{
++    AbilitySlice::OnStop();
++}
++} // namespace OHOS
+diff --git a/setting/src/main/cpp/setting_dhcp_ability_slice.h b/setting/src/main/cpp/setting_dhcp_ability_slice.h
+new file mode 100644
+index 0000000..2474bbb
+--- /dev/null
++++ b/setting/src/main/cpp/setting_dhcp_ability_slice.h
+@@ -0,0 +1,90 @@
++/*
++ * Copyright (c) 2026 Huawei Device Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_SETTING_DHCP_ABILITY_SLICE_H
++#define OHOS_SETTING_DHCP_ABILITY_SLICE_H
++
++#include <cstddef>
++#include <cstdio>
++#include <cstring>
++
++#include "ability_loader.h"
++#include "common/task.h"
++#include "components/ui_label.h"
++#include "components/ui_label_button.h"
++#include "components/ui_list.h"
++#include "components/ui_scroll_view.h"
++#include "components/ui_toggle_button.h"
++#include "event_listener.h"
++#include "gfx_utils/list.h"
++#include "parameter.h"
++#include "pthread.h"
++#include "setting_utils.h"
++
++namespace OHOS {
++class DhcpBtnOnStateChangeListener : public OHOS::UICheckBox::OnChangeListener, public OHOS::UIView::OnClickListener {
++public:
++    ~DhcpBtnOnStateChangeListener() {}
++    explicit DhcpBtnOnStateChangeListener(UIView* uiView) : myUiView(uiView) {}
++
++    bool OnChange(UICheckBox::UICheckBoxState state) override
++    {
++        return true;
++    }
++    bool OnClick(UIView& view, const ClickEvent& event) override;
++
++private:
++    UIView* myUiView;
++};
++
++class SettingDhcpAbilitySlice : public AbilitySlice, Task {
++public:
++    SettingDhcpAbilitySlice();
++    virtual ~SettingDhcpAbilitySlice();
++    void Callback() override;
++protected:
++    void OnStart(const Want& want) override;
++    void OnInactive() override;
++    void OnActive(const Want& want) override;
++    void OnBackground() override;
++    void OnStop() override;
++
++private:
++    void SetButtonListener();
++    void SetHead();
++    void SetToggleButton();
++    void SetUseDhcp();
++    void SetScrollDhcp();
++
++    UIViewGroup* headView_;
++    UIViewGroup* toggleButtonView_;
++    UIScrollView* scrollView_;
++    RootView* rootView_;
++    DhcpBtnOnStateChangeListener* changeListener_;
++    EventListener* buttonBackListener_;
++
++    constexpr static int TOGGLE_X = 36;
++    constexpr static int TOGGLE_Y = 72;
++
++    constexpr static int USE_DHCP_FONT_X = 54;
++    constexpr static int USE_DHCP_FONT_Y = 187;
++
++    constexpr static int SCROLL_DHCP_X = 36;
++    constexpr static int SCROLL_DHCP_Y = 242;
++    constexpr static int SCROLL_DHCP_WIDTH = 960;
++    constexpr static int SCROLL_DHCP_HEIGHT = 238;
++};
++} // namespace OHOS
++#endif
+diff --git a/setting/src/main/cpp/setting_display_ability_slice.cpp b/setting/src/main/cpp/setting_display_ability_slice.cpp
+index 5b70ba1..2759e8f 100755
+--- a/setting/src/main/cpp/setting_display_ability_slice.cpp
++++ b/setting/src/main/cpp/setting_display_ability_slice.cpp
+@@ -113,6 +113,7 @@ void SettingDisplayAbilitySlice::OnStart(const Want& want)
+ 
+     rootView_ = RootView::GetWindowRootView();
+     rootView_->SetPosition(DE_ROOT_X, DE_ROOT_Y, DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
++    rootView_->Resize(DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
+     rootView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_ROOT_BACKGROUND_COLOR);
+     SetButtonListener();
+     SetHead();
+diff --git a/setting/src/main/cpp/setting_utils.h b/setting/src/main/cpp/setting_utils.h
+index b291e8d..5ab10ae 100755
+--- a/setting/src/main/cpp/setting_utils.h
++++ b/setting/src/main/cpp/setting_utils.h
+@@ -28,15 +28,15 @@ namespace OHOS {
+ 
+ #define DE_ROOT_X 0
+ #define DE_ROOT_Y 0
+-#define DE_ROOT_WIDTH 960
+-#define DE_ROOT_HEIGHT 480
+-#define DE_ROOT_BACKGROUND_COLOR Color::ColorTo32(Color::Black())
++#define DE_ROOT_WIDTH 1920
++#define DE_ROOT_HEIGHT 1080
++#define DE_ROOT_BACKGROUND_COLOR Color::ColorTo32(Color::Gray())
+ 
+ #define DE_SCROLL_X 36
+ #define DE_SCROLL_Y 72
+-#define DE_SCROLL_WIDTH 888
+-#define DE_SCROLL_HEIGHT 408
+-#define DE_SCROLL_COLOR Color::ColorTo32(Color::Black())
++#define DE_SCROLL_WIDTH 1840
++#define DE_SCROLL_HEIGHT 1008
++#define DE_SCROLL_COLOR Color::ColorTo32(Color::Gray())
+ 
+ #define DE_HEAD_X  0
+ #define DE_HEAD_Y  0
+@@ -55,7 +55,7 @@ namespace OHOS {
+ #define DE_HEAD_TEXT_SIZE 32
+ #define DE_HEAD_TEXT_COLOR Color::ColorTo32(Color::White())
+ 
+-#define DE_BUTTON_WIDTH 888
++#define DE_BUTTON_WIDTH 1840
+ #define DE_BUTTON_HEIGHT 89
+ #define DE_BUTTON_BACKGROUND_COLOR Color::ColorTo32(Color::GetColorFromRGB(0x33, 0x33, 0x33))
+ #define DE_BUTTON_RADIUS 16
+@@ -67,17 +67,17 @@ namespace OHOS {
+ #define DE_TITLE_TEXT_SIZE 26
+ #define DE_TITLE_TEXT_COLOR Color::ColorTo32(Color::White())
+ 
+-#define DE_SUBTITLE_TEXT_WIDTH 400
++#define DE_SUBTITLE_TEXT_WIDTH 600
+ #define DE_SUBTITLE_TEXT_HEIGHT 40
+ #define DE_SUBTITLE_TEXT_COLOR Color::ColorTo32(Color::GetColorFromRGB(0x9F, 0x9F, 0x9F))
+ #define DE_SUBTITLE_TEXT_SIZE 24
+ 
+-#define DE_FORWARD_IMG_X 855
++#define DE_FORWARD_IMG_X 1805
+ #define DE_FORWARD_IMG_Y 24
+ #define DE_FORWARD_IMG_WIDTH 12
+ #define DE_FORWARD_IMG_HEIGHT 12
+ 
+-#define DE_TOGGLE_BUTTON_X 816
++#define DE_TOGGLE_BUTTON_X 1776
+ #define DE_TOGGLE_BUTTON_Y 14
+ 
+ #define DE_ITEM_INTERVAL 95
+diff --git a/setting/src/main/cpp/setting_wifi_ability_slice.cpp b/setting/src/main/cpp/setting_wifi_ability_slice.cpp
+index c37b18f..503599a 100755
+--- a/setting/src/main/cpp/setting_wifi_ability_slice.cpp
++++ b/setting/src/main/cpp/setting_wifi_ability_slice.cpp
+@@ -212,7 +212,7 @@ void SettingWifiAbilitySlice::SetScrollWifi(void)
+     scrollView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_SCROLL_COLOR);
+     scrollView_->SetPosition(DE_SCROLL_X, SCROLL_WIFI_Y, DE_SCROLL_WIDTH, SCROLL_WIFI_HEIGHT);
+     scrollView_->SetXScrollBarVisible(false);
+-    scrollView_->SetYScrollBarVisible(true);
++    scrollView_->SetYScrollBarVisible(false);
+     rootView_->Add(scrollView_);
+     g_wifiStatus = 0;
+     AddWifi();
+@@ -239,6 +239,7 @@ void SettingWifiAbilitySlice::OnStart(const Want& want)
+ 
+     rootView_ = RootView::GetWindowRootView();
+     rootView_->SetPosition(DE_ROOT_X, DE_ROOT_Y, DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
++    rootView_->Resize(DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
+     rootView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_ROOT_BACKGROUND_COLOR);
+     SetButtonListener();
+     SetHead();
+diff --git a/setting/src/main/cpp/setting_wifi_input_password_ability_slice.cpp b/setting/src/main/cpp/setting_wifi_input_password_ability_slice.cpp
+index 4f7ceb6..37b512e 100755
+--- a/setting/src/main/cpp/setting_wifi_input_password_ability_slice.cpp
++++ b/setting/src/main/cpp/setting_wifi_input_password_ability_slice.cpp
+@@ -245,6 +245,7 @@ void SettingWifiInputPasswordAbilitySlice::OnStart(const Want& want)
+     g_inputCount = 0;
+     g_cursorPositionX = 20; // 20
+     rootView_->SetPosition(DE_ROOT_X, DE_ROOT_Y, DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
++    rootView_->Resize(DE_ROOT_WIDTH, DE_ROOT_HEIGHT);
+     rootView_->SetStyle(STYLE_BACKGROUND_COLOR, DE_ROOT_BACKGROUND_COLOR);
+     SetButtonListener();
+     SetHead();

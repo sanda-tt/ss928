@@ -1,0 +1,146 @@
+{
+  "modelName": "SqueezeNet1_1",
+  "modelDesc": "Squeezenet的设计采用了卷积替换、减少卷积通道数和降采样操作后置等策略，旨在在不大幅降低模型精度的前提下，最大程度的提高运算速度。",
+  "modelRepository": "https://gitee.com/HiSpark/modelzoo/tree/master/samples/built-in/classification/SqueezeNet1_1",
+  "modelParameter": {
+    "输入": "224x224",
+    "参数量": "1.235 M",
+    "计算量": "0.715 GFLOPs"
+  },
+  "isBeta": false,
+  "betaDesc": "",
+  "modelFeedback": "https://developers.hisilicon.com/forum/0155201230363076006",
+  "modelUsageScenes": [
+    {
+      "task": "Vision",
+      "tags": [
+        "分类"
+      ]
+    }
+  ],
+  "modelFrame": [
+    "PyTorch"
+  ],
+  "modelDatasets": {
+    "desc": "数据集ImageNet",
+    "link": "https://image-net.org/"
+  },
+  "srcModelLicense": [
+    {
+      "desc": "源模型",
+      "link": "https://github.com/pytorch/vision/blob/v0.14.0/LICENSE"
+    }
+  ],
+  "modelLicense": [
+    {
+      "desc": "部署模型",
+      "link": "https://gitee.com/HiSpark/modelzoo/blob/master/LICENSE"
+    }
+  ],
+  "quickStart": {
+    "md": "https://gitee.com/HiSpark/modelzoo-dev/tree/master/samples/built-in/classification/SqueezeNet1_1/"
+  },
+  "modelChipset": [
+    {
+      "chipset": "Hi3403 SVP_NNN",
+      "tools": [
+        {
+          "name": "CANN配置",
+          "link": "https://hispark-obs.obs.cn-east-3.myhuaweicloud.com/SVP_NNN_PC_V1.0.6.0.tgz",
+          "desc": ""
+        },
+        {
+          "name": "编译工具库",
+          "link": "https://gitee.com/HiSpark/pegasus/blob/Beta-v0.9.1/docs/Hi3403V100%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97/Hi3403V100%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97.md",
+          "desc": ""
+        },
+        {
+          "name": "SDK",
+          "link": "https://gitee.com/HiSpark/ss928v100_clang/tree/Beta-v0.9.1/",
+          "desc": ""
+        }
+      ],
+      "os": [
+        "OpenHarmony",
+        "Linux"
+      ],
+      "performance": [
+        {
+          "quantMode": "A8W8",
+          "detail": [
+            {
+              "performance": 0.502,
+              "performanceUnit": "耗时（ms）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 1992.07,
+              "performanceUnit": "性能（fps）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 3.762,
+              "performanceUnit": "单帧内存带宽（MB）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 4.84,
+              "performanceUnit": "内存（MB）",
+              "performanceDesc": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chipset": "Hi3403 NNN",
+      "tools": [
+        {
+          "name": "CANN工具包 SPC022 (请联系FAE获取)",
+          "link": "",
+          "desc": ""
+        },
+        {
+          "name": "编译工具链 aarch64-mix210-linux-gcc (请联系FAE获取)",
+          "link": "",
+          "desc": ""
+        },
+        {
+          "name": "SDK SPC022 (请联系FAE获取)",
+          "link": "",
+          "desc": ""
+        }
+      ],
+      "os": [
+        "Linux"
+      ],
+      "performance": [
+        {
+          "quantMode": "FP16",
+          "detail": [
+            {
+              "performance": 1.247,
+              "performanceUnit": "耗时（ms）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 801.62,
+              "performanceUnit": "性能（fps）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 14.634,
+              "performanceUnit": "带宽（MB）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 50.066,
+              "performanceUnit": "内存（MB）",
+              "performanceDesc": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

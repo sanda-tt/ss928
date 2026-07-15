@@ -1,0 +1,13 @@
+diff --git a/lite/appspawn_process.c b/lite/appspawn_process.c
+index 2071439..e47f560 100644
+--- a/lite/appspawn_process.c
++++ b/lite/appspawn_process.c
+@@ -144,7 +144,7 @@ static int SetCapabilities(struct AppSpawnContent *content, AppSpawnClient *clie
+     }
+ 
+ #ifndef APPSPAWN_TEST
+-    unsigned int tmpCaps[] = {17};  // 17 means CAP_SYS_RAWIO
++    unsigned int tmpCaps[] = {17, 21, 23};  // 17 means CAP_SYS_RAWIO, CAP_SYS_ADMIN (21), CAP_SYS_NICE (23)
+     unsigned int tmpsCapCnt = sizeof(tmpCaps) / sizeof(tmpCaps[0]);
+     if (SetCapability(tmpsCapCnt, tmpCaps) != 0) {
+         APPSPAWN_LOGE("[appspawn] setrlimit failed, err: %d.", errno);

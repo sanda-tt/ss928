@@ -1,0 +1,12 @@
+diff --git a/interfaces/innerkits/appverify_lite/include/app_file.h b/interfaces/innerkits/appverify_lite/include/app_file.h
+index 6b36115..b6f9592 100644
+--- a/interfaces/innerkits/appverify_lite/include/app_file.h
++++ b/interfaces/innerkits/appverify_lite/include/app_file.h
+@@ -17,6 +17,7 @@
+ #define SECURITY_APP_FILE_H
+ 
+ #include <stdint.h>
++#include <stdlib.h>
+ 
+ #ifdef __cplusplus
+ #if __cplusplus

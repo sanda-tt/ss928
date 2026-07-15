@@ -1,0 +1,404 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 9fdb375..a36239e 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -74,6 +74,7 @@ lite_library("graphic_utils_lite") {
+     "frameworks/hal_cpu.cpp",
+     "frameworks/hal_tick.cpp",
+     "frameworks/mem_api.cpp",
++    "frameworks/mem_custom.cpp",
+     "frameworks/pixel_format_utils.cpp",
+     "frameworks/style.cpp",
+     "frameworks/trans_affine.cpp",
+@@ -86,7 +87,10 @@ lite_library("graphic_utils_lite") {
+     public_deps =
+         [ "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_static" ]
+   } else {
+-    deps = [ "//third_party/bounds_checking_function:libsec_shared" ]
++    deps = [
++      ":graphic_hals",
++      "//third_party/bounds_checking_function:libsec_shared"
++    ]
+     public_deps =
+         [ "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared" ]
+   }
+@@ -97,6 +101,8 @@ config("graphic_utils_public_config") {
+     "interfaces/innerkits",
+     "interfaces/kits",
+     "$product_path/graphic_config",
++    "//drivers/peripheral/base",
++    "//drivers/peripheral/display/interfaces/include",
+   ]
+ 
+   defines += [
+@@ -132,12 +138,13 @@ if (ohos_kernel_type != "liteos_m") {
+     sources = [
+       "frameworks/hals/gfx_engines.cpp",
+       "frameworks/hals/hi_fbdev.cpp",
++      "frameworks/hals/gralloc_engines.cpp"
+     ]
+     include_dirs =
+         [ "//foundation/window/window_manager_lite/interfaces/innerkits" ]
+     deps = [
+-      ":utils_lite",
+       "//drivers/peripheral/display/hal:hdi_display",
++      "//third_party/bounds_checking_function:libsec_shared"
+     ]
+     public_configs = [ ":graphic_hals_public_config" ]
+     ldflags = [
+@@ -150,6 +157,7 @@ if (ohos_kernel_type != "liteos_m") {
+ 
+ config("graphic_hals_public_config") {
+   include_dirs = [
++    "interfaces/kits",
+     "interfaces/innerkits",
+     "//drivers/peripheral/base",
+     "//drivers/peripheral/display/interfaces/include",
+diff --git a/frameworks/hals/gfx_engines.cpp b/frameworks/hals/gfx_engines.cpp
+index 6653222..5b55677 100644
+--- a/frameworks/hals/gfx_engines.cpp
++++ b/frameworks/hals/gfx_engines.cpp
+@@ -16,6 +16,7 @@
+ #include "hals/gfx_engines.h"
+ 
+ #include "gfx_utils/graphic_log.h"
++#include "securec.h"
+ 
+ namespace OHOS {
+ struct {
+@@ -161,4 +162,43 @@ bool GfxEngines::GfxBlit(const LiteSurfaceData& srcSurfaceData,
+     }
+     return true;
+ }
++
++bool GfxEngines::GfxBlitWithOpt(const LiteSurfaceData& srcSurfaceData,
++                                const Rect& srcRect,
++                                const LiteSurfaceData& dstSurfaceData,
++                                const Rect& dstRect,
++                                uint8_t opa)
++{
++    if (gfxFuncs_ == nullptr || srcSurfaceData.phyAddr == nullptr || dstSurfaceData.phyAddr == nullptr) {
++        return false;
++    }
++    ISurface srcSurface = {};
++    ISurface dstSurface = {};
++    if (Convert2ISurface(srcSurfaceData, srcSurface) == false) {
++        return false;
++    }
++    if (Convert2ISurface(dstSurfaceData, dstSurface) == false) {
++        return false;
++    }
++    IRect srcIRect = {};
++    IRect dstIRect = {};
++    Convert2IRect(srcRect, srcIRect);
++    Convert2IRect(dstRect, dstIRect);
++    GfxOpt opt;
++    if (memset_s(&opt, sizeof(GfxOpt), 0, sizeof(GfxOpt)) != EOK) {
++        return false;
++    }
++    opt.enPixelAlpha = true;
++    opt.blendType = BLEND_SRCOVER;
++    opt.enableScale = true;
++    opt.enGlobalAlpha = true;
++    opt.globalAlpha = opa;
++
++    if (gfxFuncs_->Blit(&srcSurface, &srcIRect, &dstSurface, &dstIRect, &opt) == DISPLAY_FAILURE) {
++        GRAPHIC_LOGW("HW blit failed, and retry SW blit.");
++        return false;
++    }
++    return true;
++}
++
+ } // namespace OHOS
+diff --git a/frameworks/hals/gralloc_engines.cpp b/frameworks/hals/gralloc_engines.cpp
+new file mode 100644
+index 0000000..1a12a47
+--- /dev/null
++++ b/frameworks/hals/gralloc_engines.cpp
+@@ -0,0 +1,81 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "hals/gralloc_engines.h"
++#include <map>
++#include "display_type.h"
++#include "gfx_utils/graphic_log.h"
++#include "securec.h"
++namespace OHOS {
++static std::map<uint64_t, BufferHandle*> buffers;
++
++GrallocEngines* GrallocEngines::GetInstance()
++{
++    static GrallocEngines instance;
++    return &instance;
++}
++
++bool GrallocEngines::Init()
++{
++    if (grallocFuncs_ != nullptr) {
++        GRAPHIC_LOGI("GrallocEngines has init succeed.");
++        return true;
++    }
++#ifdef ENABLE_GFX_ENGINES
++    if (GrallocInitialize(&grallocFuncs_) != DISPLAY_SUCCESS) {
++        return false;
++    }
++#endif
++    return true;
++}
++
++bool GrallocEngines::AllocBuffer(const AllocInfo& info, GrallocBuffer& buffer)
++{
++    if (grallocFuncs_ == nullptr) {
++        GRAPHIC_LOGE("GrallocEngines not init!");
++        return false;
++    }
++    BufferHandle* bufferHandle = nullptr;
++    if (grallocFuncs_->AllocMem(&info, &bufferHandle) != DISPLAY_SUCCESS) {
++        return false;
++    }
++    buffers.insert(std::make_pair(reinterpret_cast<uint64_t>(bufferHandle->virAddr), bufferHandle));
++    buffer.phyAddr = bufferHandle->phyAddr;
++    buffer.virAddr = bufferHandle->virAddr;
++    return true;
++}
++
++void GrallocEngines::FreeBuffer(const uint8_t* virAddr)
++{
++    if (grallocFuncs_ == nullptr) {
++        GRAPHIC_LOGE("GrallocEngines not init!");
++        return;
++    }
++
++    if (virAddr == nullptr) {
++        return;
++    }
++
++    uint64_t addr = reinterpret_cast<uint64_t>(virAddr);
++    auto iter = buffers.find(addr);
++    if (iter != buffers.end()) {
++        BufferHandle* handle = iter->second;
++        if (handle != nullptr) {
++            buffers.erase(iter);
++            grallocFuncs_->FreeMem(handle);
++        }
++    }
++}
++} // namespace OHOS
+\ No newline at end of file
+diff --git a/frameworks/mem_api.cpp b/frameworks/mem_api.cpp
+index 974a0d7..83a0f43 100644
+--- a/frameworks/mem_api.cpp
++++ b/frameworks/mem_api.cpp
+@@ -17,6 +17,7 @@
+ #include "gfx_utils/common_macros.h"
+ 
+ namespace OHOS {
++#ifndef IMG_CACHE_MEMORY_CUSTOM
+ UI_WEAK_SYMBOL void* ImageCacheMalloc(const ImageInfo& info)
+ {
+     return malloc(info.dataSize);
+@@ -29,6 +30,7 @@ UI_WEAK_SYMBOL void ImageCacheFree(ImageInfo& info)
+     info.data = nullptr;
+     return;
+ }
++#endif
+ 
+ UI_WEAK_SYMBOL void* UIMalloc(uint32_t size)
+ {
+diff --git a/frameworks/mem_custom.cpp b/frameworks/mem_custom.cpp
+new file mode 100644
+index 0000000..9e4a59e
+--- /dev/null
++++ b/frameworks/mem_custom.cpp
+@@ -0,0 +1,51 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "gfx_utils/mem_api.h"
++#include "gfx_utils/common_macros.h"
++#ifdef IMG_CACHE_MEMORY_CUSTOM
++#include "hals/gralloc_engines.h"
++#include "gfx_utils/graphic_log.h"
++
++namespace OHOS {
++UI_WEAK_SYMBOL void* ImageCacheMalloc(const ImageInfo& info)
++{
++    AllocInfo allocInfo;
++    allocInfo.expectedSize = info.dataSize;
++    allocInfo.usage = HBM_USE_ASSIGN_SIZE | HBM_USE_MEM_MMZ;
++    GrallocBuffer buffer;
++    if (!GrallocEngines::GetInstance()->AllocBuffer(allocInfo, buffer)) {
++        GRAPHIC_LOGE("AllocBuffer failed.");
++        return nullptr;
++    }
++    uint8_t** buf = const_cast<uint8_t**>(&info.phyAddr);
++    *buf = reinterpret_cast<uint8_t*>(buffer.phyAddr);
++    buf = const_cast<uint8_t**>(&info.data);
++    *buf = reinterpret_cast<uint8_t*>(buffer.virAddr);
++    return buffer.virAddr;
++}
++
++UI_WEAK_SYMBOL void ImageCacheFree(ImageInfo& info)
++{
++    if (info.data == nullptr) {
++        return;
++    }
++    GrallocEngines::GetInstance()->FreeBuffer(info.data);
++    info.phyAddr = nullptr;
++    info.data = nullptr;
++    return;
++}
++}
++#endif
+\ No newline at end of file
+diff --git a/interfaces/innerkits/graphic_config.h b/interfaces/innerkits/graphic_config.h
+index 83f533b..40b570f 100755
+--- a/interfaces/innerkits/graphic_config.h
++++ b/interfaces/innerkits/graphic_config.h
+@@ -257,6 +257,21 @@ namespace OHOS {
+ #ifndef ENABLE_PNG
+ #define ENABLE_PNG                        1
+ #endif
++
++/**
++ * @brief Customize the memory area when loading image resources
++ */
++#ifndef IMG_CACHE_MEMORY_CUSTOM
++#define IMG_CACHE_MEMORY_CUSTOM            1
++#endif
++
++/**
++ * @brief Cache the decoded content for Jpeg and Png image
++ */
++#ifndef CACHE_JPEG_AND_PNG
++#define CACHE_JPEG_AND_PNG                1
++#endif
++
+ /**
+  * @brief ARM NEON ability, which is enabled by default on other platforms.
+  */
+diff --git a/interfaces/innerkits/hals/gfx_engines.h b/interfaces/innerkits/hals/gfx_engines.h
+index 8e4d539..93bc9ad 100644
+--- a/interfaces/innerkits/hals/gfx_engines.h
++++ b/interfaces/innerkits/hals/gfx_engines.h
+@@ -40,6 +40,12 @@ public:
+                  const LiteSurfaceData& dstSurfaceData,
+                  int16_t x,
+                  int16_t y);
++
++    bool GfxBlitWithOpt(const LiteSurfaceData& srcSurfaceData,
++                    const Rect& srcRect,
++                    const LiteSurfaceData& dstSurfaceData,
++                    const Rect& dstRect,
++                    uint8_t opa);
+ private:
+     GfxEngines() : gfxFuncs_(nullptr) {}
+     virtual ~GfxEngines() {}
+diff --git a/interfaces/innerkits/hals/gralloc_engines.h b/interfaces/innerkits/hals/gralloc_engines.h
+new file mode 100644
+index 0000000..863f586
+--- /dev/null
++++ b/interfaces/innerkits/hals/gralloc_engines.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef GRAPHIC_LITE_GRALLOC_ENGINES_H
++#define GRAPHIC_LITE_GRALLOC_ENGINES_H
++#include "display_gralloc.h"
++#include "display_type.h"
++#ifndef __LITEOS_M__
++#include "buffer_handle.h"
++#endif
++
++namespace OHOS {
++typedef struct {
++    void* virAddr;
++    uint64_t phyAddr;
++} GrallocBuffer;
++
++class GrallocEngines {
++public:
++    static GrallocEngines* GetInstance();
++    bool Init();
++
++    bool AllocBuffer(const AllocInfo& info, GrallocBuffer& buffer);
++    void FreeBuffer(const uint8_t* virAddr);
++
++private:
++    GrallocEngines() : grallocFuncs_(nullptr) {}
++    ~GrallocEngines() {}
++    GrallocFuncs* grallocFuncs_;
++};
++} // end namespace
++#endif // GRAPHIC_LITE_GRALLOC_ENGINES_H
+\ No newline at end of file
+diff --git a/interfaces/kits/gfx_utils/image_info.h b/interfaces/kits/gfx_utils/image_info.h
+index cf3df69..99f2cee 100644
+--- a/interfaces/kits/gfx_utils/image_info.h
++++ b/interfaces/kits/gfx_utils/image_info.h
+@@ -36,6 +36,7 @@
+ #define GRAPHIC_LITE_IMAGE_INFO_H
+ 
+ #include <cstdint>
++#include "graphic_config.h"
+ 
+ namespace OHOS {
+ /**
+@@ -63,6 +64,9 @@ struct ImageInfo {
+     uint32_t dataSize;
+     /** Pixel color data of pixelmap images */
+     const uint8_t* data;
++#if IMG_CACHE_MEMORY_CUSTOM
++    const uint8_t* phyAddr;
++#endif
+     /** User-defined data */
+     void* userData;
+ };
+diff --git a/utils.gni b/utils.gni
+index 50c026b..7011897 100644
+--- a/utils.gni
++++ b/utils.gni
+@@ -51,4 +51,5 @@ graphic_hals_include_dirs = [
+ graphic_hals_sources = [
+   "$GRAPHIC_GRAPHIC_UTILS_LITE_PATH/frameworks/hals/gfx_engines.cpp",
+   "$GRAPHIC_GRAPHIC_UTILS_LITE_PATH/frameworks/hals/hi_fbdev.cpp",
++  "$GRAPHIC_GRAPHIC_UTILS_LITE_PATH/frameworks/hals/gralloc_engines.cpp",
+ ]

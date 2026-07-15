@@ -1,0 +1,15 @@
+diff --git a/frameworks/src/lite/ipc_adapt.c b/frameworks/src/lite/ipc_adapt.c
+index 67c97e0..425a7b0 100644
+--- a/frameworks/src/lite/ipc_adapt.c
++++ b/frameworks/src/lite/ipc_adapt.c
+@@ -1638,8 +1638,8 @@ int32_t GetIpcIoDataLength(const IpcIo *io)
+ 
+ void ShowIpcSvcInfo(const SvcIdentity *svc)
+ {
+-    LOGI("svc information - handle(%" LOG_PUB "u), token(%" LOG_PUB "u), cookie(%" LOG_PUB "u)", svc->handle,
+-        svc->token, svc->cookie);
++    LOGI("svc information - handle(%" LOG_PUB "u), token(%" LOG_PUB "u), cookie(%" LOG_PUB "u)", (int32_t)svc->handle,
++        (int32_t)svc->token, (int32_t)svc->cookie);
+ }
+ 
+ int32_t InitProxyAdapt(void)

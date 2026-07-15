@@ -1,0 +1,117 @@
+diff --git a/a55_linux/mpp/out/ko/load_ss928v100_ohos b/a55_linux/mpp/out/ko/load_ss928v100_ohos
+index 7ab0841..4cfdc5a 100644
+--- a/a55_linux/mpp/out/ko/load_ss928v100_ohos
++++ b/a55_linux/mpp/out/ko/load_ss928v100_ohos
+@@ -60,6 +60,36 @@ function remove_security_subsys()
+     rmmod ot_cipher.ko
+ }
+ 
++function insert_fb()
++{
++    insmod ot_hdmi.ko
++    insmod gfbg.ko video="gfbg:vram0_size:32400,vram1_size:16200,vram3_size:4052"
++    insmod ot_vo.ko
++}
++
++function remove_fb()
++{
++    rmmod ot_hdmi
++    rmmod gfbg
++    rmmod ot_vo
++}
++
++function insert_drm()
++{
++    insmod drm_kms_helper.ko
++    insmod drm_dma_helper.ko
++    insmod drm_display_helper.ko
++    insmod smart_drm.ko
++}
++
++function remove_drm()
++{
++    rmmod drm_kms_helper.ko
++    rmmod drm_dma_helper.ko
++    rmmod drm_display_helper.ko
++    rmmod smart_drm.ko
++}
++
+ function insert_ko()
+ {
+     # sys config
+@@ -71,28 +101,33 @@ function insert_ko()
+     insmod ot_base.ko
+     insmod ot_sys.ko
+     insmod ot_tde.ko
+-    insmod ot_vo.ko
+     insmod svp_npu/ot_svp_npu.ko
+-    # gfbg: default fb0:argb1555,3840x2160,2buf;fb1:argb8888,1920x1080,2buf;fb2:clut4,3840x2160,1buf
+-    insmod gfbg.ko video="gfbg:vram0_size:32400,vram1_size:16200,vram3_size:4052"
+ 
+-    insmod ot_hdmi.ko
+     insmod ot_mipi_tx.ko g_smooth=0
+     insmod ot_mipi_rx.ko
+ 
+     insert_security_subsys
++    
++    if [ "$DISPLAY_MODE" = "drm" ]; then
++        insert_drm
++    else
++        insert_fb
++    fi
+ }
+ 
+ function remove_ko()
+ {
++    if [ "$DISPLAY_MODE" = "drm" ]; then
++        remove_drm
++    else
++        remove_fb
++    fi
++    
+     remove_security_subsys
+     
+     rmmod ot_mipi_rx
+     rmmod ot_mipi_tx
+-    rmmod ot_hdmi
+-    rmmod gfbg
+     rmmod svp_npu/ot_svp_npu.ko
+-    rmmod ot_vo
+     rmmod ot_tde
+     rmmod ot_sys
+     rmmod ot_base
+@@ -109,6 +144,7 @@ load_usage()
+     echo "    -i                       insert modules"
+     echo "    -r                       remove modules"
+     echo "    -a                       remove modules first, then insert modules"
++    echo "    -display drm|fb          select display mode [default: drm]"
+     echo "    -sensor0~3 sensor_name   config sensor type [default: hy_s0603]"
+     echo "    -total mem_size          config total mem size [unit: M, default: 4096]"
+     echo "    -osmem os_mem_size       config os mem size [unit: M, default: 512]"
+@@ -146,9 +182,16 @@ function parse_arg()
+     b_arg_sensor3=0
+     b_arg_total_mem=0
+     b_arg_os_mem=0
++    b_arg_display=0
++    DISPLAY_MODE="drm"
+ 
+     for arg in $@
+     do
++        if [ $b_arg_display -eq 1 ] ; then
++            b_arg_display=0;
++            DISPLAY_MODE=$arg;
++        fi
++
+         if [ $b_arg_sensor0 -eq 1 ] ; then
+             b_arg_sensor0=0;
+             SNS_TYPE0=$arg;
+@@ -221,6 +264,9 @@ function parse_arg()
+             "-total")
+                 b_arg_total_mem=1;
+                 ;;
++            "-display")
++                b_arg_display=1;
++                ;;
+         esac
+     done
+ 

@@ -1,0 +1,118 @@
+applications/sample/camera:
+  - ../../vendor/rkh/patches/applications/sample/camera/camera_001.patch
+  - ../../vendor/rkh/patches/applications/sample/camera/camera_002.patch
+  - ../../vendor/rkh/patches/applications/sample/camera/camera_003.patch
+
+applications/sample/camera/gallery:
+  - ../../vendor/rkh/patches/applications/sample/camera/gallery/camera_gallery_001.patch
+  - ../../vendor/rkh/patches/applications/sample/camera/gallery/camera_gallery_resource_002.patch
+
+applications/sample/camera/launcher:
+  - ../../vendor/rkh/patches/applications/sample/camera/launcher/camera_launcher_001.patch
+  - ../../vendor/rkh/patches/applications/sample/camera/launcher/camera_launcher_resource_002.patch
+
+applications/sample/camera/media:
+  - device/soc/hisilicon/patches/applications/sample/camera/media/camera_media_001.patch
+  - device/soc/hisilicon/patches/applications/sample/camera/media/camera_media_002.patch
+  - ../../vendor/rkh/patches/applications/sample/camera/media/camera_media_003.patch
+  - ../../vendor/rkh/patches/applications/sample/camera/media/camera_media_004.patch
+
+applications/sample/camera/setting:
+  - ../../vendor/rkh/patches/applications/sample/camera/setting/camera_setting_001.patch
+  - ../../vendor/rkh/patches/applications/sample/camera/setting/camera_setting_002.patch
+
+base/security/appverify:
+  - device/soc/hisilicon/patches/base/security/appverify/appverify_001.patch
+  - ../../vendor/rkh/patches/base/security/appverify/appverify_002.patch
+
+base/security/device_auth:
+  - device/soc/hisilicon/patches/base/security/device_auth/device_auth_001.patch
+
+base/security/huks:
+  - device/soc/hisilicon/patches/base/security/huks/huks_001.patch
+  - device/soc/hisilicon/patches/base/security/huks/huks_002.patch
+
+base/security/permission_lite:
+  - ../../vendor/rkh/patches/base/security/permission_lite/permission_lite_001.patch
+
+base/startup/appspawn:
+  - ../../vendor/rkh/patches/base/startup/appspawn/appspawn_001.patch
+
+base/startup/init:
+  - device/soc/hisilicon/patches/base/startup/init/init_001.patch
+  - ../../vendor/rkh/patches/base/startup/init/init_002.patch
+
+build:
+  - device/soc/hisilicon/patches/build/build_001.patch
+
+commonlibrary/c_utils:
+  - device/soc/hisilicon/patches/commonlibrary/c_utils/c_utils_001.patch
+
+developtools/syscap_codec:
+  - device/soc/hisilicon/patches/developtools/syscap_codec/syscap_codec_001.patch
+
+drivers/hdf_core:
+  - device/soc/hisilicon/patches/drivers/hdf_core/hdf_core_001.patch
+
+drivers/peripheral:
+  - device/soc/hisilicon/patches/drivers/peripheral/peripheral_001.patch
+  - ../../vendor/rkh/patches/drivers/peripheral/peripheral_002.patch
+
+foundation/arkui/ace_engine_lite:
+  - ../../vendor/rkh/patches/foundation/arkui/ace_engine_lite/ace_engine_lite_001.patch
+
+foundation/arkui/ui_lite:
+  - device/soc/hisilicon/patches/foundation/arkui/ui_lite/arkui_ui_lite_001.patch
+
+foundation/bundlemanager/bundle_framework_lite:
+  - ../../vendor/rkh/patches/foundation/bundlemanager/bundle_framework_lite/bundle_framework_lite_001.patch
+
+foundation/communication/dhcp:
+  - ../../vendor/rkh/patches/foundation/communication/dhcp/dhcp_001.patch
+
+foundation/distributedhardware/distributed_audio:
+  - device/soc/hisilicon/patches/foundation/distributedhardware/distributed_audio/distributed_audio_001.patch
+
+foundation/graphic/graphic_utils_lite:
+  - device/soc/hisilicon/patches/foundation/graphic/graphic_utils_lite/graphic_utils_lite_001.patch
+  - ../../vendor/rkh/patches/foundation/graphic/graphic_utils_lite/graphic_utils_lite_002.patch
+  - ../../vendor/rkh/patches/foundation/graphic/graphic_utils_lite/graphic_utils_lite_003.patch
+
+foundation/multimedia/audio_lite:
+  - device/soc/hisilicon/patches/foundation/multimedia/audio_lite/audio_lite_001.patch
+  - ../../vendor/rkh/patches/foundation/multimedia/audio_lite/audio_lite_002.patch
+
+foundation/multimedia/camera_lite:
+  - device/soc/hisilicon/patches/foundation/multimedia/camera_lite/camera_lite_001.patch
+
+foundation/multimedia/media_lite:
+  - device/soc/hisilicon/patches/foundation/multimedia/media_lite/media_lite_001.patch
+  - ../../vendor/rkh/patches/foundation/multimedia/media_lite/media_lite_002.patch
+
+foundation/multimedia/media_utils_lite:
+  - device/soc/hisilicon/patches/foundation/multimedia/media_utils_lite/media_utils_lite_001.patch
+  - ../../vendor/rkh/patches/foundation/multimedia/media_utils_lite/media_utils_lite_002.patch
+
+foundation/systemabilitymgr/samgr_lite:
+  - ../../vendor/rkh/patches/foundation/systemabilitymgr/samgr_lite/samgr_lite_001.patch
+
+foundation/window/window_manager_lite:
+  - device/soc/hisilicon/patches/foundation/window/window_manager_lite/window_manager_lite_001.patch
+
+test/xts/acts:
+  - device/soc/hisilicon/patches/test/xts/acts/acts_001.patch
+
+test/xts/tools:
+  - device/soc/hisilicon/patches/test/xts/tools/tools_001.patch
+
+third_party/alsa-lib:
+  - ../../vendor/rkh/patches/third_party/alsa-lib/alsa-lib_001.patch
+
+third_party/alsa-utils:
+  - ../../vendor/rkh/patches/third_party/alsa-utils/alsa-utils_001.patch
+
+third_party/musl:
+  - device/soc/hisilicon/patches/third_party/musl/musl_001.patch
+
+third_party/openssl:
+  - device/soc/hisilicon/patches/third_party/openssl/openssl_001.patch

@@ -1,0 +1,136 @@
+diff --git a/bundle.json b/bundle.json
+index 3df7c4a..a56f825 100644
+--- a/bundle.json
++++ b/bundle.json
+@@ -51,7 +51,8 @@
+         "huks_enable_skip_upgrade_key_storage_secure_level",
+         "huks_sa_skip_upgrade_config",
+         "huks_hap_skip_upgrade_config",
+-        "huks_enable_hdi_in_standard"
++        "huks_enable_hdi_in_standard",
++        "huks_enable_hisilicon_cipher_in_small"
+       ],
+       "adapted_system_type": [
+           "standard",
+diff --git a/frameworks/huks_standard/main/common/include/hks_config_small.h b/frameworks/huks_standard/main/common/include/hks_config_small.h
+index 2db021c..a3cef93 100644
+--- a/frameworks/huks_standard/main/common/include/hks_config_small.h
++++ b/frameworks/huks_standard/main/common/include/hks_config_small.h
+@@ -16,6 +16,7 @@
+ #ifndef HKS_CONFIG_H
+ #define HKS_CONFIG_H
+ 
++#define HKS_ENABLE_EVENT_DELETE
+ #define HKS_SUPPORT_POSIX
+ 
+ #ifndef __LINUX__
+diff --git a/frameworks/huks_standard/main/crypto_engine/rkc/include/hks_rkc.h b/frameworks/huks_standard/main/crypto_engine/rkc/include/hks_rkc.h
+index 4480b5b..b67e1c0 100644
+--- a/frameworks/huks_standard/main/crypto_engine/rkc/include/hks_rkc.h
++++ b/frameworks/huks_standard/main/crypto_engine/rkc/include/hks_rkc.h
+@@ -21,7 +21,11 @@
+ 
+ #define HKS_RKC_RMK_LEN 64                              /* the length of root main key */
+ #define HKS_RKC_RMK_EK_LEN 32                           /* the encryption key length of root main key */
+-#define HKS_RKC_RAW_KEY_LEN 64                          /* the raw key length of root key component */
++#ifdef HKS_CIPHER_ROOT_KEY
++#define HKS_RKC_RAW_KEY_LEN 32
++#else
++#define HKS_RKC_RAW_KEY_LEN 64
++#endif                         /* the raw key length of root key component */
+ #define HKS_HARDWARE_UDID_LEN 32                        /* the length of hardware UDID */
+ #define HKS_RKC_MK_ADD_DATA_LEN 8                       /* the additional data length of main key */
+ #define HKS_KSF_NAME_LEN_MAX 256                        /* the max length of rkc keystore filename */
+diff --git a/frameworks/huks_standard/main/crypto_engine/rkc/src/hks_rkc_rw.c b/frameworks/huks_standard/main/crypto_engine/rkc/src/hks_rkc_rw.c
+index 72b16cc..ff021ca 100644
+--- a/frameworks/huks_standard/main/crypto_engine/rkc/src/hks_rkc_rw.c
++++ b/frameworks/huks_standard/main/crypto_engine/rkc/src/hks_rkc_rw.c
+@@ -28,7 +28,11 @@
+ #include <securec.h>
+ 
+ #define HKS_RKC_HASH_LEN 32         /* the hash value length of root key component */
+-#define HKS_KSF_BUF_LEN 258         /* the length of rkc or mk keystore buffer */
++#ifdef HKS_CIPHER_ROOT_KEY
++#define HKS_KSF_BUF_LEN 290         /* the length of rkc or mk keystore buffer */
++#else
++#define HKS_KSF_BUF_LEN 258
++#endif
+ #define USER_ID_ROOT_DEFAULT          "0"
+ 
+ /* the flag of keystore file, used to identify files as HKS keystore file, don't modify. */
+diff --git a/frameworks/huks_standard/main/os_dependency/sysinfo/src/hks_get_udid.c b/frameworks/huks_standard/main/os_dependency/sysinfo/src/hks_get_udid.c
+index 0f2ce03..d7a3a47 100644
+--- a/frameworks/huks_standard/main/os_dependency/sysinfo/src/hks_get_udid.c
++++ b/frameworks/huks_standard/main/os_dependency/sysinfo/src/hks_get_udid.c
+@@ -23,6 +23,10 @@
+ 
+ #define HKS_HARDWARE_UDID_LEN 32
+ 
++#ifdef HKS_CIPHER_ROOT_KEY
++#include "huks_hdi_cipher.h"
++#endif
++
+ #ifndef _CUT_AUTHENTICATE_
+ 
+ #ifdef GET_DEV_UDID_ENABLE
+@@ -31,7 +35,11 @@
+ 
+ #define HKS_HARDWARE_UDID_STRING_LEN    (HKS_HARDWARE_UDID_LEN * 2 + 1)
+ 
++#ifdef HKS_CIPHER_ROOT_KEY
++static int32_t ComputeHash(uint32_t *data, uint32_t len, struct HksBlob *hash)
++#else
+ static int32_t ComputeHash(const char *data, uint32_t len, struct HksBlob *hash)
++#endif /* HKS_CIPHER_ROOT_KEY */
+ {
+     struct HksBlob srcData = { len, (uint8_t *)data };
+     return HksCryptoHalHash(HKS_DIGEST_SHA256, &srcData, hash);
+@@ -41,7 +49,22 @@ static int32_t ComputeHash(const char *data, uint32_t len, struct HksBlob *hash)
+ 
+ int32_t HksGetHardwareUdid(uint8_t *udid, uint32_t udidLen)
+ {
++    if (udid == NULL) {
++        return HKS_ERROR_BAD_STATE;
++    }
+ #ifdef GET_DEV_UDID_ENABLE
++#ifdef HKS_CIPHER_ROOT_KEY
++    uint8_t devDieidString[HKS_HARDWARE_UDID_LEN] = { 0 };
++    int32_t ret = GetDevDieid(devDieidString, sizeof(devDieidString));
++    if (ret != HKS_SUCCESS) {
++        HKS_LOG_E("Get uniqueid error, ret = 0x%x", ret);
++        return HKS_ERROR_NO_PERMISSION;
++    }
++
++    uint8_t devUdid[HKS_HARDWARE_UDID_LEN] = {0};
++    struct HksBlob hashData = { HKS_HARDWARE_UDID_LEN, devUdid };
++    ret = ComputeHash((uint32_t *)devDieidString, sizeof(devDieidString), &hashData);
++#else
+     char devUdidString[HKS_HARDWARE_UDID_STRING_LEN] = {0};
+     int32_t ret = GetDevUdid(devUdidString, sizeof(devUdidString));
+     if (ret != 0) {
+@@ -52,6 +75,7 @@ int32_t HksGetHardwareUdid(uint8_t *udid, uint32_t udidLen)
+     uint8_t devUdid[HKS_HARDWARE_UDID_LEN] = {0};
+     struct HksBlob hashData = { HKS_HARDWARE_UDID_LEN, devUdid };
+     ret = ComputeHash(devUdidString, sizeof(devUdidString), &hashData);
++#endif /* HKS_CIPHER_ROOT_KEY */
+     HKS_IF_NOT_SUCC_LOGE_RETURN(ret, ret, "compute udid hash failed")
+ #else
+     /* simulation implementation */
+@@ -62,11 +86,16 @@ int32_t HksGetHardwareUdid(uint8_t *udid, uint32_t udidLen)
+         0xC4, 0xD7, 0x2E, 0xDE, 0x51, 0xE3, 0x73, 0x11,
+     };
+ #endif
+-
++#ifdef HKS_CIPHER_ROOT_KEY
++    for (uint32_t i = 0; i < udidLen; ++i) {
++        udid[i] = udid[i] ^ devUdid[i];
++    }
++#else
+     if (memcpy_s(udid, udidLen, devUdid, HKS_HARDWARE_UDID_LEN) != EOK) {
+         HKS_LOG_E("Memcpy udid failed!");
+         return HKS_ERROR_BAD_STATE;
+     }
++#endif /* HKS_CIPHER_ROOT_KEY */
+ 
+     return HKS_SUCCESS;
+ }

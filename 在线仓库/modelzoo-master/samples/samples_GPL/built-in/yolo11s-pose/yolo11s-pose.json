@@ -1,0 +1,147 @@
+{
+  "modelName": "YOLO11s-pose",
+  "modelDesc": "YOLO系列网络模型是最为经典的one-stage算法，也是目前工业领域使用最多的目标检测网络，YOLO11网络模型是YOLO系列的最新版本，在继承了原有YOLO网络模型优点的基础上，在架构和训练方法上进行了重大改进，具有更高的检测精度、速度和效率。YOLO11s-pose作为YOLO11的姿态估计的模型，能检测出代表人体不同部位的17个关键点。",
+  "modelRepository": "https://gitee.com/Hispark/modelzoo/tree/master/samples/samples_GPL/built-in/yolo11s-pose",
+  "modelParameter": {
+    "输入": "640x640",
+    "参数量": "9.970M",
+    "计算量": "25.414GFLOPs"
+  },
+  "isBeta": false,
+  "betaDesc": "",
+  "modelFeedback": "https://developers.hisilicon.com/forum/0155201230363076006",
+  "modelUsageScenes": [
+    {
+      "task": "Vision",
+      "tags": [
+        "姿态估计",
+        "检测"
+      ]
+    }
+  ],
+  "modelFrame": [
+    "PyTorch"
+  ],
+  "modelDatasets": {
+    "desc": "数据集coco2017",
+    "link": "https://cocodataset.org/#download"
+  },
+  "srcModelLicense": [
+    {
+      "desc": "源模型",
+      "link": "https://github.com/ultralytics/ultralytics/blob/main/LICENSE"
+    }
+  ],
+  "modelLicense": [
+    {
+      "desc": "部署模型",
+      "link": "https://gitee.com/HiSpark/modelzoo/tree/master/samples/samples_GPL/built-in/yolo11s-pose/LICENSE"
+    }
+  ],
+  "quickStart": {
+    "md": "https://gitee.com/HiSpark/modelzoo/tree/master/samples/samples_GPL/built-in/yolo11s-pose/doc/快速开始.md"
+  },
+  "modelChipset": [
+    {
+      "chipset": "Hi3403V100 SVP_NNN",
+      "tools": [
+        {
+          "name": "CANN配置",
+          "link": "https://hispark-obs.obs.cn-east-3.myhuaweicloud.com/SVP_NNN_PC_V1.0.6.0.tgz",
+          "desc": "AI异构计算架构，承上启下，提升计算效率的关键平台"
+        },
+        {
+          "name": "编译工具链",
+          "link": "https://gitee.com/HiSpark/pegasus/blob/Beta-v0.9.1/docs/Hi3403V100%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97/Hi3403V100%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA%E6%8C%87%E5%8D%97.md",
+          "desc": "高效编译，精准适配AI性能优化，应用流畅运行"
+        },
+        {
+          "name": "SDK",
+          "link": "https://gitee.com/HiSpark/ss928v100_clang/tree/Beta-v0.9.1/",
+          "desc": "稳定、易用的设计，支撑客户快速产品量产"
+        }
+      ],
+      "os": [
+        "OpenHarmony",
+        "Linux"
+      ],
+      "performance": [
+        {
+          "quantMode": "a16w8",
+          "detail": [
+            {
+              "performance": 25.09,
+              "performanceUnit": "耗时（ms）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 39.85,
+              "performanceUnit": "性能（fps）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 168.145,
+              "performanceUnit": "单帧内存带宽（MB）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 36.895,
+              "performanceUnit": "内存（MB）",
+              "performanceDesc": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "chipset": "Hi3403V100 NNN",
+      "tools": [
+        {
+          "name": "CANN配置",
+          "link": "",
+          "desc": "SPC022 (请联系FAE获取)"
+        },
+        {
+          "name": "编译工具链",
+          "link": "",
+          "desc": "aarch64-mix210-linux-gcc (请联系FAE获取)"
+        },
+        {
+          "name": "SDK",
+          "link": "",
+          "desc": "SPC022 (请联系FAE获取)"
+        }
+      ],
+      "os": [
+        "Linux"
+      ],
+      "performance": [
+        {
+          "quantMode": "fp16",
+          "detail": [
+            {
+              "performance": 45.41,
+              "performanceUnit": "耗时（ms）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 22.02,
+              "performanceUnit": "性能（fps）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 360.947,
+              "performanceUnit": "单帧内存带宽（MB）",
+              "performanceDesc": ""
+            },
+            {
+              "performance": 125.070,
+              "performanceUnit": "内存（MB）",
+              "performanceDesc": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

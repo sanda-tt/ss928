@@ -1,0 +1,70 @@
+diff --git a/build_scripts/build.sh b/build_scripts/build.sh
+index 856d4dc..06ee575 100755
+--- a/build_scripts/build.sh
++++ b/build_scripts/build.sh
+@@ -166,13 +166,15 @@ function init_ohpm() {
+ }
+ 
+ if [[ "$*" != *ohos-sdk* ]]; then
+-  echo "[OHOS INFO] Ohpm initialization started..."
+-  init_ohpm
+-  if [[ "$?" -ne 0 ]]; then
+-    echo -e "\033[31m[OHOS ERROR] ohpm initialization failed!\033[0m"
+-    exit 1
++  if [[ "$*" != *ipcamera_hispark* ]]; then
++    echo "[OHOS INFO] Ohpm initialization started..."
++    init_ohpm
++    if [[ "$?" -ne 0 ]]; then
++      echo -e "\033[31m[OHOS ERROR] ohpm initialization failed!\033[0m"
++      exit 1
++    fi
++    echo -e "\033[32m[OHOS INFO] ohpm initialization successful!\033[0m"
+   fi
+-  echo -e "\033[32m[OHOS INFO] ohpm initialization successful!\033[0m"
+ fi
+ echo -e "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+ 
+diff --git a/core/gn/ohos_exec_script_allowlist.gni b/core/gn/ohos_exec_script_allowlist.gni
+index 6e9be5b..2a624a0 100644
+--- a/core/gn/ohos_exec_script_allowlist.gni
++++ b/core/gn/ohos_exec_script_allowlist.gni
+@@ -88,6 +88,7 @@ ohos_exec_script_config = {
+     "//device/board/unionman/unionpi_tiger/hardware/camera/BUILD.gn",
+     "//device/soc/hisilicon/hi3516dv300/sdk_liteos/BUILD.gn",
+     "//device/soc/st/stm32mp1xx/sdk_liteos/BUILD.gn",
++    "//device/soc/hisilicon/common/hal/media/BUILD.gn",
+     "//drivers/hdf_core/adapter/khdf/liteos_m/hdi_mini.gni",
+     "//drivers/hdf_core/adapter/khdf/uniproton/core/BUILD.gn",
+     "//drivers/hdf_core/adapter/uhdf2/hdi.gni",
+diff --git a/lite/config/BUILD.gn b/lite/config/BUILD.gn
+index dc49a43..6c676b9 100644
+--- a/lite/config/BUILD.gn
++++ b/lite/config/BUILD.gn
+@@ -27,7 +27,7 @@ config("language_c") {
+ }
+ 
+ config("language_cpp") {
+-  cflags_cc = [ "-std=c++11" ]
++  cflags_cc = [ "-std=c++17" ]
+ }
+ 
+ config("kernel_macros") {
+diff --git a/lite/config/BUILDCONFIG.gn b/lite/config/BUILDCONFIG.gn
+index 0de2556..d85c1b6 100644
+--- a/lite/config/BUILDCONFIG.gn
++++ b/lite/config/BUILDCONFIG.gn
+@@ -29,7 +29,13 @@ if (board_cpu != "") {
+   target_arch_cflags += [ "-mcpu=$board_cpu" ]
+ }
+ 
+-arch = "arm"
++# Hisilicon modify for 64bit
++if (target_cpu == "arm64") {
++  arch = "arm64"
++} else {
++  arch = "arm"
++}
++
+ if (ohos_kernel_type == "liteos_a") {
+   target_triple = "$arch-liteos-ohos"
+ } else if (ohos_kernel_type == "linux") {

@@ -1,0 +1,15 @@
+this_makefile_dir := $(dir $(lastword $(MAKEFILE_LIST)))
+
+include $(this_makefile_dir)/../Makefile.param
+
+MPI_LIBS += $(REL_LIB)/libss_ive.a
+MPI_LIBS += $(REL_LIB)/libss_md.a
+MPI_LIBS += $(REL_LIB)/libss_mau.a
+MPI_LIBS += $(REL_LIB)/libss_dpu_rect.a
+MPI_LIBS += $(REL_LIB)/libss_dpu_match.a
+MPI_LIBS += $(REL_LIB)/libss_dsp.a
+MPI_LIBS += $(REL_LIB)/svp_npu/libsvp_acl.a
+MPI_LIBS += -L$(REL_LIB)/svp_npu -lprotobuf-c
+CFLAGS += -I$(PWD)/../common
+CFLAGS += -fstack-protector-strong
+

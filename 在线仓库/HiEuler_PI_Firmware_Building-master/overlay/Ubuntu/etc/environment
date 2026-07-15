@@ -1,0 +1,6 @@
+PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/opt/bin"
+LD_LIBRARY_PATH="/opt/lib"
+QT_QPA_PLATFORM_PLUGIN_PATH="/opt/plugins"
+QT_QPA_PLATFORM="linuxfb:tty=/dev/fb0"
+QT_QPA_PLATFORM="linuxfb:fb=/dev/fb0:size=1920x1080:offset=0x0:nographicsmodeswitch"
+QT_QPA_FONTDIR="/opt/fonts"

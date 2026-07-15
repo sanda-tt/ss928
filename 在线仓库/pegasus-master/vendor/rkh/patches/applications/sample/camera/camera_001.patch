@@ -1,0 +1,21 @@
+diff --git a/bundle.json b/bundle.json
+index f06eb0c..1ca8e85 100644
+--- a/bundle.json
++++ b/bundle.json
+@@ -30,6 +30,7 @@
+                 "syspara_lite",
+                 "camera_lite",
+                 "media_lite",
++                "audio_lite",
+                 "permission",
+                 "samgr_lite",
+                 "utils_base"
+@@ -45,6 +46,8 @@
+                 "//applications/sample/camera/cameraApp:cameraApp_hap",
+                 "//applications/sample/camera/setting:setting_hap",
+                 "//applications/sample/camera/gallery:gallery_hap",
++                "//applications/sample/camera/recorder:recorder_hap",
++                "//applications/sample/camera/gallery:test_jpeg",
+                 "//applications/sample/camera/media:media_sample"
+             ],
+             "inner_kits": [],

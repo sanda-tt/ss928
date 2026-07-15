@@ -1,0 +1,2479 @@
+diff --git a/recorder/BUILD.gn b/recorder/BUILD.gn
+new file mode 100644
+index 0000000..5bb7972
+--- /dev/null
++++ b/recorder/BUILD.gn
+@@ -0,0 +1,101 @@
++# Copyright (C) 2024 RKH Corp.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++# http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++import("//build/lite/config/hap_pack.gni")
++
++config("hilog_dir") {
++  include_dirs =
++      [ "//base/hiviewdfx/hilog_lite/interfaces/native/innerkits/hilog/" ]
++}
++config("hilog_lite_dir") {
++  include_dirs =
++      [ "//base/hiviewdfx/hilog_lite/interfaces/native/kits/hilog_lite/" ]
++}
++
++shared_library("recorder") {
++  sources = [
++    "src/recorder_ability.cpp",
++    "src/recorder_ability_main_slice.cpp",
++    "src/recorder_list_adapter.cpp",
++    "src/media_utils.cpp",
++  ]
++
++  include_dirs = [
++    "include",
++    "${aafwk_lite_path}/interfaces/kits/ability_lite",
++    "${appexecfwk_lite_path}/interfaces/kits/bundle_lite",
++    "${aafwk_lite_path}/interfaces/kits/want_lite",
++    "//foundation/multimedia/media_lite/interfaces/kits/player_lite",
++  ]
++
++  deps = [
++    "${aafwk_lite_path}/frameworks/ability_lite:aafwk_abilitykit_lite",
++    "${appexecfwk_lite_path}/frameworks/bundle_lite:bundle",
++    "//foundation/arkui/ui_lite:ui_lite",
++    "//foundation/distributeddatamgr/kv_store/interfaces/inner_api/kv_store:kv_store",
++    "//foundation/graphic/graphic_utils_lite:utils_lite",
++    "//foundation/graphic/surface_lite",
++    "//foundation/multimedia/media_lite/frameworks/player_lite:player_lite",
++    "//foundation/multimedia/media_lite/frameworks/recorder_lite:recorder_lite",
++    "//foundation/systemabilitymgr/samgr_lite/samgr:samgr",
++  ]
++
++  if (defined(ohos_lite)) {
++    if (ohos_kernel_type == "liteos_m") {
++      configs += [ ":hilog_lite_dir" ]
++      deps += [ "//base/hiviewdfx/hilog_lite/frameworks/mini:hilog_lite" ]
++    } else if (ohos_kernel_type == "liteos_a") {
++      configs += [ ":hilog_dir" ]
++      deps += [
++        "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared",
++        "//third_party/bounds_checking_function:libsec_shared",
++      ]
++    }
++  }
++
++  cflags = [ "-Wall" ]
++  cflags_cc = cflags
++  ldflags = [ "-shared" ]
++  ldflags += [ "-lstdc++" ]
++  ldflags += [ "-lpthread" ]
++  ldflags += [ "-L$ohos_root_path/sysroot/usr/lib" ]
++  ldflags += [ "-Wl,-rpath-link=$ohos_root_path/sysroot/usr/lib" ]
++  ldflags += [
++    "-lui",
++    "-lsurface",
++    "-lplayer_lite",
++    "-lability",
++  ]
++
++  defines = [
++    "OHOS_APPEXECFWK_BMS_BUNDLEMANAGER",
++    "ENABLE_WINDOW=1",
++    "ABILITY_WINDOW_SUPPORT",
++    "HILOG_ENABLE",
++    # "USE_RECORDER_FD"
++    "USE_RECORDER_API",
++    "USE_PLAYER_API"
++  ]
++}
++
++hap_pack("recorder_hap") {
++  deps = [ ":recorder" ]
++  mode = "hap"
++  json_path = "config.json"
++  ability_so_path = "$root_out_dir/librecorder.so"
++  force = "true"
++  cert_profile = "cert/recorder_AppProvision_Release.p7b"
++  resources_path = "resources"
++  hap_name = "recorder"
++  privatekey = "HOS Application Provision Release"
++}
+diff --git a/recorder/config.json b/recorder/config.json
+new file mode 100644
+index 0000000..4fb86ce
+--- /dev/null
++++ b/recorder/config.json
+@@ -0,0 +1,89 @@
++{
++    "app": {
++        "bundleName": "com.huawei.recorder",
++        "vendor": "huawei",
++        "version": {
++            "code": 1,
++            "name": "1.0"
++        },
++        "apiVersion": {
++            "compatible": 3,
++            "target": 4
++        }
++    },
++    "deviceConfig": {
++        "default": {
++        }
++    },
++    "module": {
++        "package": "com.huawei.recorder",
++        "name": ".MyHarmonyAbilityPackage",
++        "deviceType": [
++            "phone",
++            "tv",
++            "tablet",
++            "pc",
++            "car",
++            "smartWatch",
++            "sportsWatch",
++            "smartVision"
++        ],
++        "distro": {
++            "deliveryWithInstall": true,
++            "moduleName": "recorder",
++            "moduleType": "entry"
++        },
++        "abilities": [
++            {
++                "name": "RecorderAbility",
++                "icon": "assets/recorder/resources/drawable/recorder.png",
++                "label": "test app 1",
++                "launchType": "standard",
++                "type": "page",
++                "visible": true
++            }
++        ],
++        "reqPermissions": [
++            {
++                "name": "ohos.permission.MODIFY_AUDIO_SETTINGS",
++                "reason": "SYSTEM_GRANT",
++                "usedScene": {
++                    "ability": [
++                        ".FormAbility"
++                    ],
++                    "when": "inuse"
++                }
++            },
++            {
++                "name": "ohos.permission.READ_MEDIA",
++                "reason": "USER_GRANT",
++                "usedScene": {
++                    "ability": [
++                        ".FormAbility"
++                    ],
++                    "when": "inuse"
++                }
++            },
++            {
++                "name": "ohos.permission.READ_MEDIA_AUDIO",
++                "reason": "USER_GRANT",
++                "usedScene": {
++                    "ability": [
++                        ".FormAbility"
++                    ],
++                    "when": "inuse"
++                }
++            },
++            {
++                "name": "ohos.permission.MICROPHONE",
++                "reason": "USER_GRANT",
++                "usedScene": {
++                    "ability": [
++                        ".FormAbility"
++                    ],
++                    "when": "inuse"
++                }
++            }
++        ]
++    }
++}
+\ No newline at end of file
+diff --git a/recorder/include/event_listener.h b/recorder/include/event_listener.h
+new file mode 100644
+index 0000000..473283c
+--- /dev/null
++++ b/recorder/include/event_listener.h
+@@ -0,0 +1,68 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_EVENT_LISTENER_H
++#define OHOS_EVENT_LISTENER_H
++
++#include <components/ui_view.h>
++#include <functional>
++#include <utility>
++
++namespace OHOS {
++using OnEventFunc = std::function<bool(UIView &view, const Event &event)>;
++
++class EventListener :
++        public UIView::OnClickListener,
++        public UIView::OnLongPressListener {
++public:
++    EventListener() = delete;
++    ~EventListener() override = default;
++
++    EventListener(OnEventFunc onClick, OnEventFunc onLongPress)
++    {
++        onClick_ = std::move(onClick);
++        onLongPress_ = std::move(onLongPress);
++    }
++
++    bool OnClick(UIView& view, const ClickEvent &event) override
++    {
++        if (!onClick_) {
++            return false;
++        }
++        UIView *currentView = &view;
++        if (currentView == nullptr) {
++            return false;
++        }
++        return onClick_(*currentView, event);
++    }
++
++    bool OnLongPress(UIView& view, const LongPressEvent &event) override
++    {
++        if (!onLongPress_) {
++            return false;
++        }
++        UIView *currentView = &view;
++        if (currentView == nullptr) {
++            return false;
++        }
++        return onLongPress_(*currentView, event);
++    }
++
++private:
++    OnEventFunc onClick_ {};
++    OnEventFunc onLongPress_ {};
++};
++}
++#endif // OHOS_EVENT_LISTENER_H
+\ No newline at end of file
+diff --git a/recorder/include/media_utils.h b/recorder/include/media_utils.h
+new file mode 100644
+index 0000000..6f8cd30
+--- /dev/null
++++ b/recorder/include/media_utils.h
+@@ -0,0 +1,78 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_MEDIA_UTILS_H
++#define OHOS_MEDIA_UTILS_H
++
++#include <memory>
++
++#ifdef USE_RECORDER_API
++#include <recorder.h>
++#endif
++#ifdef USE_PLAYER_API
++#include <player.h>
++#endif
++
++namespace OHOS {
++class MediaUtils {
++public:
++    ~MediaUtils();
++
++    // Recorder
++#ifdef USE_RECORDER_API
++    bool SetRecorderCallback(Media::RecorderCallback* recorderCallback);
++#endif
++    bool StartRecord();
++    bool StopRecord();
++
++    // Player
++#ifdef USE_PLAYER_API
++    bool SetPlayerCallback(Media::PlayerCallback* playerCallback);
++#endif
++    bool StartPlay(const char* filePath);
++    bool PausePlay();
++    bool StopPlay();
++
++private:
++    bool InitRecorder();
++    bool CloseRecorder();
++    bool MoveFiles();
++
++    bool InitPlayer(const char* filePath);
++    bool ClosePlayer();
++
++private:
++#ifdef USE_RECORDER_API
++    std::shared_ptr<Media::Recorder> recorder_;
++    Media::RecorderCallback* recorderCallback_ { nullptr };
++    std::shared_ptr<Media::RecorderCallback> recorderCallbackPtr_;
++#endif
++
++#ifdef USE_PLAYER_API
++    std::shared_ptr<Media::Player> player_;
++    Media::PlayerCallback* playerCallback_ { nullptr };
++    std::shared_ptr<Media::PlayerCallback> playerCallbackPtr_;
++#endif
++#ifdef USE_RECORDER_FD
++    int32_t recordFd_ = -1;
++#endif
++
++    bool recording_ = false;
++    bool playing_ = false;
++    bool paused_ = false;
++};
++}
++
++#endif // OHOS_RECORDER_ABILITY_H
+\ No newline at end of file
+diff --git a/recorder/include/recorder_ability.h b/recorder/include/recorder_ability.h
+new file mode 100644
+index 0000000..92f9545
+--- /dev/null
++++ b/recorder/include/recorder_ability.h
+@@ -0,0 +1,32 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_RECORDER_ABILITY_H
++#define OHOS_RECORDER_ABILITY_H
++
++#include <ability_loader.h>
++
++namespace OHOS {
++class RecorderAbility : public Ability {
++protected:
++    void OnStart(const Want &want) override;
++    void OnInactive() override;
++    void OnActive(const Want &want) override;
++    void OnBackground() override;
++    void OnStop() override;
++};
++}
++
++#endif // OHOS_RECORDER_ABILITY_H
+\ No newline at end of file
+diff --git a/recorder/include/recorder_ability_main_slice.h b/recorder/include/recorder_ability_main_slice.h
+new file mode 100644
+index 0000000..d9d7b3a
+--- /dev/null
++++ b/recorder/include/recorder_ability_main_slice.h
+@@ -0,0 +1,117 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_RECORDER_ABILITY_MAIN_SLICE_H
++#define OHOS_RECORDER_ABILITY_MAIN_SLICE_H
++
++#include <ability_slice.h>
++#include <components/ui_image_view.h>
++#include <components/ui_label.h>
++#include <components/ui_list.h>
++#include <components/abstract_adapter.h>
++#include <event_listener.h>
++
++#include "recorder_config.h"
++#include "recorder_list_adapter.h"
++#include "media_utils.h"
++#include "task_helper.h"
++
++namespace OHOS {
++class RecorderAbilityMainSlice : public AbilitySlice, Media::PlayerCallback, Media::RecorderCallback {
++public:
++    RecorderAbilityMainSlice() = default;
++    ~RecorderAbilityMainSlice() override;
++
++public:
++    // Media::PlayerCallback overrides
++    void OnPlaybackComplete() override;
++    void OnError(int32_t errorType, int32_t errorCode) override;
++    void OnInfo(int type, int extra) override;
++    void OnVideoSizeChanged(int width, int height) override {}
++    void OnRewindToComplete() override {}
++protected:
++    void OnStart(const Want &want) override;
++    void OnInactive() override;
++    void OnActive(const Want &want) override;
++    void OnBackground() override;
++    void OnStop() override;
++
++private:
++    void InitTitle();
++    void InitRecordList();
++    void InitRecordCtrl();
++    void Start();
++    void Stop();
++    void Pause();
++    void Resume();
++    void Cancel();
++
++    // recorder timer
++    void StartTimer();
++    void PauseTimer();
++    void ResumeTimer();
++    void StopTimer();
++    void UpdateRecordTime();
++    void UpdateDurationLabel();
++
++    void ReloadItems();
++
++    void OnItemPlay(int16_t index, const RecordItem& item);
++    void OnItemDelete(int16_t index, const RecordItem& item);
++
++    RootView* rootView_ { nullptr };
++    UIViewGroup* titleBar_ { nullptr };
++    UIImageView* backButton_ { nullptr };
++    EventListener* backButtonListener_ { nullptr };
++    UILabel* titleLabel_ { nullptr };
++    UILabel* noticeLabel_ { nullptr };
++    UILabel* durationLabel_ { nullptr };
++    UIImageView* fsImageView_ { nullptr };
++
++    UIImageView* startButton_ { nullptr };  // start/stop
++    UIImageView* pauseButton_ { nullptr };  // pause/resume
++    UIImageView* cancelButton_ { nullptr };
++
++    EventListener* startButtonListener_ { nullptr };
++    EventListener* stopButtonListener_ { nullptr };
++    EventListener* pauseButtonListener_ { nullptr };
++    EventListener* resumeButtonListener_ { nullptr };
++    EventListener* cancelButtonListener_ { nullptr };
++
++    UILabel* listLabel_ { nullptr };
++    UIList* list_ { nullptr };
++    RecorderListAdapter* adapter_ { nullptr };
++    std::string durationTime_;
++    MediaUtils mediaUtils_;
++
++    // recorder timer
++    std::shared_ptr<Task> recordTimeUpdateTask_;
++    uint32_t lastRecordTime_;
++    uint32_t recordDuration_;
++
++    char backIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char fsIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char startIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char stopIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char pauseIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char resumeIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char cancelIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char listFileIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char listPlayIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char listPauseIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char listDeleteIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++};
++}
++#endif // OHOS_RECORDER_ABILITY_MAIN_SLICE_H
+\ No newline at end of file
+diff --git a/recorder/include/recorder_ability_slice.h b/recorder/include/recorder_ability_slice.h
+new file mode 100644
+index 0000000..3020b51
+--- /dev/null
++++ b/recorder/include/recorder_ability_slice.h
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_RECORDER_ABILITY_SLICE_H
++#define OHOS_RECORDER_ABILITY_SLICE_H
++
++#include <ability_slice.h>
++#include <components/root_view.h>
++#include <components/ui_label.h>
++#include <components/ui_image_view.h>
++#include <event_listener.h>
++
++#include "recorder_config.h"
++
++namespace OHOS {
++class RecorderAbilitySlice : public AbilitySlice {
++public:
++    RecorderAbilitySlice() = default;
++    ~RecorderAbilitySlice() override;
++protected:
++    void OnStart(const Want &want) override;
++    void OnInactive() override;
++    void OnActive(const Want &want) override;
++    void OnBackground() override;
++    void OnStop() override;
++
++private:
++    void SetUpRootView();
++    void SetUpBackArea();
++
++private:
++    RootView* rootView_ { nullptr };
++    UIViewGroup* backArea_ { nullptr };
++    UIImageView* backIcon_ { nullptr };
++    UILabel* titleLabel_ { nullptr };
++    EventListener* backIconListener_ { nullptr };
++    char backIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++};
++} // namespace OHOS
++#endif // OHOS_RECORDER_ABILITY_SLICE_H
+diff --git a/recorder/include/recorder_config.h b/recorder/include/recorder_config.h
+new file mode 100644
+index 0000000..5a9b9f3
+--- /dev/null
++++ b/recorder/include/recorder_config.h
+@@ -0,0 +1,185 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_RECORDER_CONFIG_H
++#define OHOS_RECORDER_CONFIG_H
++
++#include "components/ui_view_group.h"
++
++namespace OHOS {
++
++/** icon resource file path */
++static const char* const BACK_ICON_PATH = "/recorder/assets/recorder/resources/drawable/ic_back.png";
++static const char* const FS_ICON_PATH = "/recorder/assets/recorder/resources/drawable/fs.png";
++static const char* const START_ICON_PATH = "/recorder/assets/recorder/resources/drawable/start.png";
++static const char* const STOP_ICON_PATH = "/recorder/assets/recorder/resources/drawable/stop.png";
++static const char* const PAUSE_ICON_PATH = "/recorder/assets/recorder/resources/drawable/pause.png";
++static const char* const RESUME_ICON_PATH = "/recorder/assets/recorder/resources/drawable/resume.png";
++static const char* const CANCEL_ICON_PATH = "/recorder/assets/recorder/resources/drawable/cancel.png";
++static const char* const LIST_FILE_ICON_PATH = "/recorder/assets/recorder/resources/drawable/list_file.png";
++static const char* const LIST_PLAY_ICON_PATH = "/recorder/assets/recorder/resources/drawable/list_play.png";
++static const char* const LIST_PAUSE_ICON_PATH = "/recorder/assets/recorder/resources/drawable/list_pause.png";
++static const char* const LIST_DEL_ICON_PATH = "/recorder/assets/recorder/resources/drawable/list_del.png";
++
++static constexpr int16_t MAX_PICTURE_COUNT = 256;
++static constexpr uint16_t MAX_PATH_LENGTH = 512;
++
++/** recorder folder path */
++static const char* const RECORDER_DIRECTORY = "/userdata/audio/";
++static const char* const RECORDER_TEMP_DIRECTORY = "/userdata/audio/norm/";
++static const char* const RECORDER_TEMP_FILE_POSTFIX = ".MP4";
++static const char* const RECORDER_FILE_POSTFIX = ".m4a";
++static const char* const RECORDER_FILE_NAME_FMT = "%Y%m%d_%H%M%S";
++static const char* const RECORDER_FILE_TIME_FMT = "%Y/%m/%d";
++
++/** general page configuration */
++static constexpr int ROOT_VIEW_X = 0;
++static constexpr int ROOT_VIEW_Y = 0;
++static constexpr int ROOT_VIEW_WIDTH = 1920;
++static constexpr int ROOT_VIEW_HEIGHT = 1080;
++static constexpr uint16_t ROOT_VIEW_OPACITY = 255;
++
++static const char* const FONT_NAME = "SourceHanSansSC-Regular.otf";
++
++/** title bar */
++static constexpr int16_t TITLE_BAR_X = 0;
++static constexpr int16_t TITLE_BAR_Y = 0;
++static constexpr int16_t TITLE_BAR_WIDTH = ROOT_VIEW_WIDTH;
++static constexpr int16_t TITLE_BAR_HEIGHT = 70;
++// title back icon
++static constexpr int16_t BACK_ICON_SIZE = 36;   // 36 x 36
++static constexpr int16_t BACK_ICON_PADDING_H = 30;
++static constexpr int16_t BACK_ICON_PADDING_V = (TITLE_BAR_HEIGHT - BACK_ICON_SIZE) / 2;
++static constexpr int16_t BACK_ICON_X = 0;
++static constexpr int16_t BACK_ICON_Y = TITLE_BAR_Y;
++static constexpr int16_t BACK_ICON_WIDTH = BACK_ICON_SIZE + BACK_ICON_PADDING_H * 2;
++static constexpr int16_t BACK_ICON_HEIGHT = TITLE_BAR_HEIGHT;
++// title label
++static constexpr int16_t TITLE_LABEL_X = BACK_ICON_X + BACK_ICON_SIZE + BACK_ICON_PADDING_H * 2;
++static constexpr int16_t TITLE_LABEL_Y = 0;
++static constexpr int16_t TITLE_LABEL_WIDTH = 100;
++static constexpr int16_t TITLE_LABEL_HEIGHT = TITLE_BAR_HEIGHT;
++static constexpr uint16_t TITLE_LABEL_FONT_SIZE = 25;
++
++/** notice label **/
++static constexpr int16_t NOTICE_LABEL_WIDTH = 400;
++static constexpr int16_t NOTICE_LABEL_HEIGHT = 36;
++static constexpr int16_t NOTICE_LABEL_MARGIN_TOP = 30;
++static constexpr int16_t NOTICE_LABEL_X = (ROOT_VIEW_WIDTH - NOTICE_LABEL_WIDTH) / 2;
++static constexpr int16_t NOTICE_LABEL_Y = TITLE_BAR_Y + TITLE_BAR_HEIGHT + NOTICE_LABEL_MARGIN_TOP;
++static constexpr uint16_t NOTICE_LABEL_FONT_SIZE = 32;
++
++/** duration **/
++static constexpr int16_t DURATION_LABEL_WIDTH = 400;
++static constexpr int16_t DURATION_LABEL_HEIGHT = 50;
++static constexpr int16_t DURATION_LABEL_MARGIN_TOP = 30;
++static constexpr int16_t DURATION_LABEL_X = (ROOT_VIEW_WIDTH - DURATION_LABEL_WIDTH) / 2;
++static constexpr int16_t DURATION_LABEL_Y = NOTICE_LABEL_Y + NOTICE_LABEL_HEIGHT + DURATION_LABEL_MARGIN_TOP;
++static constexpr uint16_t DURATION_LABEL_FONT_SIZE = 48;
++
++/** fs **/
++static constexpr int16_t FS_IMAGE_WIDTH = 260;
++static constexpr int16_t FS_IMAGE_HEIGHT = 110;
++static constexpr int16_t FS_IMAGE_MARGIN_TOP = 40;
++static constexpr int16_t FS_IMAGE_X = (ROOT_VIEW_WIDTH - FS_IMAGE_WIDTH) / 2;
++static constexpr int16_t FS_IMAGE_Y = DURATION_LABEL_Y + DURATION_LABEL_HEIGHT + FS_IMAGE_MARGIN_TOP;
++
++/** start/stop button */
++static constexpr int16_t START_BUTTON_SIZE = 140;
++static constexpr int16_t START_BUTTON_WIDTH = START_BUTTON_SIZE;
++static constexpr int16_t START_BUTTON_HEIGHT = START_BUTTON_SIZE;
++static constexpr int16_t START_BUTTON_MARGIN_TOP = 40;
++static constexpr int16_t START_BUTTON_X = (ROOT_VIEW_WIDTH - START_BUTTON_WIDTH) / 2;
++static constexpr int16_t START_BUTTON_Y = FS_IMAGE_Y + FS_IMAGE_HEIGHT + START_BUTTON_MARGIN_TOP;
++
++/** cancel button */
++static constexpr int16_t CANCEL_BUTTON_SIZE = 80;
++static constexpr int16_t CANCEL_BUTTON_WIDTH = CANCEL_BUTTON_SIZE;
++static constexpr int16_t CANCEL_BUTTON_HEIGHT = CANCEL_BUTTON_SIZE;
++static constexpr int16_t CANCEL_BUTTON_MARGIN_RIGHT = 40;
++static constexpr int16_t CANCEL_BUTTON_X = START_BUTTON_X - CANCEL_BUTTON_WIDTH - CANCEL_BUTTON_MARGIN_RIGHT;
++static constexpr int16_t CANCEL_BUTTON_Y = START_BUTTON_Y;
++
++/** pause/resume button */
++static constexpr int16_t PAUSE_BUTTON_SIZE = CANCEL_BUTTON_SIZE;
++static constexpr int16_t PAUSE_BUTTON_WIDTH = PAUSE_BUTTON_SIZE;
++static constexpr int16_t PAUSE_BUTTON_HEIGHT = PAUSE_BUTTON_SIZE;
++static constexpr int16_t PAUSE_BUTTON_MARGIN_LEFT = CANCEL_BUTTON_MARGIN_RIGHT;
++static constexpr int16_t PAUSE_BUTTON_X = START_BUTTON_X + START_BUTTON_WIDTH + PAUSE_BUTTON_MARGIN_LEFT;
++static constexpr int16_t PAUSE_BUTTON_Y = START_BUTTON_Y;
++
++/** list */
++static constexpr int16_t LIST_MARGIN_H = 20;
++// list lable
++static constexpr int16_t LIST_LABEL_MARGIN_TOP = 20;
++static constexpr int16_t LIST_LABEL_X = LIST_MARGIN_H;
++static constexpr int16_t LIST_LABEL_Y = START_BUTTON_Y + START_BUTTON_HEIGHT + LIST_LABEL_MARGIN_TOP;
++static constexpr int16_t LIST_LABEL_WIDTH = 200;
++static constexpr int16_t LIST_LABEL_HEIGHT = 36;
++static constexpr uint16_t LIST_LABEL_FONT_SIZE = 32;
++// list
++static constexpr int16_t LIST_MARGIN_TOP = 20;
++static constexpr int16_t LIST_MARGIN_BOTTOM = 20;
++static constexpr int16_t LIST_X = LIST_MARGIN_H;
++static constexpr int16_t LIST_Y = LIST_LABEL_Y + LIST_LABEL_HEIGHT + LIST_MARGIN_TOP;
++static constexpr int16_t LIST_WIDTH = ROOT_VIEW_WIDTH - (LIST_MARGIN_H * 2);
++static constexpr int16_t LIST_HEIGHT = ROOT_VIEW_HEIGHT - LIST_MARGIN_BOTTOM - LIST_Y;
++// list divider
++static constexpr int16_t LIST_DIVIDER_HEIGHT = 8;
++// list item
++static constexpr int16_t LIST_ITEM_X = 0;
++static constexpr int16_t LIST_ITEM_Y = 0;
++static constexpr int16_t LIST_ITEM_WIDTH = LIST_WIDTH;
++static constexpr int16_t LIST_ITEM_HEIGHT = 110;
++static constexpr int16_t LIST_ITEM_PADDING_H = 20;
++static constexpr int16_t LIST_ITEM_PADDING_V = 20;
++// list item file icon
++static constexpr int16_t LIST_ITEM_FILE_ICON_X = LIST_ITEM_PADDING_H;
++static constexpr int16_t LIST_ITEM_FILE_ICON_Y = LIST_ITEM_PADDING_V;
++static constexpr int16_t LIST_ITEM_FILE_ICON_WIDTH = 72;
++static constexpr int16_t LIST_ITEM_FILE_ICON_HEIGHT = 72;
++// list item name label
++static constexpr int16_t LIST_ITEM_NAME_LABEL_MARGIN_LEFT = 20;
++static constexpr int16_t LIST_ITEM_NAME_LABEL_X = LIST_ITEM_FILE_ICON_X + LIST_ITEM_FILE_ICON_WIDTH + LIST_ITEM_NAME_LABEL_MARGIN_LEFT;
++static constexpr int16_t LIST_ITEM_NAME_LABEL_WIDTH = 500;
++static constexpr int16_t LIST_ITEM_NAME_LABEL_HEIGHT = 28;
++static constexpr uint16_t LIST_ITEM_NAME_LABEL_FONT_SIZE = 24;
++// list item time label
++static constexpr int16_t LIST_ITEM_TIME_PADDING_TOP = 10;
++static constexpr int16_t LIST_ITEM_TIME_LABEL_X = LIST_ITEM_NAME_LABEL_X;
++static constexpr int16_t LIST_ITEM_TIME_LABEL_WIDTH = 200;
++static constexpr int16_t LIST_ITEM_TIME_LABEL_HEIGHT = 22;
++static constexpr uint16_t LIST_ITEM_TIME_LABEL_FONT_SIZE = 20;
++// refactor list time name/time label Y
++static constexpr int16_t LIST_ITEM_NAME_LABEL_Y = (LIST_ITEM_HEIGHT - (LIST_ITEM_NAME_LABEL_HEIGHT + LIST_ITEM_TIME_PADDING_TOP + LIST_ITEM_TIME_LABEL_HEIGHT)) / 2;
++static constexpr int16_t LIST_ITEM_TIME_LABEL_Y = LIST_ITEM_NAME_LABEL_Y + LIST_ITEM_NAME_LABEL_HEIGHT + LIST_ITEM_TIME_PADDING_TOP;
++// list item play button
++static constexpr int16_t LIST_ITEM_BUTTON_SIZE = 56;
++static constexpr int16_t LIST_ITEM_BUTTON_MARGIN = 20;
++static constexpr int16_t LIST_ITEM_PLAY_BUTTON_X = LIST_ITEM_WIDTH - LIST_ITEM_PADDING_H - LIST_ITEM_BUTTON_SIZE * 2 - LIST_ITEM_BUTTON_MARGIN;
++static constexpr int16_t LIST_ITEM_PLAY_BUTTON_Y = (LIST_ITEM_HEIGHT - LIST_ITEM_BUTTON_SIZE) / 2;
++static constexpr int16_t LIST_ITEM_PLAY_BUTTON_WIDTH = LIST_ITEM_BUTTON_SIZE;
++static constexpr int16_t LIST_ITEM_PLAY_BUTTON_HEIGHT = LIST_ITEM_BUTTON_SIZE;
++// list item delete button
++static constexpr int16_t LIST_ITEM_DEL_BUTTON_X = LIST_ITEM_WIDTH - LIST_ITEM_PADDING_H - LIST_ITEM_BUTTON_SIZE;
++static constexpr int16_t LIST_ITEM_DEL_BUTTON_Y = (LIST_ITEM_HEIGHT - LIST_ITEM_BUTTON_SIZE) / 2;
++static constexpr int16_t LIST_ITEM_DEL_BUTTON_WIDTH = LIST_ITEM_BUTTON_SIZE;
++static constexpr int16_t LIST_ITEM_DEL_BUTTON_HEIGHT = LIST_ITEM_BUTTON_SIZE;
++
++
++/** prefix and File Type */
++static const char* const AVAILABEL_SOURCE_TYPE = ".aac";
++} // namespace OHOS
++#endif // OHOS_RECORDER_CONFIG_H
+\ No newline at end of file
+diff --git a/recorder/include/recorder_list_adapter.h b/recorder/include/recorder_list_adapter.h
+new file mode 100644
+index 0000000..b51aaa8
+--- /dev/null
++++ b/recorder/include/recorder_list_adapter.h
+@@ -0,0 +1,118 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_RECORDER_LIST_ADAPTER_H
++#define OHOS_RECORDER_LIST_ADAPTER_H
++
++#include <components/ui_view.h>
++#include <components/abstract_adapter.h>
++#include <event_listener.h>
++
++#include <vector>
++#include <functional>
++#include <memory>
++
++#include "recorder_config.h"
++
++namespace OHOS {
++struct RecordItem {
++    std::string name;   // file name
++    std::string path;   // file path
++    std::string timeStr;
++    long time;          // create time.
++    bool started;       // play started status
++    bool paused;        // paused status
++};
++
++class OnItemPlayListener : public HeapBase
++{
++public:
++    virtual void OnItemPlay(int16_t index, const RecordItem& item) = 0;
++    virtual ~OnItemPlayListener() = default;
++};
++
++class OnItemDeleteListener : public HeapBase
++{
++public:
++    virtual void OnItemDelete(int16_t index, const RecordItem& item) = 0;
++    virtual ~OnItemDeleteListener() = default;
++};
++
++
++using OnItemFunc = std::function<void(int16_t index, const RecordItem& item)>;
++
++class RecorderListItemListener :
++        public OnItemPlayListener,
++        public OnItemDeleteListener {
++public:
++    RecorderListItemListener() = delete;
++    ~RecorderListItemListener() override = default;
++
++    RecorderListItemListener(OnItemFunc onPlay, OnItemFunc onDelete)
++    {
++        onPlay_ = std::move(onPlay);
++        onDelete_ = std::move(onDelete);
++    }
++
++    void OnItemPlay(int16_t index, const RecordItem& item) override
++    {
++        if (!onPlay_) {
++            return;
++        }
++        onPlay_(index, item);
++    }
++
++    void OnItemDelete(int16_t index, const RecordItem& item) override
++    {
++        if (!onDelete_) {
++            return;
++        }
++        onDelete_(index, item);
++    }
++
++private:
++    OnItemFunc onPlay_ {};
++    OnItemFunc onDelete_ {};
++};
++
++
++class RecorderListAdapter : public AbstractAdapter {
++public:
++    RecorderListAdapter();
++    ~RecorderListAdapter() override;
++    uint16_t GetCount() override;
++    UIView* GetView(UIView* inView, int16_t index) override;
++    void Init();
++    void SetOnItemPlayListener(OnItemPlayListener* listener);
++    void SetOnItemDeleteListener(OnItemDeleteListener* listener);
++    void SetItems(std::vector<RecordItem>& items);
++    void AddItem(const RecordItem& item);
++    void RemoveItem(int16_t index);
++    void UpdateItem(int16_t index, const RecordItem& item);
++    bool GetItem(int16_t index, RecordItem& item) const;
++private:
++    UIViewGroup* CreateItemView();
++private:
++    std::vector<RecordItem> items_;
++    char fileIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char playIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char pauseIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    char deleteIconAbsolutePath[MAX_PATH_LENGTH] = { 0 };
++    OnItemPlayListener* onItemPlayListener_ { nullptr };
++    OnItemDeleteListener* onItemDeleteListener_ { nullptr };
++};
++
++}
++#endif // OHOS_RECORDER_LIST_ADAPTER_H
+\ No newline at end of file
+diff --git a/recorder/include/recorder_log.h b/recorder/include/recorder_log.h
+new file mode 100644
+index 0000000..38a492d
+--- /dev/null
++++ b/recorder/include/recorder_log.h
+@@ -0,0 +1,70 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef RECORDER_LOG_H
++#define RECORDER_LOG_H
++
++#ifdef HILOG_ENABLE
++
++#ifndef LOG_DOMAIN
++#define LOG_DOMAIN 0xD0000
++#endif
++
++#ifndef LOG_TAG
++#define LOG_TAG "[RECORDER]"
++#endif
++
++#include <hilog/log.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#define FILE_NAME (strrchr((__FILE__), '/') ? strrchr((__FILE__), '/') + 1 : (__FILE__))
++
++#define LOGD(fmt, ...) HILOG_DEBUG(LOG_APP, "[%s:%d] " fmt, FILE_NAME, __LINE__, ##__VA_ARGS__)
++#define LOGI(fmt, ...) HILOG_INFO(LOG_APP, "[%s:%d] " fmt, FILE_NAME, __LINE__, ##__VA_ARGS__)
++#define LOGW(fmt, ...) HILOG_WARN(LOG_APP, "[%s:%d] " fmt, FILE_NAME, __LINE__, ##__VA_ARGS__)
++#define LOGE(fmt, ...) HILOG_ERROR(LOG_APP, "[%s:%d] " fmt, FILE_NAME, __LINE__, ##__VA_ARGS__)
++#define LOGF(fmt, ...) HILOG_FATAL(LOG_APP, "[%s:%d] " fmt, FILE_NAME, __LINE__, ##__VA_ARGS__)
++
++#ifdef __cplusplus
++}
++#endif
++
++#else
++
++#include <stdio.h>
++#include <string.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++#define FILE_NAME (strrchr((__FILE__), '/') ? strrchr((__FILE__), '/') + 1 : (__FILE__))
++
++#define LOGD(fmt, ...) printf("[D][RECORDER][%s:%d] " fmt "\n", FILE_NAME, __LINE__, ##__VA_ARGS__)
++#define LOGI(fmt, ...) printf("[I][RECORDER][%s:%d] " fmt "\n", FILE_NAME, __LINE__, ##__VA_ARGS__)
++#define LOGW(fmt, ...) printf("[W][RECORDER][%s:%d] " fmt "\n", FILE_NAME, __LINE__, ##__VA_ARGS__)
++#define LOGE(fmt, ...) printf("[E][RECORDER][%s:%d] " fmt "\n", FILE_NAME, __LINE__, ##__VA_ARGS__)
++#define LOGF(fmt, ...) printf("[F][RECORDER][%s:%d] " fmt "\n", FILE_NAME, __LINE__, ##__VA_ARGS__)
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
++
++#endif /* RECORDER_LOG_H */
+diff --git a/recorder/include/recorder_utils.h b/recorder/include/recorder_utils.h
+new file mode 100644
+index 0000000..edfd1ce
+--- /dev/null
++++ b/recorder/include/recorder_utils.h
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_RECORDER_UTILS_H
++#define OHOS_RECORDER_UTILS_H
++
++#include <sstream>
++#include <iomanip>
++#include <ctime>
++#include <sys/stat.h>
++
++namespace OHOS {
++const uint32_t MS_PER_SECOND = 1000;
++const long long MS_PER_MINUTE = 60 * MS_PER_SECOND;
++const long long MS_PER_HOUR = 60 * MS_PER_MINUTE;
++
++static std::string FormatDurationTime(uint32_t total_ms) {
++    if (total_ms == 0) {
++        return "00:00:00";
++    }
++    uint32_t hours = static_cast<uint32_t>(total_ms / MS_PER_HOUR);
++    total_ms %= MS_PER_HOUR;
++    uint32_t minutes = static_cast<uint32_t>(total_ms / MS_PER_MINUTE);
++    total_ms %= MS_PER_MINUTE;
++    uint32_t seconds = static_cast<uint32_t>(total_ms / MS_PER_SECOND);
++
++    std::ostringstream oss;
++    oss << std::setfill('0')
++        << std::setw(2) << hours
++        << ":"
++        << std::setw(2) << minutes
++        << ":"
++        << std::setw(2) << seconds;
++    return oss.str();
++}
++
++static std::string FormatTime(long timeMs, const char* format) {
++    std::time_t time = timeMs;
++    std::tm* tm = std::localtime(&time);
++    std::stringstream ss;
++    ss << std::put_time(tm, format);
++    return ss.str();
++}
++
++static long GetFileTime(const std::string& path) {
++    struct stat fileStat;
++    if (stat(path.c_str(), &fileStat) == 0) {
++        return fileStat.st_mtime;
++    } else {
++        LOGE("get file time failed, path:%s, errno:%d", path.c_str(), errno);
++        return 0;
++    }
++}
++
++
++}
++#endif // OHOS_RECORDER_ABILITY_H
+\ No newline at end of file
+diff --git a/recorder/include/task_helper.h b/recorder/include/task_helper.h
+new file mode 100644
+index 0000000..fcd12d8
+--- /dev/null
++++ b/recorder/include/task_helper.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_RECORDER_TASK_HELPER_H
++#define OHOS_RECORDER_TASK_HELPER_H
++
++#include <sstream>
++#include <iomanip>
++
++#include <common/task_manager.h>
++
++namespace OHOS {
++
++template <typename Callable>
++class TaskLambdaWrapper : public Task {
++private:
++    Callable m_func;
++public:
++    explicit TaskLambdaWrapper(Callable func) : m_func(std::move(func)) {}
++
++    void Callback() override {
++        m_func();
++    }
++};
++
++template <typename Callable>
++static std::shared_ptr<Task> CreateTask(Callable func) {
++    return std::make_shared<TaskLambdaWrapper<Callable>>(std::move(func));
++}
++
++}
++#endif // OHOS_RECORDER_TASK_HELPER_H
+\ No newline at end of file
+diff --git a/recorder/src/media_utils.cpp b/recorder/src/media_utils.cpp
+new file mode 100644
+index 0000000..133ced5
+--- /dev/null
++++ b/recorder/src/media_utils.cpp
+@@ -0,0 +1,441 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <dirent.h>
++#include <fcntl.h>
++#include <stdio.h>
++#include <errno.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <sstream>
++
++#include <media_errors.h>
++
++#include "recorder_ability.h"
++#include "recorder_log.h"
++#include "recorder_config.h"
++#include "media_utils.h"
++
++namespace OHOS {
++static std::string GernerateFileName()
++{
++    time_t stCurrent;
++    char aszDatetime[0x100];
++    (void)time(&stCurrent);
++    struct tm *pstCurrentTime = localtime(&(stCurrent));
++    if (pstCurrentTime == nullptr) {
++        return "";
++    }
++    strftime(aszDatetime, 0x100, RECORDER_FILE_NAME_FMT, pstCurrentTime);
++    std::ostringstream oss;
++    oss << RECORDER_DIRECTORY << aszDatetime << RECORDER_FILE_POSTFIX;
++    return oss.str();
++}
++
++static bool IsDirExists(const char *path) {
++    struct stat st;
++    int ret = lstat(path, &st);
++    if (ret == -1) {
++        if (errno == ENOENT) return false;
++        perror("lstat failed");
++        exit(EXIT_FAILURE);
++    }
++    return S_ISDIR(st.st_mode);
++}
++
++MediaUtils::~MediaUtils()
++{
++    CloseRecorder();
++    ClosePlayer();
++}
++
++#ifdef USE_RECORDER_API
++class RecorderCallbackAdapter: public Media::RecorderCallback
++{
++public:
++    RecorderCallbackAdapter(Media::RecorderCallback* from)
++    {
++        target = from;
++    }
++    ~RecorderCallbackAdapter()
++    {
++        target = nullptr;
++    }
++    void OnError(int32_t errorType, int32_t errorCode) override
++    {
++        if (target) {
++            target->OnError(errorType, errorCode);
++        }
++    }
++    void OnInfo(int type, int extra) override
++    {
++        if (target) {
++            target->OnError(type, extra);
++        }
++    }
++private:
++    Media::RecorderCallback *target = nullptr;
++};
++
++bool MediaUtils::SetRecorderCallback(Media::RecorderCallback* recorderCallback)
++{
++    recorderCallback_ = recorderCallback;
++    return true;
++}
++#endif
++
++bool MediaUtils::InitRecorder()
++{
++    LOGI("InitRecorder");
++#ifdef USE_RECORDER_API
++    int32_t audioSourceId = 0;
++    AudioSourceType inputSource = AUDIO_MIC;
++    AudioCodecFormat audioFormat = AAC_LC;
++    int32_t sampleRate = 48000;
++    int32_t channelCount = 1;
++    int32_t audioEncodingBitRate = 96000;
++
++    recorder_ = std::make_shared<Media::Recorder>();
++    int ret = 0;
++
++    if ((ret = recorder_->SetAudioSource(inputSource, audioSourceId)) != Media::SUCCESS) {
++        LOGE("SetAudioSource failed, ret:%d", ret);
++        return false;
++    }
++    if ((ret = recorder_->SetAudioEncoder(audioSourceId, audioFormat)) != Media::SUCCESS) {
++        LOGE("SetAudioEncoder failed, ret:%d", ret);
++        return false;
++    }
++    if ((ret = recorder_->SetAudioSampleRate(audioSourceId, sampleRate)) != Media::SUCCESS) {
++        LOGE("SetAudioSampleRate failed, ret:%d", ret);
++        return false;
++    }
++    if ((ret = recorder_->SetAudioChannels(audioSourceId, channelCount)) != Media::SUCCESS) {
++        LOGE("SetAudioChannels failed, ret:%d", ret);
++        return false;
++    }
++    if ((ret = recorder_->SetAudioEncodingBitRate(audioSourceId, audioEncodingBitRate)) != Media::SUCCESS) {
++        LOGE("SetAudioEncodingBitRate failed, ret:%d", ret);
++        return false;
++    }
++    if ((ret = recorder_->SetMaxDuration(36000)) != Media::SUCCESS) { // 36000s=10h
++        LOGE("SetMaxDuration failed, ret:%d", ret);
++        return false;
++    }
++    if ((ret = recorder_->SetOutputFormat(Media::FORMAT_M4A)) != Media::SUCCESS) {
++        LOGE("SetOutputFormat failed, ret:%d", ret);
++        return false;
++    }
++    recorderCallbackPtr_ = std::make_shared<RecorderCallbackAdapter>(recorderCallback_);
++    recorder_->SetRecorderCallback(recorderCallbackPtr_);
++#endif
++    return true;
++}
++
++bool MediaUtils::StartRecord()
++{
++    LOGI("StartRecord");
++    if (recording_) {
++        LOGW("already recording!");
++        return false;
++    }
++    if (!IsDirExists(RECORDER_DIRECTORY)) {
++        if (mkdir(RECORDER_DIRECTORY, 0755) != 0) {
++            LOGE("mkdir for %s failed, errno:%d", RECORDER_DIRECTORY, errno);
++            CloseRecorder();
++            return false;
++        }
++    }
++#ifdef USE_RECORDER_FD
++    std::string filename = GernerateFileName();
++    LOGI("GernerateFileName %s", filename.c_str());
++    recordFd_ = open(filename.c_str(), O_RDWR | O_CREAT);
++    if (recordFd_ == -1) {
++        LOGE("open file failed! filename:%s, errno:%d", filename.c_str(), errno);
++        return false;
++    }
++#endif
++
++#ifdef USE_RECORDER_API
++    if (recorder_ == nullptr) {
++        LOGW("recorder is nullptr, do init.");
++        if (!InitRecorder()) {
++            LOGE("recorder init failed!");
++            return false;
++        }
++    }
++
++    int ret = 0;
++#if USE_RECORDER_FD
++    if ((ret = recorder_->SetOutputFile(recordFd_)) != Media::SUCCESS) {
++        LOGE("SetOutputPath failed. ret:%d", ret);
++        CloseRecorder();
++        return false;
++    }
++#else
++    if ((ret = recorder_->SetOutputPath(RECORDER_DIRECTORY)) != Media::SUCCESS) {
++        LOGE("SetOutputPath failed. ret:%d", ret);
++        CloseRecorder();
++        return false;
++    }
++#endif
++
++    ret = recorder_->Prepare();
++    if (ret != Media::SUCCESS) {
++        LOGE("Prepare failed. ret:%d", ret);
++        CloseRecorder();
++        return false;
++    }
++    ret = recorder_->Start();
++    if (ret != Media::SUCCESS) {
++        LOGE("Start failed. ret:%d", ret);
++        CloseRecorder();
++        return false;
++    }
++#endif
++
++    recording_ = true;
++    return true;
++}
++
++bool MediaUtils::StopRecord()
++{
++    LOGI("StopRecord");
++    if (!recording_) {
++        LOGW("current not recording!");
++        return false;
++    }
++    CloseRecorder();
++    MoveFiles();
++    recording_ = false;
++    return true;
++}
++
++bool MediaUtils::MoveFiles()
++{
++    LOGI("MoveFiles");
++    struct dirent* entry;
++    DIR* dir = opendir(RECORDER_TEMP_DIRECTORY);
++    if (dir == nullptr) {
++        LOGE("open recorder dir failed. errno:%d", errno);
++        return false;
++    }
++
++    while ((entry = readdir(dir)) != nullptr) {
++        std::string filename = entry->d_name;
++        if (entry->d_type == DT_REG &&
++            filename.size() > 4 &&
++            (filename.substr(filename.size() - 4) == RECORDER_TEMP_FILE_POSTFIX)) {
++            LOGI("find file: %s", filename.c_str());
++            std::string src = std::string(RECORDER_TEMP_DIRECTORY) + filename;
++            std::string dst = std::string(RECORDER_DIRECTORY) + filename.substr(0, filename.size() - 4) + RECORDER_FILE_POSTFIX;
++            if (rename(src.c_str(), dst.c_str()) != 0) {
++                LOGE("rename file failed, errno:%d, src:%s, dst:%s", errno, src.c_str(), dst.c_str());
++                continue;
++            }
++        }
++    }
++    closedir(dir);
++    return true;
++}
++
++bool MediaUtils::CloseRecorder()
++{
++    LOGI("CloseRecorder");
++#ifdef USE_RECORDER_API
++    if (recorder_) {
++        recorder_->Stop(true);
++        recorder_->Release();
++        recorder_ = nullptr;
++    }
++#endif
++
++#ifdef USE_RECORDER_FD
++    if (recordFd_ != -1) {
++        FILE *fp = fdopen(recordFd_, "w+");
++        if (fp) {
++            fflush(fp);
++            fsync(recordFd_);
++            fclose(fp);
++            close(recordFd_);
++        }
++        recordFd_ = -1;
++    }
++#endif
++    return true;
++}
++
++// Player
++#ifdef USE_PLAYER_API
++class PlayerCallbackAdapter: public Media::PlayerCallback
++{
++public:
++    PlayerCallbackAdapter(Media::PlayerCallback* from)
++    {
++        target = from;
++    }
++    ~PlayerCallbackAdapter() override
++    {
++        target = nullptr;
++    }
++    void OnPlaybackComplete() override
++    {
++        if (target) {
++            target->OnPlaybackComplete();
++        }
++    }
++    void OnError(int32_t errorType, int32_t errorCode) override
++    {
++        if (target) {
++            target->OnError(errorType, errorCode);
++        }
++    }
++    void OnInfo(int type, int extra) override
++    {
++        if (target) {
++            target->OnError(type, extra);
++        }
++    }
++    void OnVideoSizeChanged(int width, int height)      override
++    {
++        if (target) {
++            target->OnVideoSizeChanged(width, height);
++        }
++    }
++    void OnRewindToComplete() override
++    {
++        if (target) {
++            target->OnRewindToComplete();
++        }
++    }
++private:
++    Media::PlayerCallback *target = nullptr;
++};
++
++bool MediaUtils::SetPlayerCallback(Media::PlayerCallback* playerCallback)
++{
++    playerCallback_ = playerCallback;
++    return true;
++}
++#endif
++
++bool MediaUtils::InitPlayer(const char* filePath)
++{
++    LOGI("InitPlayer");
++#ifdef USE_PLAYER_API
++    player_ = std::make_shared<Media::Player>();
++    if (!player_) {
++        LOGE("create Player failed!");
++        return false;
++    }
++    std::string uri(filePath);
++    Media::Source source(uri);
++    int ret = player_->SetSource(source);
++    if (ret != Media::SUCCESS) {
++        LOGE("SetSource failed!");
++        ClosePlayer();
++        return false;
++    }
++    playerCallbackPtr_ = std::make_shared<PlayerCallbackAdapter>(playerCallback_);
++    player_->SetPlayerCallback(playerCallbackPtr_);
++#endif
++    return true;
++}
++
++bool MediaUtils::StartPlay(const char* filePath)
++{
++    LOGI("StartPlay file:%s", filePath);
++    if (playing_ && !paused_) {
++        LOGW("already playing.");
++        return false;
++    }
++#ifdef USE_PLAYER_API
++    if (!player_) {
++        LOGE("player is null, do init!");
++        if (!InitPlayer(filePath)) {
++            LOGE("init player failed");
++            return false;
++        }
++    }
++    int ret = 0;
++    if (playing_ && paused_) {
++        ret = player_->Play();
++        if (ret != Media::SUCCESS) {
++            LOGE("Play(resume) failed!");
++            ClosePlayer();
++            return false;
++        }
++    } else {
++        ret = player_->Prepare();
++        if (ret != Media::SUCCESS) {
++            LOGE("Prepare failed!");
++            ClosePlayer();
++            return false;
++        }
++        ret = player_->Play();
++        if (ret != Media::SUCCESS) {
++            LOGE("Play failed!");
++            ClosePlayer();
++            return false;
++        }
++    }
++#endif
++    playing_ = true;
++    paused_ = false;
++    return true;
++}
++
++bool MediaUtils::PausePlay()
++{
++    LOGI("PausePlay");
++#ifdef USE_PLAYER_API
++    int ret = player_->Pause();
++    if (ret != Media::SUCCESS) {
++        LOGE("Pause failed!");
++        ClosePlayer();
++        return false;
++    }
++#endif
++    paused_ = true;
++    return true;
++}
++
++bool MediaUtils::StopPlay()
++{
++    LOGI("StopPlay");
++    if (!playing_) {
++        LOGW("current not playing!");
++        return false;
++    }
++    ClosePlayer();
++    return true;
++}
++
++bool MediaUtils::ClosePlayer()
++{
++    LOGI("ClosePlayer");
++#ifdef USE_PLAYER_API
++    if (player_) {
++        player_->Stop();
++        player_->Release();
++        player_ = nullptr;
++    }
++#endif
++    playing_ = false;
++    paused_ = false;
++    return true;
++}
++
++}
+\ No newline at end of file
+diff --git a/recorder/src/recorder_ability.cpp b/recorder/src/recorder_ability.cpp
+new file mode 100644
+index 0000000..c0f070e
+--- /dev/null
++++ b/recorder/src/recorder_ability.cpp
+@@ -0,0 +1,53 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "recorder_ability.h"
++#include "recorder_log.h"
++
++namespace OHOS {
++REGISTER_AA(RecorderAbility)
++
++void RecorderAbility::OnStart(const Want &want)
++{
++    LOGI("Recorder::OnStart");
++    SetMainRoute("RecorderAbilityMainSlice");
++
++    Ability::OnStart(want);
++}
++
++void RecorderAbility::OnInactive()
++{
++    LOGI("Recorder::OnInactive");
++    Ability::OnInactive();
++}
++
++void RecorderAbility::OnActive(const Want &want)
++{
++    LOGI("Recorder::OnActive");
++    Ability::OnActive(want);
++}
++
++void RecorderAbility::OnBackground()
++{
++    LOGI("Recorder::OnBackground");
++    Ability::OnBackground();
++}
++
++void RecorderAbility::OnStop()
++{
++    LOGI("Recorder::OnStop");
++    Ability::OnStop();
++}
++}
+\ No newline at end of file
+diff --git a/recorder/src/recorder_ability_main_slice.cpp b/recorder/src/recorder_ability_main_slice.cpp
+new file mode 100644
+index 0000000..0fdcdf3
+--- /dev/null
++++ b/recorder/src/recorder_ability_main_slice.cpp
+@@ -0,0 +1,561 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <ability_env.h>
++#include <ability_loader.h>
++#include <ability_manager.h>
++#include <components/text_adapter.h>
++#include <common/screen.h>
++#include <hal_tick.h>
++
++#include <dirent.h>
++#include <algorithm>
++#include <cstdio>
++
++#include "recorder_ability_main_slice.h"
++#include "recorder_log.h"
++#include "recorder_utils.h"
++
++namespace OHOS {
++REGISTER_AS(RecorderAbilityMainSlice)
++
++RecorderAbilityMainSlice::~RecorderAbilityMainSlice()
++{
++    LOGI("~RecorderAbilityMainSlice()");
++    StopTimer();
++}
++
++void RecorderAbilityMainSlice::InitTitle()
++{
++    LOGI("RecorderAbilityMainSlice::InitTitle");
++    titleBar_ = new UIViewGroup();
++    titleBar_->SetPosition(TITLE_BAR_X, TITLE_BAR_Y, TITLE_BAR_WIDTH, TITLE_BAR_HEIGHT);
++    titleBar_->SetStyle(STYLE_BACKGROUND_COLOR, Color::White().full);
++    titleBar_->SetStyle(STYLE_BACKGROUND_OPA, OPA_OPAQUE);
++
++    backButton_ = new UIImageView();
++    backButton_->SetPosition(BACK_ICON_X, BACK_ICON_Y, BACK_ICON_WIDTH, BACK_ICON_HEIGHT);
++    backButton_->SetStyle(STYLE_PADDING_LEFT, BACK_ICON_PADDING_H);
++    backButton_->SetStyle(STYLE_PADDING_RIGHT, BACK_ICON_PADDING_H);
++    backButton_->SetStyle(STYLE_PADDING_TOP, BACK_ICON_PADDING_V);
++    backButton_->SetStyle(STYLE_PADDING_BOTTOM, BACK_ICON_PADDING_V);
++    backButton_->SetSrc(backIconAbsolutePath);
++    backButton_->SetTouchable(true);
++
++    auto onClick = [this] (UIView& view, const Event& event) -> bool {
++        LOGI("TerminateAbility by BackPress");
++        TerminateAbility();
++        return true;
++    };
++    backButtonListener_ = new EventListener(onClick, nullptr);
++    backButton_->SetOnClickListener(backButtonListener_);
++
++    titleLabel_ = new UILabel();
++    titleLabel_->SetPosition(TITLE_LABEL_X, TITLE_LABEL_Y, TITLE_LABEL_WIDTH, TITLE_LABEL_HEIGHT);
++    titleLabel_->SetAlign(UITextLanguageAlignment::TEXT_ALIGNMENT_LEFT, UITextLanguageAlignment::TEXT_ALIGNMENT_CENTER);
++    titleLabel_->SetFont(FONT_NAME, TITLE_LABEL_FONT_SIZE);
++    titleLabel_->SetStyle(STYLE_TEXT_COLOR, Color::Black().full);
++    titleLabel_->SetStyle(STYLE_TEXT_OPA, OPA_OPAQUE);
++    titleLabel_->SetText("录音机");
++
++    titleBar_->Add(backButton_);
++    titleBar_->Add(titleLabel_);
++    rootView_->Add(titleBar_);
++}
++
++void RecorderAbilityMainSlice::InitRecordCtrl()
++{
++    noticeLabel_ = new UILabel();
++    noticeLabel_->SetPosition(NOTICE_LABEL_X, NOTICE_LABEL_Y, NOTICE_LABEL_WIDTH, NOTICE_LABEL_HEIGHT);
++    noticeLabel_->SetAlign(UITextLanguageAlignment::TEXT_ALIGNMENT_CENTER, UITextLanguageAlignment::TEXT_ALIGNMENT_CENTER);
++    noticeLabel_->SetFont(FONT_NAME, NOTICE_LABEL_FONT_SIZE);
++    noticeLabel_->SetStyle(STYLE_TEXT_COLOR, Color::GetColorFromRGB(78, 89, 105).full);
++    noticeLabel_->SetStyle(STYLE_TEXT_OPA, OPA_OPAQUE);
++    noticeLabel_->SetText("点击下方按钮开始录音");
++
++    durationLabel_ = new UILabel();
++    durationLabel_->SetPosition(DURATION_LABEL_X, DURATION_LABEL_Y, DURATION_LABEL_WIDTH, DURATION_LABEL_HEIGHT);
++    durationLabel_->SetAlign(UITextLanguageAlignment::TEXT_ALIGNMENT_CENTER, UITextLanguageAlignment::TEXT_ALIGNMENT_CENTER);
++    durationLabel_->SetFont(FONT_NAME, DURATION_LABEL_FONT_SIZE);
++    durationLabel_->SetStyle(STYLE_TEXT_COLOR, Color::Black().full);
++    durationLabel_->SetStyle(STYLE_TEXT_OPA, OPA_OPAQUE);
++    durationLabel_->SetText("00:00:00");
++
++    fsImageView_ = new UIImageView();
++    fsImageView_->SetPosition(FS_IMAGE_X, FS_IMAGE_Y, FS_IMAGE_WIDTH, FS_IMAGE_HEIGHT);
++    fsImageView_->SetAutoEnable(false);
++    fsImageView_->SetResizeMode(UIImageView::FILL);
++    fsImageView_->SetSrc(fsIconAbsolutePath);
++    fsImageView_->SetTouchable(false);
++
++    startButton_ = new UIImageView();
++    startButton_->SetPosition(START_BUTTON_X, START_BUTTON_Y, START_BUTTON_WIDTH, START_BUTTON_HEIGHT);
++    startButton_->SetAutoEnable(false);
++    startButton_->SetResizeMode(UIImageView::CONTAIN);
++    startButton_->SetSrc(startIconAbsolutePath);
++    startButton_->SetTouchable(true);
++
++    pauseButton_ = new UIImageView();
++    pauseButton_->SetPosition(PAUSE_BUTTON_X, PAUSE_BUTTON_Y, PAUSE_BUTTON_WIDTH, PAUSE_BUTTON_HEIGHT);
++    pauseButton_->SetAutoEnable(false);
++    pauseButton_->SetResizeMode(UIImageView::CONTAIN);
++    pauseButton_->SetSrc(pauseIconAbsolutePath);
++    pauseButton_->SetTouchable(true);
++    pauseButton_->SetVisible(false);
++
++    cancelButton_ = new UIImageView();
++    cancelButton_->SetPosition(CANCEL_BUTTON_X, CANCEL_BUTTON_Y, CANCEL_BUTTON_WIDTH, CANCEL_BUTTON_HEIGHT);
++    cancelButton_->SetAutoEnable(false);
++    cancelButton_->SetResizeMode(UIImageView::CONTAIN);
++    cancelButton_->SetSrc(cancelIconAbsolutePath);
++    cancelButton_->SetTouchable(true);
++    cancelButton_->SetVisible(false);
++
++    startButtonListener_ = new EventListener(
++        [this] (UIView& view, const Event& event) -> bool {
++            LOGI("start button on click");
++            Start();
++            return true;
++        }, nullptr);
++
++    stopButtonListener_ = new EventListener(
++        [this] (UIView& view, const Event& event) -> bool {
++            LOGI("stop button on click");
++            Stop();
++            return true;
++        }, nullptr);
++
++    pauseButtonListener_ = new EventListener(
++        [this] (UIView& view, const Event& event) -> bool {
++            LOGI("pause button on click");
++            Pause();
++            return true;
++        }, nullptr);
++
++    resumeButtonListener_ = new EventListener(
++        [this] (UIView& view, const Event& event) -> bool {
++            LOGI("resume button on click");
++            Resume();
++            return true;
++        }, nullptr);
++
++    cancelButtonListener_ = new EventListener(
++        [this] (UIView& view, const Event& event) -> bool {
++            LOGI("cancel button on click");
++            Cancel();
++            return true;
++        }, nullptr);
++
++    startButton_->SetOnClickListener(startButtonListener_);
++    pauseButton_->SetOnClickListener(pauseButtonListener_);
++    cancelButton_->SetOnClickListener(cancelButtonListener_);
++
++    rootView_->Add(noticeLabel_);
++    rootView_->Add(durationLabel_);
++    rootView_->Add(fsImageView_);
++    rootView_->Add(startButton_);
++    rootView_->Add(pauseButton_);
++    rootView_->Add(cancelButton_);
++}
++
++void RecorderAbilityMainSlice::InitRecordList()
++{
++    listLabel_ = new UILabel();
++    listLabel_->SetPosition(LIST_LABEL_X, LIST_LABEL_Y, LIST_LABEL_WIDTH, LIST_LABEL_HEIGHT);
++    listLabel_->SetAlign(UITextLanguageAlignment::TEXT_ALIGNMENT_LEFT, UITextLanguageAlignment::TEXT_ALIGNMENT_CENTER);
++    listLabel_->SetFont(FONT_NAME, LIST_LABEL_FONT_SIZE);
++    listLabel_->SetStyle(STYLE_TEXT_COLOR, Color::Black().full);
++    listLabel_->SetStyle(STYLE_TEXT_OPA, OPA_OPAQUE);
++    listLabel_->SetText("录音列表");
++
++    list_ = new UIList(UIList::VERTICAL);
++    std::vector<RecordItem> items;
++    adapter_ = new RecorderListAdapter();
++    adapter_->Init();
++    OnItemPlayListener* playListener = new RecorderListItemListener(
++        [this](int16_t index, const RecordItem& item) {
++            LOGI("OnItemPlayListener index: %d", index);
++            this->OnItemPlay(index, item);
++        }, nullptr);
++    OnItemDeleteListener* deleteListener = new RecorderListItemListener(
++        nullptr,
++        [this](int16_t index, const RecordItem& item) {
++            LOGI("OnItemDeleteListener index: %d", index);
++            this->OnItemDelete(index, item);
++        });
++    adapter_->SetOnItemPlayListener(playListener);
++    adapter_->SetOnItemDeleteListener(deleteListener);
++    adapter_->SetItems(items);
++
++    list_->SetIntercept(true);
++    list_->SetStyle(STYLE_BACKGROUND_OPA, OPA_TRANSPARENT);
++    list_->SetStyle(STYLE_TEXT_COLOR, Color::Black().full);
++    list_->SetStyle(STYLE_TEXT_OPA, OPA_OPAQUE);
++    list_->SetPosition(LIST_X, LIST_Y, LIST_WIDTH, LIST_HEIGHT);
++    list_->SetStartIndex(0);
++    list_->SetYScrollBarVisible(false);
++    list_->SetAdapter(adapter_);
++
++    rootView_->Add(listLabel_);
++    rootView_->Add(list_);
++}
++
++void RecorderAbilityMainSlice::OnStart(const Want &want)
++{
++    LOGI("RecorderAbilityMainSlice::OnStart, screen size: %dx%d", Screen::GetInstance().GetWidth(), Screen::GetInstance().GetHeight());
++    AbilitySlice::OnStart(want);
++
++    rootView_ = RootView::GetWindowRootView();
++    rootView_->SetPosition(ROOT_VIEW_X, ROOT_VIEW_Y);
++    rootView_->Resize(ROOT_VIEW_WIDTH, ROOT_VIEW_HEIGHT);
++    rootView_->SetStyle(STYLE_BACKGROUND_COLOR, Color::GetColorFromRGB(249, 250, 251).full);
++    rootView_->SetStyle(STYLE_BACKGROUND_OPA, OPA_OPAQUE);
++
++    const char* pathHeader = GetSrcPath();
++    if (sprintf_s(backIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, BACK_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | backIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(fsIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, FS_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | fsIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(startIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, START_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | startIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(stopIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, STOP_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | stopIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(pauseIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, PAUSE_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | pauseIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(resumeIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, RESUME_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | resumeIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(cancelIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, CANCEL_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | cancelIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(listFileIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, LIST_FILE_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | listFileIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(listPlayIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, LIST_PLAY_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | listPlayIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(listPauseIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, LIST_PAUSE_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | listPauseIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(listDeleteIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, LIST_DEL_ICON_PATH) < 0) {
++        LOGI("RecorderAbilityMainSlice::OnStart | listDeleteIconAbsolutePath error");
++        return;
++    }
++
++    InitTitle();
++    InitRecordCtrl();
++    InitRecordList();
++    ReloadItems();
++    SetUIContent(rootView_);
++}
++
++void RecorderAbilityMainSlice::OnItemPlay(int16_t index, const RecordItem& item)
++{
++    LOGI("OnItemPlay index:%d", index);
++    RecordItem newItem;
++    uint16_t count = adapter_->GetCount();
++    for (uint16_t i = 0; i < count; i++) {
++        adapter_->GetItem(i, newItem);
++        if (index != i) {
++            if (newItem.started) {
++                mediaUtils_.StopPlay();
++                newItem.started = false;
++                newItem.paused = false;
++                adapter_->UpdateItem(i, newItem);
++            }
++        }
++    }
++    newItem = item;
++    if (newItem.started && !newItem.paused) {
++        if (mediaUtils_.PausePlay()) {
++            newItem.paused = true;
++            adapter_->UpdateItem(index, newItem);
++        }
++    } else {
++        mediaUtils_.SetPlayerCallback(this);
++        if (mediaUtils_.StartPlay(newItem.path.c_str())) {
++            newItem.started = true;
++            newItem.paused = false;
++            adapter_->UpdateItem(index, newItem);
++        }
++    }
++    list_->RefreshList();
++}
++
++void RecorderAbilityMainSlice::OnItemDelete(int16_t index, const RecordItem& item)
++{
++    LOGI("OnItemDelete index:%d", index);
++    if (item.started) {
++        mediaUtils_.StopPlay();
++    }
++    if (unlink(item.path.c_str()) == 0) {
++        LOGI("file %s delete success.", item.path.c_str());
++        adapter_->RemoveItem(index);
++        list_->RefreshList();
++    } else {
++        LOGE("file %s delete failed, errno:%d", item.path.c_str(), errno);
++    }
++}
++
++// Media::PlayerCallback
++void RecorderAbilityMainSlice::OnPlaybackComplete()
++{
++    LOGI("PlayerCallback OnPlaybackComplete");
++    RecordItem newItem;
++    uint16_t count = adapter_->GetCount();
++    for (uint16_t i = 0; i < count; i++) {
++        adapter_->GetItem(i, newItem);
++        if (newItem.started) {
++            newItem.started = false;
++            newItem.paused = false;
++            adapter_->UpdateItem(i, newItem);
++            break;
++        }
++    }
++    mediaUtils_.StopPlay();
++    list_->RefreshList();
++}
++
++void RecorderAbilityMainSlice::OnError(int32_t errorType, int32_t errorCode)
++{
++    LOGE("PlayerCallback OnError errorType:%d, errorCode:%d", errorType, errorCode);
++    RecordItem newItem;
++    uint16_t count = adapter_->GetCount();
++    for (uint16_t i = 0; i < count; i++) {
++        adapter_->GetItem(i, newItem);
++        if (newItem.started) {
++            newItem.started = false;
++            newItem.paused = false;
++            adapter_->UpdateItem(i, newItem);
++            break;
++        }
++    }
++    mediaUtils_.StopPlay();
++    list_->RefreshList();
++}
++
++void RecorderAbilityMainSlice::OnInfo(int type, int extra)
++{
++    LOGI("PlayerCallback OnInfo type:%d, extra:%d", type, extra);
++}
++
++void RecorderAbilityMainSlice::Start()
++{
++    LOGI("Start");
++    // stop play first
++    mediaUtils_.StopPlay();
++
++    if (!mediaUtils_.StartRecord()) {
++        LOGE("Start failed!");
++        return;
++    }
++    noticeLabel_->SetText("正在录音...");
++    startButton_->SetSrc(stopIconAbsolutePath);
++    startButton_->SetOnClickListener(stopButtonListener_);
++    pauseButton_->SetSrc(pauseIconAbsolutePath);
++    pauseButton_->SetOnClickListener(pauseButtonListener_);
++    pauseButton_->SetVisible(true);
++    cancelButton_->SetVisible(true);
++    StartTimer();
++}
++
++void RecorderAbilityMainSlice::Stop()
++{
++    LOGI("Stop");
++    if (!mediaUtils_.StopRecord()) {
++        LOGE("Stop failed!");
++        return;
++    }
++    noticeLabel_->SetText("点击下方按钮开始录音");
++    startButton_->SetSrc(startIconAbsolutePath);
++    startButton_->SetOnClickListener(startButtonListener_);
++    pauseButton_->SetVisible(false);
++    cancelButton_->SetVisible(false);
++    StopTimer();
++    ReloadItems();
++}
++
++void RecorderAbilityMainSlice::Pause()
++{
++    LOGI("Pause");
++    noticeLabel_->SetText("已暂停");
++    pauseButton_->SetSrc(resumeIconAbsolutePath);
++    pauseButton_->SetOnClickListener(resumeButtonListener_);
++    PauseTimer();
++}
++
++void RecorderAbilityMainSlice::Resume()
++{
++    LOGI("Resume");
++    noticeLabel_->SetText("正在录音...");
++    pauseButton_->SetSrc(pauseIconAbsolutePath);
++    pauseButton_->SetOnClickListener(pauseButtonListener_);
++    ResumeTimer();
++}
++
++void RecorderAbilityMainSlice::Cancel()
++{
++    LOGI("Cancel");
++    noticeLabel_->SetText("点击下方按钮开始录音");
++    startButton_->SetSrc(startIconAbsolutePath);
++    startButton_->SetOnClickListener(startButtonListener_);
++    pauseButton_->SetVisible(false);
++    cancelButton_->SetVisible(false);
++    StopTimer();
++}
++
++static constexpr uint32_t RECORDER_TIMER_PERIOD = 100; // update per 100 ms.
++
++void RecorderAbilityMainSlice::StartTimer()
++{
++    LOGI("StartTimer");
++    if (!recordTimeUpdateTask_) {
++        recordTimeUpdateTask_ = CreateTask(
++            [this](){
++                this->UpdateRecordTime();
++            });
++    }
++    if (!recordTimeUpdateTask_) {
++        LOGE("create record time update task failed.");
++        return;
++    }
++    recordTimeUpdateTask_->SetPeriod(RECORDER_TIMER_PERIOD);
++    TaskManager::GetInstance()->Add(recordTimeUpdateTask_.get());
++    lastRecordTime_ = HALTick::GetInstance().GetTime();
++    recordDuration_ = 0;
++}
++
++void RecorderAbilityMainSlice::PauseTimer()
++{
++    LOGI("PauseTimer");
++    TaskManager::GetInstance()->Remove(recordTimeUpdateTask_.get());
++    uint32_t elapse = HALTick::GetInstance().GetElapseTime(lastRecordTime_);
++    recordDuration_ += elapse;
++    UpdateDurationLabel();
++}
++
++void RecorderAbilityMainSlice::ResumeTimer()
++{
++    LOGI("ResumeTimer");
++    TaskManager::GetInstance()->Add(recordTimeUpdateTask_.get());
++    lastRecordTime_ = HALTick::GetInstance().GetTime();
++}
++
++void RecorderAbilityMainSlice::StopTimer()
++{
++    LOGI("StopTimer");
++    TaskManager::GetInstance()->Remove(recordTimeUpdateTask_.get());
++    recordDuration_ = 0;
++    UpdateDurationLabel();
++}
++
++void RecorderAbilityMainSlice::UpdateRecordTime()
++{
++    LOGI("UpdateRecordTime");
++    uint32_t elapse = HALTick::GetInstance().GetElapseTime(lastRecordTime_);
++    lastRecordTime_ = HALTick::GetInstance().GetTime();
++    recordDuration_ += elapse;
++    UpdateDurationLabel();
++}
++
++void RecorderAbilityMainSlice::UpdateDurationLabel()
++{
++    std::string time = FormatDurationTime(recordDuration_);
++    if (durationTime_ != time) {
++        durationTime_ = time;
++        durationLabel_->SetText(durationTime_.c_str());
++    }
++}
++
++void RecorderAbilityMainSlice::ReloadItems()
++{
++    std::vector<RecordItem> list;
++#ifdef MOCK_DATA
++    list.push_back({"2025-11-12-10-11-01.m4a", "/userdata/audio/2025-11-12-10-11-01.m4a", "今天 17:35", 4, false, false});
++    list.push_back({"2025-11-12-10-11-02.m4a", "/userdata/audio/2025-11-12-10-11-02.m4a", "昨天 15:28", 3, false, false});
++    list.push_back({"2025-11-12-10-11-03.m4a", "/userdata/audio/2025-11-12-10-11-03.m4a", "前天 09:05", 2, false, false});
++    list.push_back({"2025-11-12-10-11-04.m4a", "/userdata/audio/2025-11-12-10-11-04.m4a", "05-18 14:30", 1, false, false});
++    list.push_back({"2025-11-12-10-11-05.m4a", "/userdata/audio/2025-11-12-10-11-05.m4a", "2023-12-25 10:00", 0, false, false});
++#else
++    struct dirent* entry;
++    DIR* dir = opendir(RECORDER_DIRECTORY);
++    if (dir == nullptr) {
++        LOGE("open recorder dir failed. errno:%d", errno);
++        return;
++    }
++
++    while ((entry = readdir(dir)) != nullptr) {
++        std::string filename = entry->d_name;
++        if (entry->d_type == DT_REG &&
++            filename.size() > 4 &&
++            (filename.substr(filename.size() - 4) == RECORDER_FILE_POSTFIX)) {
++            LOGI("find file: %s", filename.c_str());
++            std::string filePath = std::string(RECORDER_DIRECTORY) + filename;
++            long time = GetFileTime(filePath);
++            std::string timeStr = FormatTime(time, RECORDER_FILE_TIME_FMT);
++            RecordItem item = {filename, filePath, timeStr, time, false, false};
++            list.push_back(item);
++        }
++    }
++    closedir(dir);
++#endif
++    if (list.size() > 0) {
++        std::sort(list.begin(), list.end(), [](const RecordItem& a, const RecordItem& b) {
++                return a.time > b.time;
++            });
++        adapter_->SetItems(list);
++        list_->RefreshList();
++    }
++}
++
++void RecorderAbilityMainSlice::OnInactive()
++{
++    LOGI("RecorderAbilityMainSlice::OnInactive");
++    AbilitySlice::OnInactive();
++}
++
++void RecorderAbilityMainSlice::OnActive(const Want &want)
++{
++    LOGI("RecorderAbilityMainSlice::OnActive");
++    AbilitySlice::OnActive(want);
++}
++
++void RecorderAbilityMainSlice::OnBackground()
++{
++    LOGI("RecorderAbilityMainSlice::OnBackground");
++    AbilitySlice::OnBackground();
++}
++
++void RecorderAbilityMainSlice::OnStop()
++{
++    LOGI("RecorderAbilityMainSlice::OnStop");
++    AbilitySlice::OnStop();
++}
++}
+\ No newline at end of file
+diff --git a/recorder/src/recorder_list_adapter.cpp b/recorder/src/recorder_list_adapter.cpp
+new file mode 100644
+index 0000000..2ce9f61
+--- /dev/null
++++ b/recorder/src/recorder_list_adapter.cpp
+@@ -0,0 +1,292 @@
++/*
++ * Copyright (c) 2024 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <ability_env.h>
++#include <components/ui_image_view.h>
++#include <components/ui_button.h>
++#include <components/ui_label.h>
++
++#include <iostream>
++#include <chrono>
++#include <ctime>
++#include <string>
++#include <iomanip>
++#include <sstream>
++
++#include "recorder_list_adapter.h"
++#include "recorder_log.h"
++
++#define VIEW_ID_ICON "ICON"
++#define VIEW_ID_NAME "NAME"
++#define VIEW_ID_TIME "TIME"
++#define VIEW_ID_PLAY "PLAY"
++#define VIEW_ID_DELETE "DELETE"
++
++namespace OHOS {
++RecorderListAdapter::RecorderListAdapter()
++{
++}
++
++RecorderListAdapter::~RecorderListAdapter()
++{
++}
++
++void RecorderListAdapter::Init()
++{
++    const char* pathHeader = GetSrcPath();
++    if (sprintf_s(fileIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, LIST_FILE_ICON_PATH) < 0) {
++        LOGI("SimpleAdapter::Init | fileIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(playIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, LIST_PLAY_ICON_PATH) < 0) {
++        LOGI("SimpleAdapter::Init | playIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(pauseIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, LIST_PAUSE_ICON_PATH) < 0) {
++        LOGI("SimpleAdapter::Init | pauseIconAbsolutePath error");
++        return;
++    }
++    if (sprintf_s(deleteIconAbsolutePath, MAX_PATH_LENGTH, "%s%s", pathHeader, LIST_DEL_ICON_PATH) < 0) {
++        LOGI("SimpleAdapter::Init | deleteIconAbsolutePath error");
++        return;
++    }
++    if (onItemPlayListener_ != nullptr) {
++        delete onItemPlayListener_;
++        onItemPlayListener_ = nullptr;
++    }
++    if (onItemDeleteListener_ != nullptr) {
++        delete onItemDeleteListener_;
++        onItemDeleteListener_ = nullptr;
++    }
++}
++
++void RecorderListAdapter::SetOnItemPlayListener(OnItemPlayListener* listener)
++{
++    onItemPlayListener_ = listener;
++}
++
++void RecorderListAdapter::SetOnItemDeleteListener(OnItemDeleteListener* listener)
++{
++    onItemDeleteListener_ = listener;
++}
++
++void RecorderListAdapter::SetItems(std::vector<RecordItem>& items)
++{
++    items_ = items;
++}
++
++void RecorderListAdapter::AddItem(const RecordItem& item) {
++    items_.insert(items_.begin(), item);
++}
++
++void RecorderListAdapter::RemoveItem(int16_t index) {
++    items_.erase(items_.begin() + index);
++}
++
++void RecorderListAdapter::UpdateItem(int16_t index, const RecordItem& item)
++{
++    LOGI("UpdateItem index:%d", index);
++    if (index >= 0 && index < items_.size()) {
++        items_[index] = item;
++    } else {
++        LOGE("UpdateItem index out of range, index: %d, size: %zu", index, items_.size());
++    }
++}
++
++bool RecorderListAdapter::GetItem(int16_t index, RecordItem& item) const
++{
++    if (index >= 0 && index < items_.size()) {
++        item = items_[index];
++        return true;
++    } else {
++        LOGE("GetItem index out of range, index: %d, size: %zu", index, items_.size());
++        return false;
++    }
++}
++
++uint16_t RecorderListAdapter::GetCount()
++{
++    LOGI("GetCount items size: %zu", items_.size());
++    return (uint16_t)items_.size();
++}
++
++UIViewGroup* RecorderListAdapter::CreateItemView()
++{
++    UIViewGroup* item = new UIViewGroup();
++    item->SetPosition(0, 0, LIST_ITEM_WIDTH, LIST_ITEM_HEIGHT);
++    item->SetStyle(STYLE_BORDER_RADIUS, 16);
++    item->SetStyle(STYLE_BORDER_WIDTH, 0);
++    item->SetStyle(STYLE_BACKGROUND_COLOR, Color::White().full);
++    item->SetStyle(STYLE_BACKGROUND_OPA, OPA_OPAQUE);
++    item->SetStyle(STYLE_MARGIN_BOTTOM, LIST_DIVIDER_HEIGHT);
++
++    UIImageView* fileIcon = new UIImageView();
++    fileIcon->SetViewId(VIEW_ID_ICON);
++    fileIcon->SetPosition(LIST_ITEM_FILE_ICON_X, LIST_ITEM_FILE_ICON_Y, LIST_ITEM_FILE_ICON_WIDTH, LIST_ITEM_FILE_ICON_HEIGHT);
++    fileIcon->SetAutoEnable(false);
++    fileIcon->SetResizeMode(UIImageView::CONTAIN);
++    fileIcon->SetSrc(fileIconAbsolutePath);
++    fileIcon->SetTouchable(false);
++
++    UILabel* nameLabel = new UILabel();
++    nameLabel->SetViewId(VIEW_ID_NAME);
++    nameLabel->SetPosition(LIST_ITEM_NAME_LABEL_X, LIST_ITEM_NAME_LABEL_Y, LIST_ITEM_NAME_LABEL_WIDTH, LIST_ITEM_NAME_LABEL_HEIGHT);
++    nameLabel->SetAlign(UITextLanguageAlignment::TEXT_ALIGNMENT_LEFT, UITextLanguageAlignment::TEXT_ALIGNMENT_CENTER);
++    nameLabel->SetFont(FONT_NAME, LIST_ITEM_NAME_LABEL_FONT_SIZE);
++    nameLabel->SetStyle(STYLE_TEXT_COLOR, Color::Black().full);
++    nameLabel->SetStyle(STYLE_TEXT_OPA, OPA_OPAQUE);
++
++    UILabel* timeLabel = new UILabel();
++    timeLabel->SetViewId(VIEW_ID_TIME);
++    timeLabel->SetPosition(LIST_ITEM_TIME_LABEL_X, LIST_ITEM_TIME_LABEL_Y, LIST_ITEM_TIME_LABEL_WIDTH, LIST_ITEM_TIME_LABEL_HEIGHT);
++    timeLabel->SetAlign(UITextLanguageAlignment::TEXT_ALIGNMENT_LEFT, UITextLanguageAlignment::TEXT_ALIGNMENT_CENTER);
++    timeLabel->SetFont(FONT_NAME, LIST_ITEM_TIME_LABEL_FONT_SIZE);
++    timeLabel->SetStyle(STYLE_TEXT_COLOR, Color::Gray().full);
++    timeLabel->SetStyle(STYLE_TEXT_OPA, OPA_OPAQUE);
++
++    UIImageView* playButton = new UIImageView();
++    playButton->SetViewId(VIEW_ID_PLAY);
++    playButton->SetPosition(LIST_ITEM_PLAY_BUTTON_X, LIST_ITEM_PLAY_BUTTON_Y, LIST_ITEM_PLAY_BUTTON_WIDTH, LIST_ITEM_PLAY_BUTTON_HEIGHT);
++    playButton->SetAutoEnable(false);
++    playButton->SetResizeMode(UIImageView::CONTAIN);
++    playButton->SetTouchable(true);
++
++    UIImageView* deleteButton = new UIImageView();
++    deleteButton->SetViewId(VIEW_ID_DELETE);
++    deleteButton->SetPosition(LIST_ITEM_DEL_BUTTON_X, LIST_ITEM_DEL_BUTTON_Y, LIST_ITEM_DEL_BUTTON_WIDTH, LIST_ITEM_DEL_BUTTON_HEIGHT);
++    deleteButton->SetAutoEnable(false);
++    deleteButton->SetResizeMode(UIImageView::CONTAIN);
++    deleteButton->SetSrc(deleteIconAbsolutePath);
++    deleteButton->SetTouchable(true);
++
++    item->Add(fileIcon);
++    item->Add(nameLabel);
++    item->Add(timeLabel);
++    item->Add(playButton);
++    item->Add(deleteButton);
++    return item;
++}
++
++/**
++ * @brief 将 Unix 时间戳（秒级）转换为友好的字符串表示
++ * @param timestamp 秒级时间戳
++ * @return 格式化后的时间字符串，如 "今天 17:35", "昨天 15:28", "05-18 14:30"
++ */
++static std::string formatTimestamp(long timestamp) {
++    // 1. 转换时间戳为本地时间
++    std::time_t target_t = static_cast<std::time_t>(timestamp);
++    std::tm target_tm = *std::localtime(&target_t); // 线程不安全，生产环境建议用 localtime_r / localtime_s
++
++    // 2. 获取当前时间
++    std::time_t now_t = std::time(nullptr);
++    std::tm now_tm = *std::localtime(&now_t);
++
++    // 3. 计算天数差（简化版，忽略闰年/跨月，适合大部分场景）
++    auto getDayKey = [](const std::tm& tm) {
++        return tm.tm_year * 1000 + tm.tm_mon * 100 + tm.tm_mday;
++    };
++    long target_day = getDayKey(target_tm);
++    long now_day = getDayKey(now_tm);
++    long day_diff = now_day - target_day;
++
++    // 4. 格式化输出
++    std::stringstream ss;
++    if (day_diff == 0) {
++        ss << "今天 ";
++    } else if (day_diff == 1) {
++        ss << "昨天 ";
++    } else if (day_diff == 2) {
++        ss << "前天 ";
++    } else {
++        // 超过3天显示 MM-DD
++        ss << std::setw(2) << std::setfill('0') << (target_tm.tm_mon + 1) << "-"
++           << std::setw(2) << std::setfill('0') << target_tm.tm_mday << " ";
++    }
++
++    // 拼接时间（HH:mm）
++    ss << std::setw(2) << std::setfill('0') << target_tm.tm_hour << ":"
++       << std::setw(2) << std::setfill('0') << target_tm.tm_min;
++
++    return ss.str();
++}
++
++UIView* RecorderListAdapter::GetView(UIView* inView, int16_t index)
++{
++    LOGI("GetView inView:%p, index:%d", inView, index);
++    if (items_.size() == 0) {
++        return nullptr;
++    }
++    if ((index >= items_.size()) || (index < 0)) {
++        return nullptr;
++    }
++    UIViewGroup* root = nullptr;
++    UIImageView* fileIcon = nullptr;
++    UILabel* nameLabel = nullptr;
++    UILabel* timeLabel = nullptr;
++    UIImageView* playButton = nullptr;
++    UIImageView* deleteButton = nullptr;
++    if (inView == nullptr) {
++        root = CreateItemView();
++    } else {
++        root = static_cast<UIViewGroup*>(inView);
++    }
++    root->SetViewIndex(index);
++    nameLabel = static_cast<UILabel*>(root->GetChildById(VIEW_ID_NAME));
++    timeLabel = static_cast<UILabel*>(root->GetChildById(VIEW_ID_TIME));
++    playButton = static_cast<UIImageView*>(root->GetChildById(VIEW_ID_PLAY));
++    deleteButton = static_cast<UIImageView*>(root->GetChildById(VIEW_ID_DELETE));
++
++    RecordItem& item = items_[index];
++    nameLabel->SetText(item.name.c_str());
++    timeLabel->SetText(item.timeStr.c_str());
++    if (item.started && !item.paused) {
++        playButton->SetSrc(pauseIconAbsolutePath);
++    } else {
++        playButton->SetSrc(playIconAbsolutePath);
++    }
++
++    UIView::OnClickListener* playButtonlistener = playButton->GetOnClickListener();
++    if (playButtonlistener != nullptr) {
++        delete playButtonlistener;
++    }
++    UIView::OnClickListener* deleteButtonlistener = deleteButton->GetOnClickListener();
++    if (deleteButtonlistener != nullptr) {
++        delete deleteButtonlistener;
++    }
++
++    UIView::OnClickListener* playButtonListener_ = new EventListener(
++        [this, index, &item] (UIView& view, const Event& event) -> bool {
++            LOGI("play/pause button on click");
++            if (onItemPlayListener_) {
++                onItemPlayListener_->OnItemPlay(index, item);
++            }
++            return true;
++        }, nullptr);
++
++    UIView::OnClickListener* deleteButtonListener_ = new EventListener(
++        [this, index, &item] (UIView& view, const Event& event) -> bool {
++            LOGI("delete button on click");
++            if (onItemDeleteListener_) {
++                onItemDeleteListener_->OnItemDelete(index, item);
++            }
++            return true;
++        }, nullptr);
++
++    playButton->SetOnClickListener(playButtonListener_);
++    deleteButton->SetOnClickListener(deleteButtonListener_);
++    return root;
++}
++
++}
+\ No newline at end of file

@@ -1,0 +1,32 @@
+#[模式0，1，2共用]
+#输入像素格式,和实际输入格式对应,当前支持0: OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420和1: OT_PIXEL_FORMAT_RGB_8880
+pix_format=1
+
+#模板更新阈值，若实际场景整体得分偏低，则该值适当调低，取值范围[0, 1)
+online_update_thresh=0.9
+
+#模板放大系数，取值范围[1, 6]
+template_factor=2.0
+
+#搜索区放大系数，取值范围[1, 6]
+search_factor=4.5
+
+#模板刷新频率，为实际参与跟踪的帧数，若实际通路不是每帧都参与跟踪，可调小该变量
+online_update_inter=30
+
+#[模式0，1共用]
+#输入图片分辨率：width,height
+img_size=1920,1080
+
+#初始框坐标：x,y,width,height
+init_box=18,240,932,754
+
+#输入图片路径，图片命名示例：00000001.rgb，图片命名序列必须连续，且从00000001开始
+input_path=./data/rgb
+
+#[模式2]
+#批量模式输入的根目录
+batch_input_root_path=
+
+#批量模式输入的参数信息配置文件，文件中每一行格式如“子目录名 img_width img_height box_x box_y box_width box_height”
+batch_info_file=

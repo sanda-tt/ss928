@@ -1,0 +1,6 @@
+{
+    "pkg_name_versions" : [
+        "opencv=4.13==vendor/opensource/opencv"
+        "osd=1.0.0==vendor/opensource/osd"
+    ]
+}

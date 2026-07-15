@@ -1,0 +1,312 @@
+diff --git a/build/config.gni b/build/config.gni
+old mode 100755
+new mode 100644
+index 7053ec6..b5ffd36
+--- a/build/config.gni
++++ b/build/config.gni
+@@ -105,4 +105,7 @@ declare_args() {
+ 
+   # trusted list for change storage level
+   huks_change_storage_level_config = "{ 0, 3333, 5520 }"
++
++  # whether enable huks hisilicon cipher in system in small
++  huks_enable_hisilicon_cipher_in_small = false
+ }
+diff --git a/frameworks/huks_standard/main/crypto_engine/mbedtls/BUILD.gn b/frameworks/huks_standard/main/crypto_engine/mbedtls/BUILD.gn
+index 9345b93..017b6d3 100644
+--- a/frameworks/huks_standard/main/crypto_engine/mbedtls/BUILD.gn
++++ b/frameworks/huks_standard/main/crypto_engine/mbedtls/BUILD.gn
+@@ -83,6 +83,12 @@ if (os_level == "standard") {
+       "//base/security/huks/services/huks_standard/huks_service/main/hks_storage/include",
+       "//base/security/huks/frameworks/huks_standard/main/crypto_engine/rkc/include",
+     ]
++
++    if(huks_enable_hisilicon_cipher_in_small) {
++      include_dirs += [ "//drivers/peripheral/huks/interfaces/include", ]
++
++      cflags = [ "-DHKS_CIPHER_ROOT_KEY" ]
++    }
+   }
+ 
+   ohos_static_library("libhuks_mbedtls_small_static") {
+@@ -149,6 +155,11 @@ if (os_level == "standard") {
+       "//base/security/huks/frameworks/huks_standard/main/os_dependency:libhuks_os_dependency_small_static",
+       "//base/security/huks/utils/file_operator:libhuks_utils_file_operator_static",
+     ]
++
++    if (huks_enable_hisilicon_cipher_in_small) {
++      cflags = [ "-DHKS_CIPHER_ROOT_KEY" ]
++      deps += [ "$ohos_board_adapter_dir/huks:huks_cipher_adapter" ]
++    }
+     configs = [
+       "//base/security/huks/frameworks/config/build:l1_small_common_config",
+     ]
+diff --git a/frameworks/huks_standard/main/crypto_engine/mbedtls/src/hks_mbedtls_engine.c b/frameworks/huks_standard/main/crypto_engine/mbedtls/src/hks_mbedtls_engine.c
+index 590016f..a6ed919 100644
+--- a/frameworks/huks_standard/main/crypto_engine/mbedtls/src/hks_mbedtls_engine.c
++++ b/frameworks/huks_standard/main/crypto_engine/mbedtls/src/hks_mbedtls_engine.c
+@@ -26,6 +26,10 @@
+ #include "hks_log.h"
+ #include "hks_template.h"
+ 
++#ifdef HKS_CIPHER_ROOT_KEY
++#include "huks_hdi_cipher.h"
++#endif
++
+ static int32_t EncryptCheckParam(const struct HksBlob *key, const struct HksUsageSpec *usageSpec,
+     const struct HksBlob *message, struct HksBlob *cipherText)
+ {
+@@ -331,9 +335,18 @@ int32_t HksCryptoHalVerifyIsoIec97962(const struct HksBlob *key, const struct Hk
+ 
+ int32_t HksCryptoHalFillRandom(struct HksBlob *randomData)
+ {
++#ifdef HKS_CIPHER_ROOT_KEY
++    int32_t ret = HksCipherGenerateRandom(randomData);
++    if (ret != HKS_SUCCESS) {
++        HKS_LOG_E("cipher_get_random failed! ret = 0x%X", ret);
++        return HKS_ERROR_BAD_STATE;
++    }
++    return HKS_SUCCESS;
++#else
+     FillRandom func = (FillRandom)GetAbility(HKS_CRYPTO_ABILITY_FILL_RANDOM);
+     HKS_IF_NULL_RETURN(func, HKS_ERROR_INVALID_ARGUMENT)
+     return func(randomData);
++#endif /* HKS_CIPHER_ROOT_KEY */
+ }
+ 
+ int32_t HksCryptoHalFillPrivRandom(struct HksBlob *randomData)
+diff --git a/frameworks/huks_standard/main/crypto_engine/rkc/include/hks_rkc_rw.h b/frameworks/huks_standard/main/crypto_engine/rkc/include/hks_rkc_rw.h
+index 2f56510..43c15ee 100644
+--- a/frameworks/huks_standard/main/crypto_engine/rkc/include/hks_rkc_rw.h
++++ b/frameworks/huks_standard/main/crypto_engine/rkc/include/hks_rkc_rw.h
+@@ -20,7 +20,13 @@
+ 
+ #define HKS_RKC_VER 2                                   /* the version of root key component */
+ #define HKS_MK_VER 2                                    /* the version of main key */
++#ifdef HKS_CIPHER_ROOT_KEY
++#define HKS_RKC_RMK_ITER 10000                              /* the iterator number of times which derive Root Main Key */
++#define HKS_RKC_MATERIAL2_LEN 64                        /* the material2 length of root key component */
++#else
+ #define HKS_RKC_RMK_ITER 1                              /* the iterator number of times which derive Root Main Key */
++#define HKS_RKC_MATERIAL2_LEN 32                        /* the material2 length of root key component */
++#endif /* HKS_CIPHER_ROOT_KEY */
+ #define HKS_RKC_RMK_HMAC_SHA256 1                       /* the hash algorithm which derive Root Main Key */
+ #define HKS_RKC_MK_CRYPT_ALG_AES256_GCM 1               /* the encrypt algorithm of main key */
+ #define HKS_RKC_CFG_RSV_LEN 32                          /* the reserve length of the system configuration */
+@@ -70,7 +76,7 @@ struct HksKsfDataRkc {
+     struct HksTime rkCreatedTime;                       /* the created time of root key */
+     struct HksTime rkExpiredTime;                       /* the expired time of root key */
+     uint8_t rkMaterial1[HKS_RKC_MATERIAL_LEN];          /* the first material of root key */
+-    uint8_t rkMaterial2[HKS_RKC_MATERIAL_LEN];          /* the second material of root key */
++    uint8_t rkMaterial2[HKS_RKC_MATERIAL2_LEN];          /* the second material of root key */
+     uint32_t rmkIter;                                   /* the iterator number of times which derive root main key */
+     uint8_t rmkSalt[HKS_RKC_SALT_LEN];                  /* the salt which derive root main key */
+     uint32_t rmkHashAlg;                                /* the hash algorithm which derive root main key */
+diff --git a/frameworks/huks_standard/main/crypto_engine/rkc/src/hks_rkc.c b/frameworks/huks_standard/main/crypto_engine/rkc/src/hks_rkc.c
+index fcda4a4..6226c21 100644
+--- a/frameworks/huks_standard/main/crypto_engine/rkc/src/hks_rkc.c
++++ b/frameworks/huks_standard/main/crypto_engine/rkc/src/hks_rkc.c
+@@ -30,6 +30,10 @@
+ #include "hks_rkc_v1.h"
+ #endif
+ 
++#ifdef HKS_CIPHER_ROOT_KEY
++#include "huks_hdi_cipher.h"
++#endif
++
+ /* the configuration of root key component */
+ static struct HksRkcCfg g_hksRkcCfg = {
+     .state = HKS_RKC_STATE_INVALID,
+@@ -127,6 +131,37 @@ static int32_t ReadAllKsfMk(struct HksKsfDataMkWithVer *validKsfData)
+ 
+ static int32_t RkcGetRmkRawKey(const struct HksKsfDataRkc *ksfDataRkc, struct HksBlob *rawKey)
+ {
++#ifdef HKS_CIPHER_ROOT_KEY
++    int32_t ret;
++    uint8_t decryptKeyData[HKS_RKC_MATERIAL_LEN] = {0};
++    struct HksBlob decryptKey = { HKS_RKC_MATERIAL_LEN, decryptKeyData };
++    struct HksBlob mainKey = { HKS_RKC_MATERIAL_LEN, ((struct HksKsfDataRkc *)ksfDataRkc)->rkMaterial1 };
++    struct HksBlob KeyMaterial = { HKS_RKC_MATERIAL2_LEN, ((struct HksKsfDataRkc *)ksfDataRkc)->rkMaterial2 };
++
++    ret = HksCipherEncryptAndDecrypt(&mainKey, &KeyMaterial, false, &decryptKey);
++    if (ret != HKS_SUCCESS) {
++        HKS_LOG_E("Cipher Decrypt failed! ret = 0x%X", ret);
++        goto out;
++    }
++
++    ret = memcpy_s(rawKey->data, rawKey->size, decryptKey.data, decryptKey.size);
++    if (ret != EOK) {
++        HKS_LOG_E("Memcpy failed! ret = 0x%X", ret);
++        goto out;
++    }
++
++    /* XOR hardware UDID */
++    ret = HksGetHardwareUdid(rawKey->data, HKS_HARDWARE_UDID_LEN);
++    if (ret != HKS_SUCCESS) {
++        HKS_LOG_E("Get hardware udid failed! ret = 0x%X", ret);
++        goto out;
++    }
++
++out:
++    (void)memset_s(decryptKeyData, decryptKey.size, 0, decryptKey.size);
++    (void)memset_s(&decryptKey, sizeof(struct HksBlob), 0, sizeof(struct HksBlob));
++    return ret;
++#else
+     uint8_t udid[HKS_HARDWARE_UDID_LEN] = {0};
+     int32_t ret = HksGetHardwareUdid(udid, HKS_HARDWARE_UDID_LEN);
+     HKS_IF_NOT_SUCC_LOGE_RETURN(ret, ret, "Get hardware udid failed! ret = 0x%" LOG_PUBLIC "X", ret)
+@@ -138,6 +173,7 @@ static int32_t RkcGetRmkRawKey(const struct HksKsfDataRkc *ksfDataRkc, struct Hk
+ 
+     (void)memset_s(udid, HKS_HARDWARE_UDID_LEN, 0, HKS_HARDWARE_UDID_LEN);
+     return HKS_SUCCESS;
++#endif
+ }
+ 
+ uint32_t RkcDigestToHks(const uint32_t rkcDigest)
+@@ -205,6 +241,59 @@ void RkcRecoverMkTime(struct HksTime createdTime, struct HksTime expiredTime)
+ 
+ static int32_t RkcMakeRandomMaterial(struct HksKsfDataRkc *ksfDataRkc)
+ {
++#ifdef HKS_CIPHER_ROOT_KEY
++    /* two random number */
++    uint8_t random1Data[HKS_RKC_MATERIAL_LEN] = {0};
++    uint8_t encryptKeyData[HKS_RKC_MATERIAL_LEN] = {0};
++    uint8_t random2Data[HKS_RKC_MATERIAL2_LEN] = {0};
++    struct HksBlob random1 = { HKS_RKC_MATERIAL_LEN, random1Data };
++    struct HksBlob random2 = { HKS_RKC_MATERIAL2_LEN, random2Data };
++    struct HksBlob encryptKey = { HKS_RKC_MATERIAL_LEN, encryptKeyData };
++    struct HksBlob mainKey = { HKS_RKC_MATERIAL_LEN, ksfDataRkc->rkMaterial1 };
++    struct HksBlob KeyMaterial = { HKS_RKC_MATERIAL2_LEN, ksfDataRkc->rkMaterial2 };
++    int32_t ret;
++
++    /* Generate 32 random number: R1 */
++    ret = HksCryptoHalFillRandom(&random1);
++    if (ret != HKS_SUCCESS) {
++        HKS_LOG_E("Generate random1 failed! ret = 0x%X", ret);
++        goto err_exit;
++    }
++
++    /* Generate 64 random number: R2 */
++    ret = HksCryptoHalFillRandom(&random2);
++    if (ret != HKS_SUCCESS) {
++        HKS_LOG_E("Generate random2 failed! ret = 0x%X", ret);
++        goto err_exit;
++    }
++
++    ret = memcpy_s(ksfDataRkc->rkMaterial1, HKS_RKC_MATERIAL_LEN, random1.data, HKS_RKC_MATERIAL_LEN);
++    if (ret != EOK) {
++        HKS_LOG_E("Material1 memcpy failed!");
++        goto err_exit;
++    }
++
++    ret = memcpy_s(ksfDataRkc->rkMaterial2, HKS_RKC_MATERIAL2_LEN, random2.data, HKS_RKC_MATERIAL2_LEN);
++    if (ret != EOK) {
++        HKS_LOG_E("Material2 memcpy failed!");
++        goto err_exit;
++    }
++
++    ret = HksCipherEncryptAndDecrypt(&mainKey, &KeyMaterial, true, &encryptKey);
++    if(ret != HKS_SUCCESS) {
++        HKS_LOG_E("Encrypt material failed! ret = 0x%X", ret);
++    } else {
++        ret = memcpy_s(mainKey.data, HKS_RKC_MATERIAL_LEN, encryptKeyData, HKS_RKC_MATERIAL_LEN);
++        if (ret != EOK) {
++            HKS_LOG_E("Memcpy failed!");
++        }
++    }
++
++err_exit:
++    (void)memset_s(random1Data, HKS_RKC_MATERIAL_LEN, 0, HKS_RKC_MATERIAL_LEN);
++    (void)memset_s(encryptKeyData, HKS_RKC_MATERIAL_LEN, 0, HKS_RKC_MATERIAL_LEN);
++    (void)memset_s(random2Data, HKS_RKC_MATERIAL2_LEN, 0, HKS_RKC_MATERIAL2_LEN);
++#else
+     /* two random number */
+     struct HksBlob random1 = { HKS_RKC_MATERIAL_LEN, ksfDataRkc->rkMaterial1 };
+     struct HksBlob random2 = { HKS_RKC_MATERIAL_LEN, ksfDataRkc->rkMaterial2 };
+@@ -218,6 +307,7 @@ static int32_t RkcMakeRandomMaterial(struct HksKsfDataRkc *ksfDataRkc)
+         HKS_LOG_E("Generate random2 failed! ret = 0x%" LOG_PUBLIC "X", ret);
+         (void)memset_s(random1.data, HKS_RKC_MATERIAL_LEN, 0, HKS_RKC_MATERIAL_LEN);
+     }
++#endif
+     return ret;
+ }
+ 
+diff --git a/frameworks/huks_standard/main/os_dependency/BUILD.gn b/frameworks/huks_standard/main/os_dependency/BUILD.gn
+index e6366a6..0f85dfc 100644
+--- a/frameworks/huks_standard/main/os_dependency/BUILD.gn
++++ b/frameworks/huks_standard/main/os_dependency/BUILD.gn
+@@ -20,6 +20,15 @@ config("huks_config") {
+     "ipc/include",
+     "sysinfo/include",
+   ]
++  
++  if (huks_enable_hisilicon_cipher_in_small) {
++    include_dirs += [
++      "//drivers/peripheral/huks/interfaces/include",
++    ]
++    cflags = [
++      "-DHKS_CIPHER_ROOT_KEY",
++    ]
++  }
+ }
+ 
+ if (os_level == "standard") {
+@@ -159,5 +168,9 @@ if (os_level == "standard") {
+       "hilog_lite:hilog_shared",
+       "init:libbegetutil",
+     ]
++
++    if (huks_enable_hisilicon_cipher_in_small) {
++      deps += [ "$ohos_board_adapter_dir/huks:huks_cipher_adapter" ]
++    }
+   }
+ }
+diff --git a/interfaces/inner_api/huks_lite/BUILD.gn b/interfaces/inner_api/huks_lite/BUILD.gn
+index 3fac12f..a8cacad 100644
+--- a/interfaces/inner_api/huks_lite/BUILD.gn
++++ b/interfaces/inner_api/huks_lite/BUILD.gn
+@@ -106,6 +106,10 @@ config("soft_huks_config") {
+     "-DHKS_CONFIG_KEY_STORE_PATH=\"${huks_key_store_path}\"",
+     "-DHKS_KEY_VERSION=${huks_key_version}",
+   ]
++
++  if (huks_enable_hisilicon_cipher_in_small) {
++    cflags += [ "-DHKS_CIPHER_ROOT_KEY" ]
++  }
+ }
+ 
+ config("public_huks_config") {
+diff --git a/test/unittest/huks_standard_test/three_stage_test/include/asymmetric_alg_test/hks_rsa_cipher_test_common.h b/test/unittest/huks_standard_test/three_stage_test/include/asymmetric_alg_test/hks_rsa_cipher_test_common.h
+index 5ea49c1..abbd7b0 100644
+--- a/test/unittest/huks_standard_test/three_stage_test/include/asymmetric_alg_test/hks_rsa_cipher_test_common.h
++++ b/test/unittest/huks_standard_test/three_stage_test/include/asymmetric_alg_test/hks_rsa_cipher_test_common.h
+@@ -55,11 +55,11 @@ static const std::string g_inData_512 = "RSA_512_ttttttttttttttttttttttttttttttt
+                                         "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt";
+ 
+ static struct HksBlob inData_96 = {
+-    g_inData_96.length(),
++    static_cast<uint32_t>(g_inData_96.length()),
+     const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(g_inData_96.c_str()))
+ };
+ static struct HksBlob inData_192 = {
+-    g_inData_192.length(),
++    static_cast<uint32_t>(g_inData_192.length()),
+     const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(g_inData_192.c_str()))
+ };
+ 
+diff --git a/utils/file_operator/BUILD.gn b/utils/file_operator/BUILD.gn
+index f1138e6..b9c634a 100644
+--- a/utils/file_operator/BUILD.gn
++++ b/utils/file_operator/BUILD.gn
+@@ -86,6 +86,10 @@ if (os_level == "standard") {
+     complete_static_lib = true
+ 
+     external_deps = [ "hilog_lite:hilog_shared" ]
+-    sources += [ "hks_file_operator_lite.c" ]
++    if (huks_use_lite_storage == true) {
++        sources += [ "hks_file_operator_lite.c" ]
++    } else {
++      sources += [ "hks_file_operator.c" ]
++    }
+   }
+ }

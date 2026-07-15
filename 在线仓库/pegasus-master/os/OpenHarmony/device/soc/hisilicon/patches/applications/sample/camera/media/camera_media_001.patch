@@ -1,0 +1,91 @@
+diff --git a/camera_sample.cpp b/camera_sample.cpp
+index 801644d..cf95d39 100755
+--- a/camera_sample.cpp
++++ b/camera_sample.cpp
+@@ -31,6 +31,8 @@ using namespace std;
+ using namespace OHOS;
+ using namespace OHOS::Media;
+ 
++const string DEFAULT_SAVE_PATH = "/userdata/";
++
+ static int32_t SampleGetRecordFd()
+ {
+     struct timeval tv = {};
+@@ -111,30 +113,17 @@ Recorder *SampleCreateRecorder()
+         cout << "SetCaptureRate failed." << ret << endl;
+         goto ERROR;
+     }
+-    if ((ret = recorder->SetAudioSource(inputSource, audioSourceId)) != SUCCESS) {
+-        cout << "SetAudioSource failed." << ret << endl;
+-        goto ERROR;
+-    }
+-    if ((ret = recorder->SetAudioEncoder(audioSourceId, audioFormat)) != SUCCESS) {
+-        cout << "SetAudioEncoder failed." << ret << endl;
+-        goto ERROR;
+-    }
+-    if ((ret = recorder->SetAudioSampleRate(audioSourceId, sampleRate)) != SUCCESS) {
+-        cout << "SetAudioSampleRate failed." << ret << endl;
+-        goto ERROR;
+-    }
+-    if ((ret = recorder->SetAudioChannels(audioSourceId, channelCount)) != SUCCESS) {
+-        cout << "SetAudioChannels failed." << ret << endl;
+-        goto ERROR;
+-    }
+-    if ((ret = recorder->SetAudioEncodingBitRate(audioSourceId, audioEncodingBitRate)) != SUCCESS) {
++
++    if ((ret = recorder->SetMaxDuration(36000)) != SUCCESS) { // 36000s=10h
+         cout << "SetAudioEncodingBitRate failed." << ret << endl;
+         goto ERROR;
+     }
+-    if ((ret = recorder->SetMaxDuration(36000)) != SUCCESS) { // 36000s=10h
+-        cout << "SetAudioEncodingBitRate failed." << ret << endl;
++
++    if ((ret = recorder->SetOutputFormat(FORMAT_MPEG_4)) != SUCCESS) {
++        cout << "SetOutputFormat failed." << ret << endl;
+         goto ERROR;
+     }
++    
+     return recorder;
+ 
+ ERROR:
+@@ -217,13 +206,6 @@ public:
+             cout << "Recorder not available." << endl;
+             return -1;
+         }
+-        if (recordFd_ == -1) {
+-            recordFd_ = SampleGetRecordFd();
+-        }
+-        if (recordFd_ == -1) {
+-            cout << "Create fd failed." << endl;
+-            return -1;
+-        }
+         return SUCCESS;
+     }
+ 
+@@ -239,7 +221,7 @@ public:
+             CloseRecorder();
+             return;
+         }
+-        ret = recorder_->SetOutputFile(recordFd_);
++        ret = recorder_->SetOutputPath(DEFAULT_SAVE_PATH);
+         if (ret != SUCCESS) {
+             cout << "SetOutputPath failed. ret=" << ret << endl;
+             CloseRecorder();
+@@ -389,7 +371,8 @@ int main()
+ 
+     EventHandler eventHdlr; // Create a thread to handle callback events
+     SampleCameraStateMng CamStateMng(eventHdlr);
+-
++    SampleCameraDeviceCallback cameraDeviceCallback;
++    camKit->RegisterCameraDeviceCallback(cameraDeviceCallback, eventHdlr);
+     camKit->CreateCamera(camId, CamStateMng, eventHdlr);
+ 
+     char input;
+@@ -416,6 +399,7 @@ int main()
+         }
+     }
+ EXIT:
++    camKit->UnregisterCameraDeviceCallback(cameraDeviceCallback);
+     cout << "Camera sample end." << endl;
+     return 0;
+ }

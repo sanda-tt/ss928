@@ -1,0 +1,13 @@
+diff --git a/lite/build/suite.py b/lite/build/suite.py
+index a6e118a..acc38ae 100644
+--- a/lite/build/suite.py
++++ b/lite/build/suite.py
+@@ -179,7 +179,7 @@ class XDeviceBuilder:
+         :return:
+         """
+         ohos_dir = os.path.join(self.args.project_dir, 'plugins', 'ohos')
+-        command = [utils.get_python_cmd(), "setup.py", "install", "--user"]
++        command = [utils.get_python_cmd(), "setup.py", "sdist"]
+         factory_script = os.path.join(self.args.project_dir, "factory.sh")
+         if os.path.exists(factory_script):
+             os.chmod(factory_script, 0o775)

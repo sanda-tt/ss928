@@ -1,0 +1,1283 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 3b5e823..036a64b 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -185,7 +185,6 @@ if (os_level != "standard") {
+       "frameworks/draw/draw_triangle.cpp",
+       "frameworks/draw/draw_utils.cpp",
+       "frameworks/engines/gfx/gfx_engine_manager.cpp",
+-      "frameworks/engines/gfx/hi3516/hi3516_engine.cpp",
+       "frameworks/engines/gfx/soft_engine.cpp",
+       "frameworks/events/event.cpp",
+       "frameworks/font/base_font.cpp",
+@@ -207,6 +206,8 @@ if (os_level != "standard") {
+       "frameworks/imgdecode/cache_manager.cpp",
+       "frameworks/imgdecode/file_img_decoder.cpp",
+       "frameworks/imgdecode/image_load.cpp",
++      "frameworks/imgdecode/png_img_decoder.cpp",
++      "frameworks/imgdecode/jpeg_img_decoder.cpp",
+       "frameworks/layout/flex_layout.cpp",
+       "frameworks/layout/grid_layout.cpp",
+       "frameworks/layout/list_layout.cpp",
+@@ -219,6 +220,12 @@ if (os_level != "standard") {
+       "frameworks/window/window_impl.cpp",
+     ]
+ 
++    if (board_name == "hispark_aiflylite" || board_name == "hispark_aifly") {
++      sources += ["frameworks/engines/gfx/hi3519/hi3519_engine.cpp"]
++    } else {
++      sources += ["frameworks/engines/gfx/hi3516/hi3516_engine.cpp"]
++    }
++
+     if (ohos_kernel_type == "liteos_m") {
+       target_type = "static_library"
+       include_dirs = [
+@@ -260,7 +267,7 @@ if (os_level != "standard") {
+ 
+       if (ui_lite_enable_video_component_config) {
+         defines += [ "ENABLE_VIDEO_COMPONENT=1" ]
+-        source += [ "frameworks/components/ui_video.cpp" ]
++        sources += [ "frameworks/components/ui_video.cpp" ]
+ 
+         deps += [ "//foundation/multimedia/media_lite/frameworks/player_lite:player_lite" ]
+       }
+diff --git a/frameworks/common/graphic_startup.cpp b/frameworks/common/graphic_startup.cpp
+index bdc6d80..acc6833 100644
+--- a/frameworks/common/graphic_startup.cpp
++++ b/frameworks/common/graphic_startup.cpp
+@@ -38,6 +38,7 @@
+ #endif
+ #if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
+ #include "hals/gfx_engines.h"
++#include "hals/gralloc_engines.h"
+ #endif
+ #include "securec.h"
+ 
+@@ -150,6 +151,7 @@ void GraphicStartUp::Init()
+ #endif
+ #if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
+     GfxEngines::GetInstance()->InitDriver();
++    GrallocEngines::GetInstance()->Init();
+ #endif
+ }
+ } // namespace OHOS
+diff --git a/frameworks/common/image.cpp b/frameworks/common/image.cpp
+index f78d5bf..4bc7926 100755
+--- a/frameworks/common/image.cpp
++++ b/frameworks/common/image.cpp
+@@ -103,7 +103,7 @@ bool Image::SetStandardSrc(const char* src)
+         return false;
+     }
+ 
+-#if ENABLE_JPEG || ENABLE_PNG
++#if (ENABLE_JPEG || ENABLE_PNG) && (!CACHE_JPEG_AND_PNG)
+     ImageType imageType = CheckImgType(src);
+ #if ENABLE_PNG
+     if (imageType == IMG_PNG) {
+@@ -250,7 +250,7 @@ bool Image::PreParse(const char *src)
+     }
+     path_ = path;
+     bool isSucess = true;
+-#if ENABLE_JPEG || ENABLE_PNG
++#if (ENABLE_JPEG || ENABLE_PNG) && (!CACHE_JPEG_AND_PNG)
+     ImageType imageType = CheckImgType(src);
+     if (imageType == IMG_PNG) {
+ #if ENABLE_PNG
+@@ -285,7 +285,7 @@ void Image::DrawImage(BufferInfo& gfxDstBuffer,
+     }
+ }
+ 
+-#if ENABLE_PNG
++#if ENABLE_PNG && (!CACHE_JPEG_AND_PNG)
+ static inline void FreePngBytep(png_bytep** rowPointer, uint16_t size)
+ {
+     png_bytep* tmpRowPointer = *rowPointer;
+@@ -409,7 +409,7 @@ bool Image::SetPNGSrc(const char* src)
+ }
+ #endif
+ 
+-#if ENABLE_JPEG
++#if ENABLE_JPEG && (!CACHE_JPEG_AND_PNG)
+ bool Image::SetJPEGSrc(const char* src)
+ {
+     struct jpeg_decompress_struct cinfo;
+diff --git a/frameworks/components/root_view.cpp b/frameworks/components/root_view.cpp
+index 1dcd95b..5a2633b 100644
+--- a/frameworks/components/root_view.cpp
++++ b/frameworks/components/root_view.cpp
+@@ -19,6 +19,9 @@
+ #include "core/render_manager.h"
+ #include "draw/draw_utils.h"
+ #include "gfx_utils/graphic_log.h"
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++#include "hals/gralloc_engines.h"
++#endif
+ #if defined(ENABLE_WINDOW) && ENABLE_WINDOW
+ #include "window/window_impl.h"
+ #endif
+@@ -576,7 +579,13 @@ void RootView::BlitMapBuffer(Rect& curViewRect, TransformMap& transMap, const Re
+         imageInfo.header.height = dc_.mapBufferInfo->height;
+         imageInfo.header.reserved = 0;
+         imageInfo.data = reinterpret_cast<uint8_t*>(dc_.mapBufferInfo->virAddr);
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++        imageInfo.phyAddr = reinterpret_cast<uint8_t *>(dc_.mapBufferInfo->phyAddr);
++        TransformDataInfo imageTranDataInfo = {imageInfo.header, imageInfo.data,
++            imageInfo.phyAddr, pxSize, LEVEL0, BILINEAR};
++#else
+         TransformDataInfo imageTranDataInfo = {imageInfo.header, imageInfo.data, pxSize, LEVEL0, BILINEAR};
++#endif
+         BaseGfxEngine::GetInstance()->DrawTransform(*dc_.bufferInfo, invalidRect, {0, 0}, Color::Black(), OPA_OPAQUE,
+                                                     transMap, imageTranDataInfo);
+     }
+@@ -843,14 +852,34 @@ void RootView::InitMapBufferInfo(BufferInfo* bufferInfo)
+     BaseGfxEngine* baseGfxEngine = BaseGfxEngine::GetInstance();
+     baseGfxEngine->AdjustLineStride(*dc_.mapBufferInfo);
+     uint32_t bufferSize = dc_.mapBufferInfo->stride * dc_.mapBufferInfo->height;
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++    AllocInfo info;
++    info.expectedSize = bufferSize;
++    info.usage = HBM_USE_ASSIGN_SIZE | HBM_USE_MEM_MMZ;
++
++    GrallocBuffer buffer;
++    if (!GrallocEngines::GetInstance()->AllocBuffer(info, buffer)) {
++        GRAPHIC_LOGE("AllocBuffer failed.");
++        delete dc_.mapBufferInfo;
++        dc_.mapBufferInfo = nullptr;
++        return;
++    }
++    dc_.mapBufferInfo->virAddr = buffer.virAddr;
++    dc_.mapBufferInfo->phyAddr = reinterpret_cast<void *>(buffer.phyAddr);
++#else
+     dc_.mapBufferInfo->virAddr = dc_.mapBufferInfo->phyAddr =
+         baseGfxEngine->AllocBuffer(bufferSize, BUFFER_MAP_SURFACE);
++#endif
+ }
+ 
+ void RootView::DestroyMapBufferInfo()
+ {
+     if (dc_.mapBufferInfo != nullptr) {
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++        GrallocEngines::GetInstance()->FreeBuffer(static_cast<uint8_t*>(dc_.mapBufferInfo->virAddr));
++#else
+         BaseGfxEngine::GetInstance()->FreeBuffer(static_cast<uint8_t*>(dc_.mapBufferInfo->virAddr), BUFFER_MAP_SURFACE);
++#endif
+         dc_.mapBufferInfo->virAddr = dc_.mapBufferInfo->phyAddr = nullptr;
+         delete dc_.mapBufferInfo;
+         dc_.mapBufferInfo = nullptr;
+diff --git a/frameworks/components/ui_analog_clock.cpp b/frameworks/components/ui_analog_clock.cpp
+index f65a70d..404d492 100644
+--- a/frameworks/components/ui_analog_clock.cpp
++++ b/frameworks/components/ui_analog_clock.cpp
+@@ -280,8 +280,13 @@ void UIAnalogClock::DrawHandImage(BufferInfo& gfxDstBuffer,
+         return;
+     }
+     uint8_t pxSize = DrawUtils::GetPxSizeByColorMode(hand.imageInfo_.header.colorMode);
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++    TransformDataInfo imageTranDataInfo = {hand.imageInfo_.header, hand.imageInfo_.data, hand.imageInfo_.phyAddr,
++        pxSize, BlurLevel::LEVEL0, TransformAlgorithm::BILINEAR};
++#else
+     TransformDataInfo imageTranDataInfo = {hand.imageInfo_.header, hand.imageInfo_.data, pxSize, BlurLevel::LEVEL0,
+                                            TransformAlgorithm::BILINEAR};
++#endif
+     BaseGfxEngine::GetInstance()->DrawTransform(gfxDstBuffer, invalidatedArea, {0, 0}, Color::Black(), opaScale_,
+                                                 hand.trans_, imageTranDataInfo);
+ }
+diff --git a/frameworks/components/ui_canvas.cpp b/frameworks/components/ui_canvas.cpp
+index f50965f..38e2870 100644
+--- a/frameworks/components/ui_canvas.cpp
++++ b/frameworks/components/ui_canvas.cpp
+@@ -1472,8 +1472,14 @@ void UICanvas::BlitMapBuffer(BufferInfo &gfxDstBuffer, BufferInfo& gfxMapBuffer,
+         imageInfo.header.reserved = 0;
+         uint8_t* addr = reinterpret_cast<uint8_t*>(gfxMapBuffer.virAddr);
+         imageInfo.data = addr;
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++        imageInfo.phyAddr = reinterpret_cast<uint8_t *>(gfxMapBuffer.phyAddr);
++        TransformDataInfo imageTranDataInfo = {imageInfo.header, imageInfo.data, imageInfo.phyAddr, pxSize,
++                                               BlurLevel::LEVEL0, TransformAlgorithm::BILINEAR};
++#else
+         TransformDataInfo imageTranDataInfo = {imageInfo.header, imageInfo.data, pxSize,
+                                                BlurLevel::LEVEL0, TransformAlgorithm::BILINEAR};
++#endif
+         BaseGfxEngine::GetInstance()->DrawTransform(gfxDstBuffer, invalidatedArea, {0, 0}, Color::Black(),
+                                                     OPA_OPAQUE, transMap, imageTranDataInfo);
+     }
+diff --git a/frameworks/components/ui_image_view.cpp b/frameworks/components/ui_image_view.cpp
+index 0c4f47c..df8978d 100644
+--- a/frameworks/components/ui_image_view.cpp
++++ b/frameworks/components/ui_image_view.cpp
+@@ -456,9 +456,15 @@ void UIImageView::OnDraw(BufferInfo& gfxDstBuffer, const Rect& invalidatedArea)
+                     imgInfo = *(GetImageInfo());
+                 }
+                 uint8_t pxSize = DrawUtils::GetPxSizeByColorMode(imgInfo.header.colorMode);
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++                TransformDataInfo imageTranDataInfo = {imgInfo.header, imgInfo.data, imgInfo.phyAddr, pxSize,
++                                                       static_cast<BlurLevel>(blurLevel_),
++                                                       static_cast<TransformAlgorithm>(algorithm_)};
++#else
+                 TransformDataInfo imageTranDataInfo = {imgInfo.header, imgInfo.data, pxSize,
+                                                        static_cast<BlurLevel>(blurLevel_),
+                                                        static_cast<TransformAlgorithm>(algorithm_)};
++#endif
+                 OpacityType opaScale = DrawUtils::GetMixOpacity(opa, style_->imageOpa_);
+                 Matrix4<float> scaleMatrix = drawTransMap_->GetScaleMatrix();
+                 int16_t paddingX = style_->paddingLeft_ * scaleMatrix[0][0];
+diff --git a/frameworks/draw/draw_image.cpp b/frameworks/draw/draw_image.cpp
+index 55bdd95..6a998d4 100644
+--- a/frameworks/draw/draw_image.cpp
++++ b/frameworks/draw/draw_image.cpp
+@@ -28,8 +28,13 @@ void DrawImage::DrawCommon(BufferInfo& gfxDstBuffer, const Rect& coords, const R
+     }
+     OpacityType opa = DrawUtils::GetMixOpacity(opaScale, style.imageOpa_);
+     uint8_t pxBitSize = DrawUtils::GetPxSizeByColorMode(img->header.colorMode);
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++    DrawUtils::GetInstance()->DrawImage(gfxDstBuffer, coords, mask, img->data, opa, pxBitSize,
++                                        static_cast<ColorMode>(img->header.colorMode), img->phyAddr);
++#else
+     DrawUtils::GetInstance()->DrawImage(gfxDstBuffer, coords, mask, img->data, opa, pxBitSize,
+                                         static_cast<ColorMode>(img->header.colorMode));
++#endif
+ }
+ 
+ void DrawImage::DrawCommon(BufferInfo& gfxDstBuffer, const Rect& coords, const Rect& mask,
+@@ -47,8 +52,14 @@ void DrawImage::DrawCommon(BufferInfo& gfxDstBuffer, const Rect& coords, const R
+ 
+     uint8_t pxBitSize = DrawUtils::GetPxSizeByColorMode(entry.GetImageInfo().header.colorMode);
+     if (entry.InCache()) {
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++        DrawUtils::GetInstance()->DrawImage(gfxDstBuffer, coords, mask, entry.GetImgData(), opa, pxBitSize,
++                                            static_cast<ColorMode>(entry.GetImageInfo().header.colorMode),
++                                            entry.GetImageInfo().phyAddr);
++#else
+         DrawUtils::GetInstance()->DrawImage(gfxDstBuffer, coords, mask, entry.GetImgData(), opa, pxBitSize,
+                                             static_cast<ColorMode>(entry.GetImageInfo().header.colorMode));
++#endif
+     } else {
+         Rect valid = coords;
+         if (!valid.Intersect(valid, mask)) {
+diff --git a/frameworks/draw/draw_label.cpp b/frameworks/draw/draw_label.cpp
+index 388850c..0974b7c 100644
+--- a/frameworks/draw/draw_label.cpp
++++ b/frameworks/draw/draw_label.cpp
+@@ -287,10 +287,13 @@ void DrawLabel::DrawLetterWithRotate(BufferInfo& gfxDstBuffer,
+     // Avoiding errors caused by rounding calculations
+     transMap.Translate(Vector2<float>(posX + node.left, posY + offset - node.top));
+     transMap.Rotate(letterInfo.rotateAngle, Vector2<float>(posX, posY));
+-
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++    TransformDataInfo letterTranDataInfo = {ImageHeader{colorMode, 0, 0, 0, node.cols, node.rows}, fontMap, nullptr,
++        fontWeight, BlurLevel::LEVEL0, TransformAlgorithm::BILINEAR};
++#else
+     TransformDataInfo letterTranDataInfo = {ImageHeader{colorMode, 0, 0, 0, node.cols, node.rows}, fontMap, fontWeight,
+                                             BlurLevel::LEVEL0, TransformAlgorithm::BILINEAR};
+-
++#endif
+     uint8_t* buffer = nullptr;
+     if (letterInfo.hasAnimator) {
+         bool inRange = DrawLabel::CalculatedTransformDataInfo(&buffer, letterTranDataInfo, letterInfo);
+diff --git a/frameworks/draw/draw_utils.cpp b/frameworks/draw/draw_utils.cpp
+index 5692e76..fa614b4 100644
+--- a/frameworks/draw/draw_utils.cpp
++++ b/frameworks/draw/draw_utils.cpp
+@@ -381,7 +381,8 @@ void DrawUtils::DrawImage(BufferInfo& gfxDstBuffer,
+                           const uint8_t* image,
+                           OpacityType opa,
+                           uint8_t pxBitSize,
+-                          ColorMode colorMode) const
++                          ColorMode colorMode,
++                          const uint8_t* imgPhyAddr) const
+ {
+     if (image == nullptr) {
+         return;
+@@ -404,6 +405,11 @@ void DrawUtils::DrawImage(BufferInfo& gfxDstBuffer,
+ 
+     src.virAddr = static_cast<void*>(const_cast<uint8_t*>(image));
+     src.stride = imageWidthInByte;
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++    src.width = area.GetWidth();
++    src.height = area.GetHeight();
++    src.phyAddr = static_cast<void*>(const_cast<uint8_t*>(imgPhyAddr));
++#endif
+     src.mode = colorMode;
+     src.color = 0;
+ 
+diff --git a/frameworks/draw/draw_utils.h b/frameworks/draw/draw_utils.h
+index 89a08d2..d11e2ca 100644
+--- a/frameworks/draw/draw_utils.h
++++ b/frameworks/draw/draw_utils.h
+@@ -230,7 +230,8 @@ public:
+                     const OpacityType opa) const;
+ 
+     void DrawImage(BufferInfo& gfxDstBuffer, const Rect& area, const Rect& mask,
+-                   const uint8_t* image, OpacityType opa, uint8_t pxBitSize, ColorMode colorMode) const;
++                   const uint8_t* image, OpacityType opa, uint8_t pxBitSize, ColorMode colorMode,
++                   const uint8_t* imgPhyAddr = nullptr) const;
+ 
+     static void
+         GetXAxisErrForJunctionLine(bool ignoreJunctionPoint, bool isRightPart, int16_t& xMinErr, int16_t& xMaxErr);
+diff --git a/frameworks/engines/gfx/hi3519/hi3519_engine.cpp b/frameworks/engines/gfx/hi3519/hi3519_engine.cpp
+new file mode 100644
+index 0000000..2e67286
+--- /dev/null
++++ b/frameworks/engines/gfx/hi3519/hi3519_engine.cpp
+@@ -0,0 +1,169 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "engines/gfx/hi3519/hi3519_engine.h"
++#include "draw/draw_utils.h"
++#include "hals/gfx_engines.h"
++#include "lite_wm_type.h"
++
++namespace OHOS {
++const int16_t HARDWARE_ACC_SIZE_LIMIT = 50 * 50; // 50: Minimum supported pixel width and height
++
++#define ALIGN_BYTE(byte, align) (((byte) + (align) - 1) & (~((align) -1)))
++
++__attribute__((constructor)) void RegisterHi3519GfxEngine()
++{
++    BaseGfxEngine::InitGfxEngine(new Hi3519GfxEngine());
++}
++
++ImagePixelFormat Hi3519GfxEngine::GetPixelFormatByColorMode(ColorMode colorMode)
++{
++    ImagePixelFormat format = IMAGE_PIXEL_FORMAT_NONE;
++    switch (colorMode) {
++        case ARGB8888:
++            format = IMAGE_PIXEL_FORMAT_ARGB8888;
++            break;
++        case RGB888:
++            format = IMAGE_PIXEL_FORMAT_RGB888;
++            break;
++        case RGB565:
++            format = IMAGE_PIXEL_FORMAT_RGB565;
++            break;
++        case ARGB1555:
++            format = IMAGE_PIXEL_FORMAT_ARGB1555;
++            break;
++        default:
++            GRAPHIC_LOGE("current color mode not support!");
++            break;
++    }
++    return format;
++}
++
++uint8_t GetByteSizeByColorMode(uint8_t colorMode)
++{
++    switch (colorMode) {
++        case ARGB8888:
++            return 4; // 4: 4 Byte
++        case RGB888:
++            return 3; // 3: 3 Byte
++        case RGB565:
++        case ARGB1555:
++        case ARGB4444:
++            return 2; // 2: 2 Byte
++        default:
++            return 0;
++    }
++}
++
++void Hi3519GfxEngine::Blit(BufferInfo& dst, const Point& dstPos, const BufferInfo& src,
++    const Rect& subRect, const BlendOption& blendOption)
++{
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++    LiteSurfaceData srcData;
++    srcData.phyAddr = (uint8_t *)src.phyAddr;
++    srcData.width = src.width;
++    srcData.height = src.height;
++    srcData.stride = src.stride;
++    srcData.pixelFormat = GetPixelFormatByColorMode(src.mode);
++
++    LiteSurfaceData dstData;
++    dstData.phyAddr = (uint8_t *)dst.phyAddr;
++    dstData.width = dst.width;
++    dstData.height = dst.height;
++    dstData.stride = dst.stride;
++    dstData.pixelFormat = GetPixelFormatByColorMode(dst.mode);
++    Rect dstRect;
++    dstRect.SetX(subRect.GetX());
++    dstRect.SetY(subRect.GetY());
++    dstRect.SetWidth(src.rect.GetWidth());
++    dstRect.SetHeight(src.rect.GetHeight());
++    if (GfxEngines::GetInstance()->GfxBlitWithOpt(srcData, src.rect, dstData, dstRect, blendOption.opacity)) {
++        return;
++    }
++#endif
++    SoftEngine::Blit(dst, dstPos, src, subRect, blendOption);
++}
++
++void Hi3519GfxEngine::Fill(BufferInfo& dst,
++                           const Rect& fillArea,
++                           const ColorType color,
++                           const OpacityType opacity)
++{
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++    if (fillArea.GetSize() >= HARDWARE_ACC_SIZE_LIMIT) {
++        LiteSurfaceData data;
++        data.phyAddr = static_cast<uint8_t *>(dst.phyAddr);
++        data.width = dst.width;
++        data.height = dst.height;
++        data.stride = dst.stride;
++        data.pixelFormat = IMAGE_PIXEL_FORMAT_ARGB8888;
++        if (GfxEngines::GetInstance()->GfxFillArea(data, fillArea, color, opacity)) {
++            return;
++        }
++    }
++#endif
++    SoftEngine::Fill(dst, fillArea, color, opacity);
++}
++
++void Hi3519GfxEngine::DrawTransform(BufferInfo& dst, const Rect& mask, const Point& position, ColorType color,
++    OpacityType opacity, const TransformMap& transMap, const TransformDataInfo& dataInfo)
++{
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++    if ((transMap.GetRotateAngle() == 0) && (dataInfo.phyAddr != nullptr) &&
++        (dataInfo.header.width != 0) && (dataInfo.header.height != 0)) {
++        LiteSurfaceData srcData;
++        srcData.phyAddr = const_cast<uint8_t*>(dataInfo.phyAddr);
++        srcData.width = dataInfo.header.width;
++        srcData.height = dataInfo.header.height;
++        uint32_t rowSize = srcData.width * GetByteSizeByColorMode(dataInfo.header.colorMode);
++        srcData.stride = ALIGN_BYTE(rowSize, 4); // 4:Align Byte
++        srcData.pixelFormat = GetPixelFormatByColorMode(static_cast<ColorMode>(dataInfo.header.colorMode));
++
++        LiteSurfaceData dstData;
++        dstData.phyAddr = (uint8_t *)dst.phyAddr;
++        dstData.width = dst.width;
++        dstData.height = dst.height;
++        dstData.stride = dst.stride;
++        dstData.pixelFormat = GetPixelFormatByColorMode(dst.mode);
++
++        Rect trans = transMap.GetBoxRect();
++        if ((trans.GetWidth() == 0) || (trans.GetHeight() == 0)) {
++            GRAPHIC_LOGE("transMap rect error, size %u %u\n", trans.GetWidth(), trans.GetHeight());
++            return;
++        }
++        double xScale = 1.0f * trans.GetWidth() / dataInfo.header.width;
++        double yScale = 1.0f * trans.GetHeight() / dataInfo.header.height;
++        trans.SetX(trans.GetX() + position.x);
++        trans.SetY(trans.GetY() + position.y);
++        Rect dstRect;
++        if (!dstRect.Intersect(trans, mask)) {
++            return;
++        }
++
++        Rect srcRect;
++        int32_t leftOffset = dstRect.GetLeft() - trans.GetLeft();
++        int32_t topOffset = dstRect.GetTop() - trans.GetTop();
++        srcRect.SetLeft(leftOffset / xScale);
++        srcRect.SetTop(topOffset / yScale);
++        srcRect.SetWidth(dstRect.GetWidth() / xScale);
++        srcRect.SetHeight(dstRect.GetHeight() / yScale);
++        if (GfxEngines::GetInstance()->GfxBlitWithOpt(srcData, srcRect, dstData, dstRect, opacity)) {
++            return;
++        }
++    }
++#endif
++    SoftEngine::DrawTransform(dst, mask, position, color, opacity, transMap, dataInfo);
++}
++}
+\ No newline at end of file
+diff --git a/frameworks/engines/gfx/hi3519/hi3519_engine.h b/frameworks/engines/gfx/hi3519/hi3519_engine.h
+new file mode 100644
+index 0000000..fd25d04
+--- /dev/null
++++ b/frameworks/engines/gfx/hi3519/hi3519_engine.h
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef GRAPHIC_LITE_HI3519_ENGINE_H
++#define GRAPHIC_LITE_HI3519_ENGINE_H
++
++#include "engines/gfx/soft_engine.h"
++#include "gfx_utils/pixel_format_utils.h"
++
++namespace OHOS {
++class Hi3519GfxEngine : public SoftEngine {
++public:
++    void Blit(BufferInfo& dst,
++                const Point& dstPos,
++                const BufferInfo& src,
++                const Rect& subRect,
++                const BlendOption& blendOption) override;
++
++    void Fill(BufferInfo& dst,
++              const Rect& fillArea,
++              const ColorType color,
++              const OpacityType opacity) override;
++
++    void DrawTransform(BufferInfo& dst,
++                            const Rect& mask,
++                            const Point& position,
++                            ColorType color,
++                            OpacityType opacity,
++                            const TransformMap& transMap,
++                            const TransformDataInfo& dataInfo) override;
++private:
++    ImagePixelFormat GetPixelFormatByColorMode(ColorMode colorMode);
++};
++}
++#endif // GRAPHIC_LITE_HI3519_ENGINE_H
+\ No newline at end of file
+diff --git a/frameworks/imgdecode/cache_manager.cpp b/frameworks/imgdecode/cache_manager.cpp
+index 182764b..89c21d1 100644
+--- a/frameworks/imgdecode/cache_manager.cpp
++++ b/frameworks/imgdecode/cache_manager.cpp
+@@ -18,6 +18,10 @@
+ #include "hal_tick.h"
+ #include "securec.h"
+ 
++#include "common/image.h"
++#include "jpeg_img_decoder.h"
++#include "png_img_decoder.h"
++
+ namespace OHOS {
+ const uint8_t* CacheEntry::GetImgData() const
+ {
+@@ -126,7 +130,6 @@ RetCode CacheManager::Open(const char* path, const Style& style, CacheEntry& ent
+     uint16_t indexHitted = 0;
+     RetCode ret = GetIndex(path, indexHitted);
+     if (ret == RetCode::OK) {
+-        ReadToCache(entryArr_[indexHitted]);
+         entry = entryArr_[indexHitted];
+         return RetCode::OK;
+     }
+@@ -139,11 +142,21 @@ RetCode CacheManager::Open(const char* path, const Style& style, CacheEntry& ent
+     uint32_t startTime = HALTick::GetInstance().GetTime();
+     entryArr_[indexHitted].life_ = 0;
+ 
+-    ret = TryDecode(path, style, entryArr_[indexHitted]);
++    char realPath[PATH_MAX + 1] = {0};
++    if (strlen(path) > PATH_MAX || realpath(path, realPath) == nullptr) {
++        return RetCode::FAIL;
++    }
++
++    ret = TryDecode(realPath, style, entryArr_[indexHitted]);
++    if (ret != RetCode::OK) {
++        GRAPHIC_LOGE("CacheManager TryDecode %s faild\n", path);
++        return ret;
++    }
++    ret = ReadToCache(entryArr_[indexHitted]);
+     if (ret != RetCode::OK) {
++        Clear(entryArr_[indexHitted]);
+         return ret;
+     }
+-    ReadToCache(entryArr_[indexHitted]);
+     entryArr_[indexHitted].life_ = HALTick::GetInstance().GetElapseTime(startTime);
+     entry = entryArr_[indexHitted];
+     return RetCode::OK;
+@@ -268,27 +281,34 @@ RetCode CacheManager::SelectEntryToReplace(uint16_t& selectedIndex)
+ 
+ RetCode CacheManager::TryDecode(const char* path, const Style& style, CacheEntry& entry)
+ {
+-    FileImgDecoder* decoder = &(FileImgDecoder::GetInstance());
+-    if (decoder == nullptr) {
+-        Clear(entry);
+-        return RetCode::FAIL;
+-    }
+-
+     entry.dsc_.srcType = IMG_SRC_FILE;
+     RetCode ret = entry.SetSrc(path);
+     if (ret != RetCode::OK) {
+         Clear(entry);
+         return ret;
+     }
++    FileImgDecoder* decoder = &(FileImgDecoder::GetInstance());
++
++    Image::ImageType type = Image::CheckImgType(path);
++    if (type == Image::IMG_PNG) {
++        decoder = &(PngImgDecoder::GetInstance());
++    } else if (type == Image::IMG_JPEG) {
++        decoder = &(JpegImgDecoder::GetInstance());
++    }
++
++    if (decoder == nullptr) {
++        Clear(entry);
++        return RetCode::FAIL;
++    }
+     entry.dsc_.decoder = decoder;
+ 
+-    ret = entry.dsc_.decoder->GetHeader(entry.dsc_);
++    ret = entry.dsc_.decoder->Open(entry.dsc_);
+     if (ret != RetCode::OK) {
+         Clear(entry);
+         return ret;
+     }
+ 
+-    ret = entry.dsc_.decoder->Open(entry.dsc_);
++    ret = entry.dsc_.decoder->GetHeader(entry.dsc_);
+     if (ret != RetCode::OK) {
+         Clear(entry);
+         return ret;
+diff --git a/frameworks/imgdecode/file_img_decoder.cpp b/frameworks/imgdecode/file_img_decoder.cpp
+index 67b86f9..e7b9d0d 100644
+--- a/frameworks/imgdecode/file_img_decoder.cpp
++++ b/frameworks/imgdecode/file_img_decoder.cpp
+@@ -17,6 +17,7 @@
+ #include "gfx_utils/mem_api.h"
+ #include "imgdecode/file_img_decoder.h"
+ #include "imgdecode/image_load.h"
++#include "securec.h"
+ 
+ namespace OHOS {
+ FileImgDecoder& FileImgDecoder::GetInstance()
+@@ -39,12 +40,7 @@ RetCode FileImgDecoder::Open(ImgResDsc& dsc)
+ 
+     dsc.imgInfo.data = nullptr;
+     dsc.inCache_ = false;
+-    uint8_t colorMode = dsc.imgInfo.header.colorMode;
+-    if (IsImgValidMode(colorMode)) {
+-        return RetCode::OK;
+-    } else {
+-        return RetCode::FAIL;
+-    }
++    return RetCode::OK;
+ }
+ 
+ RetCode FileImgDecoder::Close(ImgResDsc& dsc)
+@@ -57,33 +53,26 @@ RetCode FileImgDecoder::Close(ImgResDsc& dsc)
+         close(dsc.fd);
+         dsc.fd = -1;
+     }
+-
++    dsc.inCache_ = false;
+     return RetCode::OK;
+ }
+ 
+ RetCode FileImgDecoder::GetHeader(ImgResDsc& dsc)
+ {
+-    int32_t fd;
+-    int32_t readCount;
+-#ifdef _WIN32
+-    fd = open(dsc.path, O_BINARY);
+-#else
+-    fd = open(dsc.path, O_RDONLY);
+-#endif
+-    if (fd == -1) {
++    if (dsc.fd == -1) {
+         return RetCode::FAIL;
+     }
+-
+-    readCount = read(fd, &dsc.imgInfo.header, sizeof(ImageHeader));
+-    close(fd);
+-    dsc.fd = -1;
++    int32_t readCount = read(dsc.fd, &dsc.imgInfo.header, sizeof(ImageHeader));
+     if (readCount != sizeof(ImageHeader)) {
+         dsc.imgInfo.header.width = 0;
+         dsc.imgInfo.header.height = 0;
+         dsc.imgInfo.header.colorMode = UNKNOWN;
+         return RetCode::FAIL;
+     }
+-
++    uint8_t colorMode = dsc.imgInfo.header.colorMode;
++    if (!IsImgValidMode(colorMode)) {
++        return RetCode::FAIL;
++    }
+     return RetCode::OK;
+ }
+ 
+@@ -116,16 +105,32 @@ RetCode FileImgDecoder::ReadToCache(ImgResDsc& dsc)
+         }
+ 
+         bool readSuccess = false;
+-        if (dsc.imgInfo.header.compressMode != COMPRESS_MODE_NONE) {
++    if (dsc.imgInfo.header.compressMode != COMPRESS_MODE_NONE) {
+             readSuccess = ImageLoad::GetImageInfo(dsc.fd, pxCount, dsc.imgInfo);
+         } else {
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++            int rowSize = dsc.imgInfo.header.width * DrawUtils::GetByteSizeByColorMode(dsc.imgInfo.header.colorMode);
++            /* tde requires 4-byte alignment of stride */
++            dsc.imgInfo.dataSize = rowSize * dsc.imgInfo.header.height;
++#else
+             dsc.imgInfo.dataSize = pxCount;
++#endif
+             dsc.imgInfo.data = reinterpret_cast<uint8_t*>(ImageCacheMalloc(dsc.imgInfo));
+             if (dsc.imgInfo.data == nullptr) {
+                 return RetCode::OK;
+             }
+             uint8_t* tmp = const_cast<uint8_t*>(dsc.imgInfo.data);
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++            int32_t readTotalSize = 0;
++            memset_s(reinterpret_cast<void*>(tmp), dsc.imgInfo.dataSize, 0, dsc.imgInfo.dataSize);
++            for (int i = 0; i < dsc.imgInfo.header.height; i++) {
++                readTotalSize += read(dsc.fd, reinterpret_cast<void*>(tmp), rowSize);
++                tmp += rowSize;
++            }
++            readSuccess = (readTotalSize == rowSize * dsc.imgInfo.header.height);
++#else
+             readSuccess = (static_cast<int32_t>(pxCount) == read(dsc.fd, reinterpret_cast<void*>(tmp), pxCount));
++#endif
+         }
+         if (!readSuccess) {
+             ImageCacheFree(dsc.imgInfo);
+diff --git a/frameworks/imgdecode/file_img_decoder.h b/frameworks/imgdecode/file_img_decoder.h
+index 945cfb4..de5d7c4 100644
+--- a/frameworks/imgdecode/file_img_decoder.h
++++ b/frameworks/imgdecode/file_img_decoder.h
+@@ -45,20 +45,21 @@ public:
+         bool inCache_;
+     };
+ 
+-    RetCode Open(ImgResDsc& dsc);
++    virtual RetCode Open(ImgResDsc& dsc);
+ 
+-    RetCode Close(ImgResDsc& dsc);
++    virtual RetCode Close(ImgResDsc& dsc);
+ 
+-    RetCode GetHeader(ImgResDsc& dsc);
++    virtual RetCode GetHeader(ImgResDsc& dsc);
+ 
+-    RetCode ReadLine(ImgResDsc& dsc, const Point& start, int16_t len, uint8_t* buf);
++    virtual RetCode ReadLine(ImgResDsc& dsc, const Point& start, int16_t len, uint8_t* buf);
+ 
+-    RetCode ReadToCache(ImgResDsc& dsc);
++    virtual RetCode ReadToCache(ImgResDsc& dsc);
+ 
+-private:
++protected:
+     FileImgDecoder() {}
+-    ~FileImgDecoder() {}
++    virtual ~FileImgDecoder() {}
+ 
++private:
+     bool IsImgValidMode(uint8_t colorMode)
+     {
+         if ((colorMode == RGB565) || (colorMode == RGB888) || (colorMode == ARGB8888)) {
+diff --git a/frameworks/imgdecode/jpeg_img_decoder.cpp b/frameworks/imgdecode/jpeg_img_decoder.cpp
+new file mode 100644
+index 0000000..aa58db4
+--- /dev/null
++++ b/frameworks/imgdecode/jpeg_img_decoder.cpp
+@@ -0,0 +1,128 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "imgdecode/jpeg_img_decoder.h"
++#include "gfx_utils/file.h"
++#include "gfx_utils/graphic_log.h"
++#include "gfx_utils/mem_api.h"
++#include "securec.h"
++
++namespace OHOS {
++RetCode JpegImgDecoder::Open(ImgResDsc& dsc)
++{
++    fp_ = fopen(dsc.path, "rb");
++    if (fp_ == nullptr) {
++        GRAPHIC_LOGE("open file:%s failed\n", dsc.path);
++        return RetCode::FAIL;
++    }
++
++    dsc.imgInfo.data = nullptr;
++    dsc.inCache_ = false;
++
++    return RetCode::OK;
++}
++
++RetCode JpegImgDecoder::Close(ImgResDsc& dsc)
++{
++    if (dsc.imgInfo.data != nullptr) {
++        ImageCacheFree(dsc.imgInfo);
++        dsc.imgInfo.data = nullptr;
++    }
++
++    if (fp_ != nullptr) {
++        fclose(fp_);
++        fp_ = nullptr;
++    }
++
++    dsc.inCache_ = false;
++    return RetCode::OK;
++}
++
++RetCode JpegImgDecoder::CreateDecoder(void)
++{
++    if (fp_ == nullptr) {
++        GRAPHIC_LOGE("File is not opened, call Open first\n");
++        return RetCode::FAIL;
++    }
++
++    cinfo_.err = jpeg_std_error(&jerr_);
++    jpeg_create_decompress(&cinfo_);
++    jpeg_stdio_src(&cinfo_, fp_);
++    jpeg_read_header(&cinfo_, TRUE);
++    jpeg_start_decompress(&cinfo_);
++
++    return RetCode::OK;
++}
++
++void JpegImgDecoder::DestroyDecoder(void)
++{
++    if (fp_ != nullptr) {
++        fclose(fp_);
++        fp_ = nullptr;
++    }
++
++    jpeg_finish_decompress(&cinfo_);
++    jpeg_destroy_decompress(&cinfo_);
++}
++
++RetCode JpegImgDecoder::GetHeader(ImgResDsc& dsc)
++{
++    if (CreateDecoder() != RetCode::OK) {
++        GRAPHIC_LOGE("Decoder is created failed\n");
++        return RetCode::FAIL;
++    }
++
++    dsc.imgInfo.header.width = cinfo_.output_width;
++    dsc.imgInfo.header.height = cinfo_.output_height;
++    dsc.imgInfo.header.colorMode = ARGB8888;
++
++    return RetCode::OK;
++}
++
++RetCode JpegImgDecoder::ReadToCache(ImgResDsc& dsc)
++{
++    JSAMPARRAY buffer;
++    uint8_t pixelByteSize = DrawUtils::GetPxSizeByColorMode(ARGB8888) >> 3; // 3: Shift right 3 bits
++    uint16_t width = cinfo_.output_width;
++    uint16_t height = cinfo_.output_height;
++    uint32_t dataSize = width * height * pixelByteSize;
++    uint16_t rowStride = cinfo_.output_width * pixelByteSize;
++    buffer = (*cinfo_.mem->alloc_sarray)(reinterpret_cast<j_common_ptr>(&cinfo_),
++        JPOOL_IMAGE, rowStride, 1); // 1: one-row-high array
++
++    dsc.imgInfo.dataSize = dataSize;
++    uint8_t* srcData = static_cast<uint8_t*>(ImageCacheMalloc(dsc.imgInfo));
++    dsc.imgInfo.data = srcData;
++    if (srcData == nullptr) {
++        DestroyDecoder();
++        return RetCode::FAIL;
++    }
++
++    uint32_t n = 0;
++    while (cinfo_.output_scanline < cinfo_.output_height) {
++        jpeg_read_scanlines(&cinfo_, buffer, 1);       // 1: read one line each time
++        for (uint16_t x = 0; x < width * 3; x += 3) { // 3: color components per pixel
++            srcData[n++] = buffer[0][x + 2];          // 2: B channel
++            srcData[n++] = buffer[0][x + 1];          // 1: G channel
++            srcData[n++] = buffer[0][x + 0];          // 0: R channel
++            srcData[n++] = 255;                       // 255: set alpha channel
++        }
++    }
++    DestroyDecoder();
++    dsc.inCache_ = true;
++
++    return RetCode::OK;
++}
++} // namespace OHOS
+diff --git a/frameworks/imgdecode/jpeg_img_decoder.h b/frameworks/imgdecode/jpeg_img_decoder.h
+new file mode 100644
+index 0000000..a909012
+--- /dev/null
++++ b/frameworks/imgdecode/jpeg_img_decoder.h
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef GRAPHIC_LITE_JPEG_IMG_DECODER_H
++#define GRAPHIC_LITE_JPEG_IMG_DECODER_H
++
++#include "file_img_decoder.h"
++#include "draw/draw_image.h"
++#include "draw/draw_utils.h"
++#include "jpeglib.h"
++
++namespace OHOS {
++class JpegImgDecoder : public FileImgDecoder {
++public:
++    static JpegImgDecoder& GetInstance()
++    {
++        static JpegImgDecoder instance;
++        return instance;
++    }
++
++    RetCode Open(ImgResDsc& dsc) override;
++
++    RetCode Close(ImgResDsc& dsc) override;
++
++    RetCode GetHeader(ImgResDsc& dsc) override;
++
++    RetCode ReadToCache(ImgResDsc& dsc) override;
++
++    RetCode ReadLine(ImgResDsc& dsc, const Point& start, int16_t len, uint8_t* buf) override
++    {
++        return RetCode::FAIL;
++    }
++
++private:
++    FILE* fp_ {nullptr};
++    struct jpeg_decompress_struct cinfo_ {0};
++    struct jpeg_error_mgr jerr_ {0};
++    JpegImgDecoder() {};
++    virtual ~JpegImgDecoder() {};
++
++    RetCode CreateDecoder(void);
++
++    void DestroyDecoder(void);
++
++    JpegImgDecoder(const JpegImgDecoder&) = delete;
++    JpegImgDecoder& operator=(const JpegImgDecoder&) = delete;
++    JpegImgDecoder(JpegImgDecoder&&) = delete;
++    JpegImgDecoder& operator=(JpegImgDecoder&&) = delete;
++};
++}
++#endif
+\ No newline at end of file
+diff --git a/frameworks/imgdecode/png_img_decoder.cpp b/frameworks/imgdecode/png_img_decoder.cpp
+new file mode 100644
+index 0000000..8102463
+--- /dev/null
++++ b/frameworks/imgdecode/png_img_decoder.cpp
+@@ -0,0 +1,194 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "imgdecode/png_img_decoder.h"
++#include "gfx_utils/mem_api.h"
++#include "gfx_utils/file.h"
++#include "gfx_utils/graphic_log.h"
++
++namespace OHOS {
++
++#define FREE_RES(ptr)   \
++    do {                \
++        UIFree(ptr);    \
++        ptr = nullptr;  \
++    } while (0)
++
++RetCode PngImgDecoder::Open(ImgResDsc& dsc)
++{
++    fp_ = fopen(dsc.path, "rb");
++    if (fp_ == nullptr) {
++        GRAPHIC_LOGE("open file:%s failed\n", dsc.path);
++        return RetCode::FAIL;
++    }
++
++    dsc.imgInfo.data = nullptr;
++    dsc.inCache_ = false;
++    dsc.fd = -1; // don't use fd here
++
++    return RetCode::OK;
++}
++
++RetCode PngImgDecoder::Close(ImgResDsc& dsc)
++{
++    if (dsc.imgInfo.data != nullptr) {
++        ImageCacheFree(dsc.imgInfo);
++        dsc.imgInfo.data = nullptr;
++    }
++
++    if (fp_ != nullptr) {
++        fclose(fp_);
++        fp_ = nullptr;
++    }
++
++    dsc.inCache_ = false;
++
++    return RetCode::OK;
++}
++
++RetCode PngImgDecoder::CreateDecoder(void)
++{
++    if (fp_ == nullptr) {
++        GRAPHIC_LOGE("File is not opened, call Open first\n");
++        return RetCode::FAIL;
++    }
++
++    png_ = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
++    if (png_ == nullptr) {
++        return RetCode::FAIL;
++    }
++
++    info_ = png_create_info_struct(png_);
++    if (info_ == nullptr) {
++        png_destroy_read_struct(&png_, nullptr, nullptr);
++        return RetCode::FAIL;
++    }
++
++    png_init_io(png_, fp_);
++    png_read_info(png_, info_);
++
++    return RetCode::OK;
++}
++
++void PngImgDecoder::DestroyDecoder(void)
++{
++    if (fp_ != nullptr) {
++        fclose(fp_);
++        fp_ = nullptr;
++    }
++
++    if (png_ != nullptr && info_ != nullptr) {
++        png_destroy_read_struct(&png_, &info_, nullptr);
++    } else if (png_ != nullptr && info_ == nullptr) {
++        png_destroy_read_struct(&png_, nullptr, nullptr);
++    }
++}
++
++RetCode PngImgDecoder::GetHeader(ImgResDsc& dsc)
++{
++    if (CreateDecoder() != RetCode::OK) {
++        GRAPHIC_LOGE("Decoder is created failed\n");
++        return RetCode::FAIL;
++    }
++
++    dsc.imgInfo.header.width = png_get_image_width(png_, info_);
++    dsc.imgInfo.header.height = png_get_image_height(png_, info_);
++    dsc.imgInfo.header.colorMode = ARGB8888;
++
++    return RetCode::OK;
++}
++
++void PngImgDecoder::UpdateInfo(void)
++{
++    uint8_t colorType = png_get_color_type(png_, info_);
++    uint8_t bitDepth = png_get_bit_depth(png_, info_);
++    if (colorType == PNG_COLOR_TYPE_GRAY && bitDepth < 8) { // 8: Expand grayscale images to the full 8 bits
++        png_set_expand_gray_1_2_4_to_8(png_);
++    }
++    if (colorType == PNG_COLOR_TYPE_GRAY || colorType == PNG_COLOR_TYPE_GRAY_ALPHA) {
++        png_set_gray_to_rgb(png_);
++    }
++    if (colorType == PNG_COLOR_TYPE_PALETTE) {
++        png_set_palette_to_rgb(png_);
++    }
++    if (bitDepth == 16) { // 16: Chop 16-bit depth images to 8-bit depth
++        png_set_strip_16(png_);
++    }
++
++    if (png_get_valid(png_, info_, PNG_INFO_tRNS)) {
++        png_set_tRNS_to_alpha(png_);
++    }
++    if (!(colorType & PNG_COLOR_MASK_ALPHA)) {
++        png_set_add_alpha(png_, 0xFF, PNG_FILLER_AFTER);
++    }
++    png_set_interlace_handling(png_);
++    png_read_update_info(png_, info_);
++}
++
++RetCode PngImgDecoder::ReadToCache(ImgResDsc& dsc)
++{
++    uint8_t pixelByteSize = DrawUtils::GetPxSizeByColorMode(ARGB8888) >> 3; // 3: Shift right 3 bits
++    uint16_t width = dsc.imgInfo.header.width;
++    uint16_t height = dsc.imgInfo.header.height;
++    uint32_t dataSize = height * width * pixelByteSize;
++
++    UpdateInfo();
++    png_bytep* rowPointer = static_cast<png_bytep*>(UIMalloc(sizeof(png_bytep) * height));
++    if (rowPointer == nullptr) {
++        DestroyDecoder();
++        return RetCode::FAIL;
++    }
++    for (uint16_t y = 0; y < height; y++) {
++        rowPointer[y] = static_cast<png_byte*>(UIMalloc(png_get_rowbytes(png_, info_)));
++        if (rowPointer[y] == nullptr) {
++            for (uint16_t i = 0; i < y; i++) {
++                FREE_RES(rowPointer[i]);
++            }
++            FREE_RES(rowPointer);
++            DestroyDecoder();
++            return RetCode::FAIL;
++        }
++    }
++    png_read_image(png_, rowPointer);
++
++    dsc.imgInfo.dataSize = dataSize;
++    uint8_t* srcData = static_cast<uint8_t*>(ImageCacheMalloc(dsc.imgInfo));
++    dsc.imgInfo.data = srcData;
++    if (srcData == nullptr) {
++        for (uint16_t i = 0; i < height; i++) {
++            FREE_RES(rowPointer[i]);
++        }
++        FREE_RES(rowPointer);
++        DestroyDecoder();
++        return RetCode::FAIL;
++    }
++    uint32_t n = 0;
++    for (uint16_t y = 0; y < height; y++) {
++        png_bytep row = rowPointer[y];
++        for (uint16_t x = 0; x < width * pixelByteSize; x += pixelByteSize) {
++            srcData[n++] = row[x + 2]; // 2: B channel
++            srcData[n++] = row[x + 1]; // 1: G channel
++            srcData[n++] = row[x + 0]; // 0: R channel
++            srcData[n++] = row[x + 3]; // 3: Alpha channel
++        }
++        FREE_RES(row);
++    }
++    FREE_RES(rowPointer);
++
++    DestroyDecoder();
++    dsc.inCache_ = true;
++    return RetCode::OK;
++}
++} // namespace OHOS
+\ No newline at end of file
+diff --git a/frameworks/imgdecode/png_img_decoder.h b/frameworks/imgdecode/png_img_decoder.h
+new file mode 100644
+index 0000000..accb873
+--- /dev/null
++++ b/frameworks/imgdecode/png_img_decoder.h
+@@ -0,0 +1,64 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef GRAPHIC_LITE_PNG_IMG_DECODER_H
++#define GRAPHIC_LITE_PNG_IMG_DECODER_H
++
++#include "file_img_decoder.h"
++#include "draw/draw_image.h"
++#include "draw/draw_utils.h"
++#include "png.h"
++
++namespace OHOS {
++class PngImgDecoder : public FileImgDecoder {
++public:
++    static PngImgDecoder& GetInstance()
++    {
++        static PngImgDecoder instance;
++        return instance;
++    }
++
++    RetCode Open(ImgResDsc& dsc) override;
++
++    RetCode Close(ImgResDsc& dsc) override;
++
++    RetCode GetHeader(ImgResDsc& dsc) override;
++
++    RetCode ReadToCache(ImgResDsc& dsc) override;
++
++    RetCode ReadLine(ImgResDsc& dsc, const Point& start, int16_t len, uint8_t* buf) override
++    {
++        return RetCode::FAIL;
++    }
++
++private:
++    FILE* fp_;
++    png_structp png_;
++    png_infop info_;
++
++    PngImgDecoder() : fp_(nullptr),  png_(nullptr), info_(nullptr) {};
++    virtual ~PngImgDecoder() {};
++
++    RetCode CreateDecoder(void);
++    void DestroyDecoder(void);
++
++    PngImgDecoder(const PngImgDecoder&) = delete;
++    PngImgDecoder& operator=(const PngImgDecoder&) = delete;
++    PngImgDecoder(PngImgDecoder&&) = delete;
++    PngImgDecoder& operator=(PngImgDecoder&&) = delete;
++    void UpdateInfo(void);
++};
++}
++#endif
+\ No newline at end of file
+diff --git a/interfaces/innerkits/engines/gfx/gfx_engine_manager.h b/interfaces/innerkits/engines/gfx/gfx_engine_manager.h
+index 6cc637e..7c0b44b 100644
+--- a/interfaces/innerkits/engines/gfx/gfx_engine_manager.h
++++ b/interfaces/innerkits/engines/gfx/gfx_engine_manager.h
+@@ -69,6 +69,9 @@ struct ArcInfo {
+ struct TransformDataInfo {
+     ImageHeader header;
+     const uint8_t* data;
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++    const uint8_t* phyAddr;
++#endif
+     uint8_t pxSize;
+     BlurLevel blurLevel;
+     TransformAlgorithm algorithm;
+diff --git a/interfaces/kits/common/image.h b/interfaces/kits/common/image.h
+index 6c190de..71479eb 100755
+--- a/interfaces/kits/common/image.h
++++ b/interfaces/kits/common/image.h
+@@ -167,14 +167,15 @@ private:
+     bool mallocFlag_;
+     bool SetLiteSrc(const char* src);
+     bool SetStandardSrc(const char* src);
+-#if ENABLE_JPEG
++#if ENABLE_JPEG && (!CACHE_JPEG_AND_PNG)
+     bool SetJPEGSrc(const char* src);
+ #endif
+-#if ENABLE_PNG
++#if ENABLE_PNG && (!CACHE_JPEG_AND_PNG)
+     bool SetPNGSrc(const char* src);
+ #endif
+ #if ENABLE_JPEG || ENABLE_PNG
+-    ImageType CheckImgType(const char* src);
++    friend class CacheManager;
++    static ImageType CheckImgType(const char* src);
+ #endif
+     bool IsImgValid(const char* suffix)
+     {

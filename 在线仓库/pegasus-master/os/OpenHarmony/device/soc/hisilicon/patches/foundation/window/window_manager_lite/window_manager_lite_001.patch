@@ -1,0 +1,48 @@
+diff --git a/services/wms/lite_win.cpp b/services/wms/lite_win.cpp
+index 0cc85e2..1e733eb 100644
+--- a/services/wms/lite_win.cpp
++++ b/services/wms/lite_win.cpp
+@@ -131,13 +131,31 @@ void LiteWindow::UpdateBackBuf()
+         if (acquireBufVirAddr != nullptr && backBufVirAddr != nullptr) {
+             GRAPHIC_LOGI("memcpy, backBuf size=%d, acquireBuffer size=%d",
+                 backBuf_->GetSize(), acquireBuffer->GetSize());
++            bool ret = false;
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
++            uintptr_t srcPhyAddr = acquireBuffer->GetPhyAddr();
++            uintptr_t dstPhyAddr = backBuf_->GetPhyAddr();
++            LiteSurfaceData srcData;
++            LiteSurfaceData dstData;
++            srcData.width = config_.rect.GetWidth();
++            srcData.height = config_.rect.GetHeight();
++            srcData.pixelFormat = static_cast<ImagePixelFormat>(surface_->GetFormat());
++            srcData.stride = surface_->GetStride();
++            srcData.phyAddr = reinterpret_cast<uint8_t*>(srcPhyAddr);
++            dstData.width = surface_->GetWidth();
++            dstData.height = surface_->GetHeight();
++            dstData.pixelFormat = static_cast<ImagePixelFormat>(surface_->GetFormat());
++            dstData.stride = surface_->GetStride();
++            dstData.phyAddr = reinterpret_cast<uint8_t*>(dstPhyAddr);
++            Rect updateRect;
++            updateRect.SetRect(0, 0, config_.rect.GetWidth() - 1, config_.rect.GetHeight() -1);
++            ret = GfxEngines::GetInstance()->GfxBlit(srcData, updateRect, dstData, 0, 0);
++#endif
++            if (!ret) {
+ #ifdef ARM_NEON_OPT
+-            {
+                 DEBUG_PERFORMANCE_TRACE("UpdateBackBuf_neon");
+                 NeonMemcpy(backBufVirAddr, backBuf_->GetSize(), acquireBufVirAddr, acquireBuffer->GetSize());
+-            }
+ #else
+-            {
+                 DEBUG_PERFORMANCE_TRACE("UpdateBackBuf");
+                 if (memcpy_s(backBufVirAddr, backBuf_->GetSize(),
+                     acquireBufVirAddr, acquireBuffer->GetSize()) != EOK) {
+@@ -232,7 +250,7 @@ void LiteWindow::Flush(const Rect& srcRect, const LiteSurfaceData* layerData, in
+     }
+ 
+     GraphicLocker lock(backBufMutex_);
+-#if ENABLE_GFX_ENGINES
++#if defined(ENABLE_GFX_ENGINES) && ENABLE_GFX_ENGINES
+     uintptr_t phyaddr = backBuf_->GetPhyAddr();
+     if (IsCoverMode() && phyaddr) {
+         LiteSurfaceData srcData;

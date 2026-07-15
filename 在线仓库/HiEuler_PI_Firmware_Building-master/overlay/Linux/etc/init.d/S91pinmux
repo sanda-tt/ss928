@@ -1,0 +1,44 @@
+#!/bin/sh
+
+export PATH=/usr/local/bin:/usr/local/sbin:$PATH
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+
+# USRT3_RX
+bspmm 0x0102F012C 0x1201 > /dev/null
+# USRT3_TX
+bspmm 0x0102F0130 0x1201 > /dev/null
+
+# USRT4_RX
+bspmm 0x0102F0134 0x1201 > /dev/null
+# USRT4_TX
+bspmm 0x0102F0138 0x1201 > /dev/null
+
+# SPI0_SCLK
+bspmm 0x0102F01D8 0x1201 > /dev/null
+# SPI0_SDO
+bspmm 0x0102F01DC 0x1201 > /dev/null
+# SPI0_SDI
+bspmm 0x0102F01E0 0x1201 > /dev/null
+# SPI0_CSN
+bspmm 0x0102F01E4 0x1201 > /dev/null
+# SYS_RSTN
+bspmm 0x0102F0114 0x1201 > /dev/null
+# CAN_INT
+bspmm 0x0102F0030 0x1200 > /dev/null
+
+# I2C6_SDA  GPIO1_6
+bspmm 0x010230038 0x1200 > /dev/null
+# I2C6_SCL  GPIO1_7
+bspmm 0x01023003C 0x1200 > /dev/null
+# I2C7_SDA  GPIO2_0
+bspmm 0x010230040 0x1200 > /dev/null
+# I2C7_SCL  GPIO2_2
+bspmm 0x010230048 0x1200 > /dev/null
+
+# PWM0_OUT1_0_P
+bspmm 0x0102F01EC 0x1201 > /dev/null
+# PWM0_OUT15_0_P
+bspmm 0x0102F00DC 0x1205 > /dev/null
+
+# LSADC_CH3
+bspmm 0x0102F00FC 0x1200 > /dev/null

@@ -1,0 +1,500 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index f2f9009..8bdcb3c 100755
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -12,6 +12,7 @@
+ # limitations under the License.
+ 
+ import("//build/lite/config/component/lite_component.gni")
++import("//foundation/multimedia/media_utils_lite/config.gni")
+ 
+ lite_library("media_common") {
+   if (ohos_kernel_type == "liteos_m") {
+@@ -22,6 +23,8 @@ lite_library("media_common") {
+   sources = [
+     "src/format.cpp",
+     "src/source.cpp",
++    "src/media_log.cpp",
++    "src/media_utils.cpp",
+   ]
+   include_dirs = [
+     "interfaces/kits",
+@@ -46,6 +49,9 @@ lite_library("media_common") {
+       ]
+     }
+   }
++  if (enable_distributed_dfx == true) {
++     defines = ["ENABLE_DFX", "HI_LOG_ENABLE"]
++  }
+ }
+ 
+ config("media_common_public_config") {
+diff --git a/config.gni b/config.gni
+index da174a6..cd36255 100644
+--- a/config.gni
++++ b/config.gni
+@@ -15,4 +15,7 @@
+ 
+ declare_args() {
+   enable_media_passthrough_mode = false
++  enable_distributed_hardware = false
++  enable_distributed_dfx = false
++  drivers_peripheral_display_4K_support = false
+ }
+diff --git a/hals/hal_camera.h b/hals/hal_camera.h
+index e6a0fcd..88b2a33 100644
+--- a/hals/hal_camera.h
++++ b/hals/hal_camera.h
+@@ -30,6 +30,7 @@ extern "C" {
+ #define DESC_MAX_LEN 64
+ #define AUTO_MODE_MAX_NUM 16
+ #define PRIVATE_META_MAX_LEN 32
++#define CAMERA_NAME_MAX_LEN 1024
+ 
+ typedef struct {
+     int32_t x;
+@@ -74,6 +75,8 @@ typedef struct {
+     ImageFormat format;
+     int32_t width;
+     int32_t height;
++    int32_t displayWidth;
++    int32_t displayHeight;
+     uint16_t fps;
+     RectInfo crop;
+     uint8_t invertMode;
+@@ -134,7 +137,7 @@ typedef enum status {
+ } CameraStatus;
+ 
+ typedef void (*BufferAvailable)(uint32_t streamId, HalBuffer *halBuffer, uint32_t bufferNum);
+-typedef void (*CameraDetectCb)(uint32_t cameraId, CameraStatus status);
++typedef void (*CameraDetectCb)(const char *cameraId, CameraStatus status);
+ 
+ typedef struct {
+     DeviceType type;
+@@ -146,6 +149,8 @@ typedef struct {
+ typedef struct {
+     int32_t x;
+     int32_t y;
++    int32_t w;
++    int32_t h;
+ } PosInfo;
+ 
+ typedef struct {
+@@ -208,33 +213,50 @@ typedef struct {
+     uint32_t privateData[PRIVATE_META_MAX_LEN];
+ } CameraMetaResult;
+ 
+-typedef void (*CameraResultCb)(uint32_t cameraId, CameraMetaResult result);
+-
+-int32_t HalCameraInit(void);
+-int32_t HalCameraDeinit(void);
+-int32_t HalCameraGetModeNum(uint8_t *num);
+-int32_t HalCameraSetMode(uint8_t index);
+-int32_t HalCameraSetDeviceDetectCb(const CameraDetectCb cb);
+-int32_t HalCameraGetDeviceNum(uint8_t *num);
+-int32_t HalCameraGetDeviceList(uint32_t *cameraList, uint8_t listNum);
+-int32_t HalCameraGetStreamCapNum(uint32_t cameraId, uint32_t *num);
+-int32_t HalCameraGetStreamCap(uint32_t cameraId, StreamCap *streamCap, uint32_t streamNum);
+-int32_t HalCameraDeviceOpen(uint32_t cameraId);
+-int32_t HalCameraDeviceClose(uint32_t cameraId);
+-int32_t HalCameraStreamCreate(uint32_t cameraId, const StreamAttr *stream, uint32_t *streamId);
+-int32_t HalCameraStreamDestroy(uint32_t cameraId, uint32_t streamId);
+-int32_t HalCameraGetDeviceId(uint32_t cameraId, uint32_t streamId, uint32_t *deviceId);
+-int32_t HalCameraStreamOn(uint32_t cameraId, uint32_t streamId);
+-int32_t HalCameraStreamOff(uint32_t cameraId, uint32_t streamId);
+-int32_t HalCameraDequeueBuf(uint32_t cameraId, uint32_t streamId, HalBuffer *buffer);
+-int32_t HalCameraQueueBuf(uint32_t cameraId, uint32_t streamId, const HalBuffer *buffer);
+-int32_t HalCameraSetBufferCallback(uint32_t cameraId, const BufferAvailable callback);
+-int32_t HalCameraStreamSetInfo(uint32_t cameraId, uint32_t streamId, const StreamInfo *info);
+-int32_t HalCameraStreamGetInfo(uint32_t cameraId, uint32_t streamId, StreamInfo *info);
+-int32_t HalCameraDeviceSetInfo(uint32_t cameraId, const DeviceInfo *info);
+-int32_t HalCameraDeviceGetInfo(uint32_t cameraId, DeviceInfo *info);
+-int32_t HalCameraGetAbility(uint32_t cameraId, AbilityInfo *ability);
+-int32_t HalCameraSetResultCb(uint32_t cameraId, CameraResultCb cb);
++typedef void (*CameraResultCb)(const char *camera, CameraMetaResult result);
++
++typedef struct HalCameraManager {
++    int32_t (*HalCameraInit)(void);
++    int32_t (*HalCameraDeinit)(void);
++    int32_t (*HalCameraGetModeNum)(uint8_t *num);
++    int32_t (*HalCameraSetMode)(uint8_t index);
++    int32_t (*HalCameraSetDeviceDetectCb)(const CameraDetectCb cb);
++    int32_t (*HalCameraGetDeviceNum)(uint8_t *num);
++    int32_t (*HalCameraGetDeviceList)(char cameraList[][CAMERA_NAME_MAX_LEN], uint8_t listNum);
++    int32_t (*HalCameraGetStreamCapNum)(const char *camera, uint32_t *num);
++    int32_t (*HalCameraGetStreamCap)(const char *camera, StreamCap *streamCap, uint32_t streamNum);
++    int32_t (*HalCameraDeviceOpen)(const char *camera);
++    int32_t (*HalCameraDeviceClose)(const char *camera);
++    int32_t (*HalCameraStreamCreate)(const char *camera, const StreamAttr *stream, uint32_t *streamId);
++    int32_t (*HalCameraStreamDestroy)(const char *camera, uint32_t streamId);
++    int32_t (*HalCameraGetDeviceId)(const char *camera, uint32_t streamId, uint32_t *deviceId);
++    int32_t (*HalCameraStreamOn)(const char *camera, uint32_t streamId);
++    int32_t (*HalCameraStreamOff)(const char *camera, uint32_t streamId);
++    int32_t (*HalCameraDequeueBuf)(const char *camera, uint32_t streamId, HalBuffer *buffer);
++    int32_t (*HalCameraQueueBuf)(const char *camera, uint32_t streamId, const HalBuffer *buffer);
++    int32_t (*HalCameraSetBufferCallback)(const char *camera, const BufferAvailable callback);
++    int32_t (*HalCameraStreamSetInfo)(const char *camera, uint32_t streamId, const StreamInfo *info);
++    int32_t (*HalCameraStreamGetInfo)(const char *camera, uint32_t streamId, StreamInfo *info);
++    int32_t (*HalCameraDeviceSetInfo)(const char *camera, const DeviceInfo *info);
++    int32_t (*HalCameraDeviceGetInfo)(const char *camera, DeviceInfo *info);
++    int32_t (*HalCameraGetAbility)(const char *camera, AbilityInfo *ability);
++    int32_t (*HalCameraSetResultCb)(const char *camera, CameraResultCb cb);
++    int32_t (*HalCameraUpdateSettings)(const char *camera, const char *value, uint32_t len);
++
++    int32_t (*HalCameraAddCameraDevice)(const char *deviceId, const char *dhId, const char *abilityInfo,
++                                        void *callbackObj);
++    int32_t (*HalCameraRemoveCameraDevice)(const char *deviceId, const char *dhId);
++    int32_t (*HalCameraAcquireBuffer)(const char *deviceId, const char *dhId, int32_t streamId, HalBuffer *buffer);
++    int32_t (*HalCameraShutterBuffer)(const char *deviceId, const char *dhId, int32_t streamId,
++        const HalBuffer *buffer);
++    int32_t (*HalCameraOnSettingsResult)(const char *deviceId, const char *dhId, const void *result);
++    int32_t (*HalCameraNotify)(const char *deviceId, const char *dhId, const void *event);
++
++    void *(*HalCameraGetProviderCallback)(const char *deviceId, const char *dhId);
++} HalCameraManager;
++
++HalCameraManager *GetHalCameraFuncs(void);
++HalCameraManager *GetHalDistributedCameraFuncs(void);
+ 
+ #ifdef __cplusplus
+ #if __cplusplus
+diff --git a/interfaces/kits/media_errors.h b/interfaces/kits/media_errors.h
+index ac7593d..ba50f9a 100644
+--- a/interfaces/kits/media_errors.h
++++ b/interfaces/kits/media_errors.h
+@@ -99,6 +99,9 @@ const int32_t  ERR_NOT_STARTED = BASE_MEDIA_ERR_OFFSET + 8;
+ 
+ /** Unknown error */
+ const int32_t  ERR_UNKNOWN = BASE_MEDIA_ERR_OFFSET + 200;
++
++/** read data time out */
++const  int32_t ERR_AUDIO_READ_DATA_TIME_OUT = -40049;
+ }  // namespace Media
+ }  // namespace OHOS
+ #endif  // MEDIA_ERRORS_H
+diff --git a/interfaces/kits/media_info.h b/interfaces/kits/media_info.h
+index 8a01883..3124643 100644
+--- a/interfaces/kits/media_info.h
++++ b/interfaces/kits/media_info.h
+@@ -216,4 +216,24 @@ typedef enum {
+     /** Invalid value */
+     BIT_WIDTH_BUTT,
+ } AudioBitWidth;
++
++typedef enum {
++    AUDIO_DEVICE_MIC_LOCAL,
++    AUDIO_DEVICE_MIC_VIRTUAL,
++    AUDIO_DEVICE_SPEAKER_LOCAL,
++    AUDIO_DEVICE_SPEAKER_VIRTUAL,
++} AudioSystemDeviceType;
++
++typedef enum {
++    CONNECT = 0,
++    DISCONNECT = 1,
++} DeviceConnectStatus;
++
++typedef struct {
++    uint32_t dhId;
++    std::string deviceName;
++    AudioSystemDeviceType deviceType;
++    DeviceConnectStatus connectStatus;
++} AudioDeviceInfo;
++
+ #endif  // MEDIA_INFO_H
+diff --git a/interfaces/kits/media_log.h b/interfaces/kits/media_log.h
+index 694dd45..78ea036 100644
+--- a/interfaces/kits/media_log.h
++++ b/interfaces/kits/media_log.h
+@@ -26,23 +26,32 @@
+ 
+ #define __FILENAME__ (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
+ 
+-#ifndef OHOS_DEBUG
+-#define DECORATOR_HILOG(op, fmt, args...) \
+-    do {                                  \
+-        op(LOG_CORE, fmt, ##args);        \
+-    } while (0)
+-#else
+-#define DECORATOR_HILOG(op, fmt, args...)                                                \
+-    do {                                                                                 \
+-        op(LOG_CORE, "{%s()-%s:%d} " fmt, __FUNCTION__, __FILENAME__, __LINE__, ##args); \
++/*
++ * @brief  log level type.
++ */
++enum MEDIA_LOG_LEVEL {
++    MEDIA_LOG_DEBUG = 0,
++    MEDIA_LOG_INFO,
++    MEDIA_LOG_WARN,
++    MEDIA_LOG_ERR,
++    MEDIA_LOG_FATAL,
++};
++
++int MediaLogPrintf(MEDIA_LOG_LEVEL level, const char *fmt, ...);
++int MediaDfxLogPrintf(const char *fmt, ...);
++
++#define DECORATOR_LOG(op, level, fmt, args...)                         \
++    do {                                                               \
++        op(level, "{%s():%d} " fmt, __FUNCTION__, __LINE__, ##args);   \
+     } while (0)
+-#endif
+ 
+-#define MEDIA_DEBUG_LOG(fmt, ...) DECORATOR_HILOG(HILOG_DEBUG, fmt, ##__VA_ARGS__)
+-#define MEDIA_ERR_LOG(fmt, ...) DECORATOR_HILOG(HILOG_ERROR, fmt, ##__VA_ARGS__)
+-#define MEDIA_WARNING_LOG(fmt, ...) DECORATOR_HILOG(HILOG_WARN, fmt, ##__VA_ARGS__)
+-#define MEDIA_INFO_LOG(fmt, ...) DECORATOR_HILOG(HILOG_INFO, fmt, ##__VA_ARGS__)
+-#define MEDIA_FATAL_LOG(fmt, ...) DECORATOR_HILOG(HILOG_FATAL, fmt, ##__VA_ARGS__)
++
++#define MEDIA_DEBUG_LOG(fmt, ...) DECORATOR_LOG(MediaLogPrintf, MEDIA_LOG_DEBUG, fmt, ##__VA_ARGS__)
++#define MEDIA_ERR_LOG(fmt, ...) DECORATOR_LOG(MediaLogPrintf, MEDIA_LOG_ERR, fmt, ##__VA_ARGS__)
++#define MEDIA_WARNING_LOG(fmt, ...) DECORATOR_LOG(MediaLogPrintf, MEDIA_LOG_WARN, fmt, ##__VA_ARGS__)
++#define MEDIA_INFO_LOG(fmt, ...) DECORATOR_LOG(MediaLogPrintf, MEDIA_LOG_INFO, fmt, ##__VA_ARGS__)
++#define MEDIA_FATAL_LOG(fmt, ...) DECORATOR_LOG(MediaLogPrintf, MEDIA_LOG_FATAL, fmt, ##__VA_ARGS__)
++#define MEDIA_DFX_LOG(fmt, ...) MediaDfxLogPrintf(fmt, ##__VA_ARGS__)
+ 
+ #define MEDIA_OK 0
+ #define MEDIA_INVALID_PARAM (-1)
+diff --git a/interfaces/kits/media_utils.h b/interfaces/kits/media_utils.h
+new file mode 100644
+index 0000000..64322f3
+--- /dev/null
++++ b/interfaces/kits/media_utils.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++#ifndef OHOS_MEDIA_UTILS_H
++#define OHOS_MEDIA_UTILS_H
++
++#include "log.h"
++
++#ifdef ENABLE_DFX
++void MediaRecordAudioRecvTime();
++
++void MediaPrintSyncTimeDiffUs();
++#endif
++#endif // OHOS_MEDIA_LOG_H
+diff --git a/src/media_log.cpp b/src/media_log.cpp
+new file mode 100644
+index 0000000..2780aa9
+--- /dev/null
++++ b/src/media_log.cpp
+@@ -0,0 +1,127 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "media_log.h"
++#include <string>
++#include <ctime>
++#include <sys/time.h>
++#include "securec.h"
++#ifdef HI_LOG_ENABLE
++#include "hilog/log.h"
++#else
++#include <cstdio>
++#endif
++
++static const char* MEDIA_LOG_TITLE_TAG = "MEDIA_COMMON";
++constexpr int32_t LOG_MAX_LEN = 4096;
++static MEDIA_LOG_LEVEL g_enabledLevel = MEDIA_LOG_ERR;
++
++static void LogTime()
++{
++    struct timeval tv;
++    gettimeofday(&tv, nullptr);
++    struct tm tm;
++    localtime_r(&tv.tv_sec, &tm);
++    const int64_t usecToMsec = 1000;
++    printf("[%02d:%02d:%02d:%03ld]", tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_usec / usecToMsec);
++}
++
++static LogLevel MapLogLevel(MEDIA_LOG_LEVEL level)
++{
++    switch (level) {
++        case MEDIA_LOG_DEBUG:
++            return LOG_DEBUG;
++        case MEDIA_LOG_INFO:
++            return LOG_INFO;
++        case MEDIA_LOG_WARN:
++            return LOG_WARN;
++        case MEDIA_LOG_ERR:
++            return LOG_ERROR;
++        default:
++            return LOG_INFO;
++    }
++}
++
++static int32_t MediaLogPrintfOut(MEDIA_LOG_LEVEL level, const char *fmt)
++{
++    if (level < g_enabledLevel) {
++        return MEDIA_OK;
++    }
++    if (fmt == nullptr) {
++        return MEDIA_ERR;
++    }
++#if defined(HI_LOG_ENABLE) && !defined(ENABLE_DFX)
++    LogLevel hiLogLevel = MapLogLevel(level);
++    (void)HiLogPrint(LOG_CORE, hiLogLevel, LOG_DOMAIN, MEDIA_LOG_TITLE_TAG, "%{public}s", fmt);
++#else
++    LogTime();
++    switch (level) {
++        case MEDIA_LOG_DEBUG:
++            printf("[D]%s\n", fmt);
++            break;
++        case MEDIA_LOG_INFO:
++            printf("[I]%s\n", fmt);
++            break;
++        case MEDIA_LOG_WARN:
++            printf("[W]%s\n", fmt);
++            break;
++        case MEDIA_LOG_ERR:
++            printf("[E]%s\n", fmt);
++            break;
++        case MEDIA_LOG_FATAL:
++            printf("[F]%s\n", fmt);
++            break;
++        default:
++            printf("[E]%s\n", fmt);
++            break;
++    }
++#endif
++    return MEDIA_OK;
++}
++
++int32_t MediaLogPrintf(MEDIA_LOG_LEVEL level, const char *fmt, ...)
++{
++    char logBuf[LOG_MAX_LEN] = { 0 };
++    va_list arg;
++    (void)memset_s(&arg, sizeof(va_list), 0, sizeof(va_list));
++    va_start(arg, fmt);
++
++    int32_t ret = vsprintf_s(logBuf, sizeof(logBuf), fmt, arg);
++    va_end(arg);
++    if (ret < 0) {
++        MediaLogPrintfOut(level, "media log length error.");
++        return MEDIA_ERR;
++    }
++    MediaLogPrintfOut(level, logBuf);
++    return MEDIA_OK;
++}
++
++int32_t MediaDfxLogPrintf(const char *fmt, ...)
++{
++    char logBuf[LOG_MAX_LEN] = { 0 };
++    va_list arg;
++    (void)memset_s(&arg, sizeof(va_list), 0, sizeof(va_list));
++    va_start(arg, fmt);
++
++    int32_t ret = vsprintf_s(logBuf, sizeof(logBuf), fmt, arg);
++    va_end(arg);
++    if (ret < 0) {
++        printf("media log length error.\n");
++        return MEDIA_ERR;
++    }
++    LogTime();
++    printf("%s\n", logBuf);
++    return MEDIA_OK;
++}
+\ No newline at end of file
+diff --git a/src/media_utils.cpp b/src/media_utils.cpp
+new file mode 100644
+index 0000000..4e90b09
+--- /dev/null
++++ b/src/media_utils.cpp
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "media_utils.h"
++#ifdef ENABLE_DFX
++#include "media_log.h"
++
++static std::atomic<uint64_t> g_receiveAudiotime = 0;
++static std::atomic<uint64_t> g_receiveAudiotimeLast = 0;
++
++static bool UIntMulIsOverflow64(uint64_t a, uint64_t b, uint64_t *value)
++{
++    if (a == 0 || b == 0) {
++        return false;
++    }
++    if (UINT64_MAX / a < b) {
++        return true;
++    }
++
++    uint64_t result = static_cast<uint64_t>((a) * (b));
++    if (value != nullptr) {
++        *value = result;
++    }
++    return false;
++}
++
++void MediaRecordAudioRecvTime()
++{
++    struct timeval timeStart;
++    gettimeofday(&timeStart, nullptr);
++    const uint64_t timeUs = 1000000;
++    uint64_t secToUs = 0;
++    bool isOverflow =
++        UIntMulIsOverflow64(static_cast<uint64_t>(timeStart.tv_sec), timeUs, &secToUs);
++    if (isOverflow) {
++        MEDIA_ERR_LOG("PUIntMulIsOverflow64 calculate reslut overflow!");
++        return;
++    }
++    g_receiveAudiotime = secToUs + timeStart.tv_usec;
++}
++
++void MediaPrintSyncTimeDiffUs()
++{
++    if (g_receiveAudiotimeLast == g_receiveAudiotime) {
++        return;
++    }
++    g_receiveAudiotimeLast.store(g_receiveAudiotime.load());
++    struct timeval timeEnd;
++    gettimeofday(&timeEnd, nullptr);
++    const uint64_t timeUs = 1000000;
++    uint64_t secToUs = 0;
++    bool isOverflow =
++        UIntMulIsOverflow64(static_cast<uint64_t>(timeEnd.tv_sec), timeUs, &secToUs);
++    if (isOverflow) {
++        MEDIA_ERR_LOG("CalcTimeDiffUsPrint calculate reslut overflow!");
++        return;
++    }
++    uint64_t endUsec = static_cast<uint64_t>(timeEnd.tv_usec + secToUs);
++    MEDIA_DFX_LOG("audio and video sync elapsed time: %lld us", endUsec - g_receiveAudiotime);
++}
++#endif
++

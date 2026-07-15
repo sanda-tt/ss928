@@ -1,0 +1,42 @@
+[
+  {
+    "buildTarget": "Pegasus-app",
+    "relativePath": "demo/face_detection",
+    "chip": "Hi3403V100",
+    "buildDef": "GCC",
+    "needSmoke": "false",
+    "description": "强逆光下人脸检测"
+  },
+  {
+    "buildTarget": "Pegasus-app",
+    "relativePath": "demo/fruit_identify",
+    "chip": "Hi3403V100",
+    "buildDef": "CLANG",
+    "needSmoke": "false",
+    "description": "水果检测"
+  },
+  {
+    "buildTarget": "Pegasus-app",
+    "relativePath": "demo/hnr_auto",
+    "chip": "Hi3403V100",
+    "buildDef": "GCC",
+    "needSmoke": "false",
+    "description": "夜间超微光(AIISP)"
+  },
+  {
+    "buildTarget": "Pegasus-app",
+    "relativePath": "demo/opencv_dnn",
+    "chip": "Hi3403V100",
+    "buildDef": "CLANG",
+    "needSmoke": "false",
+    "description": "基于opencv_dnn的人脸检测"
+  },
+  {
+    "buildTarget": "Pegasus-app",
+    "relativePath": "demo/sample_kcf_track",
+    "chip": "Hi3403V100",
+    "buildDef": "GCC",
+    "needSmoke": "false",
+    "description": "单目标追踪"
+  }
+]

@@ -1,0 +1,243 @@
+(---------------------------------------------------------------------)
+(                                                                     )
+(    Dump Library Log                                                 )
+(                                                                     )
+(    Software Version : 17.2S071                                      )
+(    Date/Time        : Tue Mar 19 15:57:49 2024                      )
+(                                                                     )
+(---------------------------------------------------------------------)
+
+
+*** file: D:/板卡资料/资料-重新整理/imx347_38X38/imx347_38X38/PCB/EB-IMX347-BC-429.brd ***
+
+
+
+  *** Creating all device files (see create_devices.log) ***
+
+
+  *** Creating padstacks. ***
+
+  C118D79 being dumped.
+
+  SO16X3 being dumped.
+
+  C178D87 being dumped.
+
+  C32D32N being dumped.
+
+  SMD2X3 being dumped.
+
+  CIR2_3 being dumped.
+
+  C47D47N being dumped.
+
+  OX0_50Y1_15T being dumped.
+
+  C48D48N being dumped.
+
+  OB13_38X59_05 being dumped.
+
+  SR21X30 being dumped.
+
+  SMD0_83RC0_53 being dumped.
+
+  PAD2_0CIR3_1P being dumped.
+
+  PAD2_1CIR2_1U being dumped.
+
+  PAD2_1CIR3_8P being dumped.
+
+  SMD30_32 being dumped.
+
+  SMD40_50 being dumped.
+
+  SMD25_20 being dumped.
+
+  BALL-0_6 being dumped.
+
+  SMD25_50 being dumped.
+
+  SMD28_32 being dumped.
+
+  SMD37_50 being dumped.
+
+  SMD51_65 being dumped.
+
+  SMD19_20PSH_L being dumped.
+
+  SMD39_50 being dumped.
+
+  PAD1_55CIR1_55 being dumped.
+
+  PADCIR40 being dumped.
+
+  O0R5X1R6 being dumped.
+
+  SMD55_48 being dumped.
+
+  SMD19_20PSH_R being dumped.
+
+  SMD0_60X1_27OB being dumped.
+
+  SMD0_70X1_27RE being dumped.
+
+  REC102X67 being dumped.
+
+  0402_OCT2 being dumped.
+
+  BALL-0_45 being dumped.
+
+  SMD135_60 being dumped.
+
+  VIA10-GEN being dumped.
+
+  SMD118_39 being dumped.
+
+  RX65Y20OB being dumped.
+
+  PAD1_55CIR1_55U being dumped.
+
+  SMD22_20-A being dumped.
+
+  SO1_5X0_5 being dumped.
+
+  SQ1_8X3_0 being dumped.
+
+  SMD20_20P0 being dumped.
+
+  RX1_8Y2_2 being dumped.
+
+  SMD10_40OB being dumped.
+
+  SMD40_10OB being dumped.
+
+  SMD130RC130 being dumped.
+
+  S2X3 being dumped.
+
+  VIA8-BGA-16 being dumped.
+
+  RX0_50Y1_3 being dumped.
+
+  PAD41 being dumped.
+
+  PAD38 being dumped.
+
+  PAD39 being dumped.
+
+  OB1_1X1_8CIR0_7P being dumped.
+
+  RC1_1X1_8CIR0_7P being dumped.
+
+  PAD2CIR2_54 being dumped.
+
+  C52D36 being dumped.
+
+  C48D32 being dumped.
+
+  RX0_20Y0_80R0_10T being dumped.
+
+  PAD103CIR83D being dumped.
+
+  THC2R60D1R70 being dumped.
+
+  S52D36 being dumped.
+
+  S48D32 being dumped.
+
+  PAD1_6SQ1_6 being dumped.
+
+  THS2R60D1R70 being dumped.
+
+  R51X43 being dumped.
+
+  R20X94 being dumped.
+
+  R25X45 being dumped.
+
+  SMD_OV24X80 being dumped.
+
+
+  *** Creating shape symbols (.dra and .ssm) ***
+
+  0402_oct2_sm being dumped.
+
+  sh19_20lno_t being dumped.
+
+  sh19_20rno_t being dumped.
+
+  s3 being dumped.
+
+  s4 being dumped.
+
+  0402_oct2 being dumped.
+
+  srx0_20y0_80r0_10 being dumped.
+
+  srx0_30y0_90r0_10 being dumped.
+
+
+  *** Creating flash symbols (.dra and .fsm) ***
+
+  tr63x77x20-45 being dumped.
+
+  tr48x62x15-45 being dumped.
+
+  tr69x83x20-45 being dumped.
+
+  tr95x109x30-45 being dumped.
+
+  tr127x198x40-45 being dumped.
+
+  fc2r60w3r20 being dumped.
+
+  tr50x64x15-45 being dumped.
+
+
+  *** Creating package symbols (.dra and .psm) ***
+
+  mx1r25_smd2p being dumped.
+
+  sot-23-5 being dumped.
+
+  lens_socket-m2-bvt being dumped.
+
+  fpc30_0r5_back being dumped.
+
+  c0402 being dumped.
+
+  r0402 being dumped.
+
+  h2_1_d3_3a being dumped.
+
+  sot23 being dumped.
+
+  sr0402 being dumped.
+
+  imx347-lqr-c being dumped.
+
+  sot-23 being dumped.
+
+
+  *** Creating format symbols (.dra and .osm) ***
+
+  esd-0707 being dumped.
+
+  layer4a being dumped.
+
+  pb-0707 being dumped.
+
+
+
+*********************** Summary *********************
+ERRORs reported:                           0
+
+Number of padstacks dumped:               70
+Number of package symbols dumped:         11
+Number of format symbols dumped:           3
+Number of shape symbols dumped:            8
+Number of flash symbols dumped:            7
+
+Total number of symbols dumped:           29
+*****************************************************
+

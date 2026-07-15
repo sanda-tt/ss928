@@ -1,0 +1,171 @@
+(---------------------------------------------------------------------)
+(                                                                     )
+(    Dump Library Log                                                 )
+(                                                                     )
+(    Software Version : 17.2S071                                      )
+(    Date/Time        : Tue Mar 19 14:13:28 2024                      )
+(                                                                     )
+(---------------------------------------------------------------------)
+
+
+*** file: D:/板卡资料/资料-重新整理/欧拉/G928-5550C-V1.0-custom.brd ***
+
+
+
+  *** Creating all device files (see create_devices.log) ***
+
+
+  *** Creating padstacks. ***
+
+  R100X60 being dumped.
+
+  MARK40-120-BOT being dumped.
+
+  REC9X26 being dumped.
+
+  REC0_4X1_95MM being dumped.
+
+  SMD20S26PSH_L being dumped.
+
+  SMD20_40 being dumped.
+
+  SMD20_50 being dumped.
+
+  SMD20S26PSH_R being dumped.
+
+  SMD14_60 being dumped.
+
+  SMD39_50 being dumped.
+
+  SMD19_20PSH_L being dumped.
+
+  SMD55_48 being dumped.
+
+  SMD19_20PSH_R being dumped.
+
+  SMD_R98X236S10 being dumped.
+
+  R018X020S being dumped.
+
+  REC0_5X0_875MM being dumped.
+
+  BALL10S14 being dumped.
+
+  BALL12S16 being dumped.
+
+  SMD_R433X102S10 being dumped.
+
+  CHAM_REC_1_1X0_85MM being dumped.
+
+  SMD_R433X295S10 being dumped.
+
+  SMD30_32A being dumped.
+
+  MARK40-120 being dumped.
+
+  REC13_8X26 being dumped.
+
+  VIA8-16-BGA being dumped.
+
+  SH37_75REC being dumped.
+
+  VIA10-20-BGA being dumped.
+
+  PAD80CIR80U being dumped.
+
+  BALL10P11S13 being dumped.
+
+  SH20_16OBSL being dumped.
+
+  HOLE2_2X4MM being dumped.
+
+
+  *** Creating shape symbols (.dra and .ssm) ***
+
+  sh20q_lno_t being dumped.
+
+  sh20q_rno_t being dumped.
+
+  sh19_20lno_t being dumped.
+
+  sh19_20rno_t being dumped.
+
+  sh37_71rec being dumped.
+
+  sh20_16obsl being dumped.
+
+  sh25_21obsl being dumped.
+
+
+  *** Creating package symbols (.dra and .psm) ***
+
+  bga200-26-2212c being dumped.
+
+  led0402 being dumped.
+
+  hsl1008 being dumped.
+
+  hbga997-26-3434 being dumped.
+
+  sot23-5 being dumped.
+
+  sy8368a being dumped.
+
+  df40c-100dp-0_4 being dumped.
+
+  hole2240 being dumped.
+
+  sot23-6b being dumped.
+
+  sot23-5s being dumped.
+
+  hsx4-0302 being dumped.
+
+  sc0402-pc being dumped.
+
+  sc0402-bga being dumped.
+
+  sop8-26-118 being dumped.
+
+  lsm2_5r5x5r2_h3 being dumped.
+
+  bga153-20-1414 being dumped.
+
+  sc0402 being dumped.
+
+  sc0603 being dumped.
+
+  sc0805 being dumped.
+
+  sl0402 being dumped.
+
+  sr0402 being dumped.
+
+
+  *** Creating mechanical symbols (.dra and .bsm) ***
+
+  ash-bin being dumped.
+
+  break_erect-5mm-lower_left-v2 being dumped.
+
+  v-cut-outline-v2 being dumped.
+
+
+  *** Creating format symbols (.dra and .osm) ***
+
+  esd-0707 being dumped.
+
+
+
+*********************** Summary *********************
+ERRORs reported:                           0
+
+Number of padstacks dumped:               31
+Number of package symbols dumped:         21
+Number of mechanical symbols dumped:       3
+Number of format symbols dumped:           1
+Number of shape symbols dumped:            7
+
+Total number of symbols dumped:           32
+*****************************************************
+

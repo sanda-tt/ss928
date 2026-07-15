@@ -1,0 +1,1066 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 4bd4a5c..7719b71 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -19,6 +19,7 @@ if (defined(ohos_lite)) {
+     deps = [
+       "$DHCP_ROOT_DIR/services/dhcp_client:dhcp_client",
+       "$DHCP_ROOT_DIR/services/dhcp_server:dhcp_server",
++      "$DHCP_ROOT_DIR/frameworks/native:dhcp_client_sdk",
+     ]
+ 
+     features = []
+diff --git a/frameworks/native/BUILD.gn b/frameworks/native/BUILD.gn
+index 25d492c..8ad48cc 100644
+--- a/frameworks/native/BUILD.gn
++++ b/frameworks/native/BUILD.gn
+@@ -46,7 +46,46 @@ if (defined(ohos_lite)) {
+       "src/dhcp_server_proxy_lite.cpp",
+     ]
+     include_dirs = local_sdk_include_dirs
+-    include_dirs += [ "//commonlibrary/c_utils/base/include" ]
++    include_dirs += [
++      "//commonlibrary/c_utils/base/include",
++      "//commonlibrary/utils_lite/include",
++      "//foundation/systemabilitymgr/samgr_lite/interfaces/kits/samgr",
++    ]
++
++    deps = [
++      "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared",
++      "//foundation/communication/ipc/interfaces/innerkits/c/ipc:ipc_single",
++      "//foundation/systemabilitymgr/samgr_lite/samgr:samgr",
++      "//third_party/bounds_checking_function:libsec_shared",
++    ]
++    configs -= [ "//build/lite/config:language_cpp" ]
++    cflags_cc = [
++      "-std=c++17",
++      "-fno-rtti",
++    ]
++    defines = [ "OHOS_ARCH_LITE" ]
++    ldflags = [
++      "-fPIC",
++      "-Wl,-E",
++    ]
++  }
++
++  shared_library("dhcp_client_sdk") {
++    sources = [
++      "src/dhcp_client.cpp",
++      "src/dhcp_client_callback_stub_lite.cpp",
++      "src/dhcp_client_proxy_lite.cpp",
++      "src/dhcp_event.cpp",
++      "src/dhcp_client_impl.cpp",
++      "c_adapter/src/dhcp_lite_c_client_api.cpp",
++      "c_adapter/src/dhcp_c_utils.cpp"
++    ]
++    include_dirs = local_sdk_include_dirs
++    include_dirs += [
++      "//commonlibrary/c_utils/base/include",
++      "//commonlibrary/utils_lite/include",
++      "//foundation/systemabilitymgr/samgr_lite/interfaces/kits/samgr",
++    ]
+ 
+     deps = [
+       "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared",
+diff --git a/frameworks/native/c_adapter/src/dhcp_lite_c_client_api.cpp b/frameworks/native/c_adapter/src/dhcp_lite_c_client_api.cpp
+new file mode 100644
+index 0000000..622fe66
+--- /dev/null
++++ b/frameworks/native/c_adapter/src/dhcp_lite_c_client_api.cpp
+@@ -0,0 +1,79 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++#include "kits/c/dhcp_lite_c_client_api.h"
++#include "inner_api/dhcp_client.h"
++#include "dhcp_sdk_define.h"
++#include "dhcp_c_utils.h"
++#include "dhcp_event.h"
++#include "dhcp_logger.h"
++#include "dhcp_errcode.h"
++
++DEFINE_DHCPLOG_DHCP_LABEL("DhcpCClient");
++namespace {
++    std::shared_ptr<OHOS::DHCP::DhcpClient> dhcpClientPtr = nullptr;
++}
++
++static std::shared_ptr<DhcpClientCallBack> dhcpClientCallBack = nullptr;
++
++NO_SANITIZE("cfi")  DhcpErrorCode RegisterDhcpClientCallBack(const char *ifname, const ClientCallBack *event)
++{
++    CHECK_PTR_RETURN(ifname, DHCP_INVALID_PARAM);
++    CHECK_PTR_RETURN(event, DHCP_INVALID_PARAM);
++    if (dhcpClientPtr == nullptr) {
++        dhcpClientPtr = OHOS::DHCP::DhcpClient::GetInstance(DHCP_CLIENT_ABILITY_ID);
++    }
++    CHECK_PTR_RETURN(dhcpClientPtr, DHCP_INVALID_PARAM);
++    if (dhcpClientCallBack == nullptr) {
++        dhcpClientCallBack = std::shared_ptr<DhcpClientCallBack>(new (std::nothrow)DhcpClientCallBack());
++    }
++    CHECK_PTR_RETURN(dhcpClientCallBack, DHCP_INVALID_PARAM);
++    dhcpClientCallBack->RegisterCallBack(ifname, event);
++    return GetCErrorCode(dhcpClientPtr->RegisterDhcpClientCallBack(ifname, dhcpClientCallBack));
++}
++
++NO_SANITIZE("cfi") DhcpErrorCode StartDhcpClient(const RouterConfig &config)
++{
++    CHECK_PTR_RETURN(dhcpClientPtr, DHCP_INVALID_PARAM);
++    OHOS::DHCP::RouterConfig routerConfig;
++    routerConfig.ifname = config.ifname;
++    routerConfig.bssid = config.bssid;
++    routerConfig.prohibitUseCacheIp = config.prohibitUseCacheIp;
++    routerConfig.bIpv6 = config.bIpv6;
++    routerConfig.bSpecificNetwork = config.bSpecificNetwork;
++    return GetCErrorCode(dhcpClientPtr->StartDhcpClient(routerConfig));
++}
++
++DhcpErrorCode DealWifiDhcpCache(int32_t cmd, const IpCacheInfo &ipCacheInfo)
++{
++    CHECK_PTR_RETURN(ipCacheInfo.ssid, DHCP_INVALID_PARAM);
++    CHECK_PTR_RETURN(ipCacheInfo.bssid, DHCP_INVALID_PARAM);
++    CHECK_PTR_RETURN(dhcpClientPtr, DHCP_INVALID_PARAM);
++    OHOS::DHCP::IpCacheInfo cacheInfo;
++    cacheInfo.ssid = ipCacheInfo.ssid;
++    cacheInfo.bssid = ipCacheInfo.bssid;
++    return GetCErrorCode(dhcpClientPtr->DealWifiDhcpCache(cmd, cacheInfo));
++}
++
++NO_SANITIZE("cfi") DhcpErrorCode StopDhcpClient(const char *ifname, bool bIpv6)
++{
++    CHECK_PTR_RETURN(ifname, DHCP_INVALID_PARAM);
++    CHECK_PTR_RETURN(dhcpClientPtr, DHCP_INVALID_PARAM);
++    CHECK_PTR_RETURN(dhcpClientCallBack, DHCP_INVALID_PARAM);
++    DhcpErrorCode ret = GetCErrorCode(dhcpClientPtr->StopDhcpClient(ifname, bIpv6));
++    if (ret == DHCP_SUCCESS) {
++        dhcpClientCallBack->UnRegisterCallBack(ifname);
++    }
++    return ret;
++}
+diff --git a/frameworks/native/include/dhcp_event.h b/frameworks/native/include/dhcp_event.h
+index c8284ee..43ffc6d 100755
+--- a/frameworks/native/include/dhcp_event.h
++++ b/frameworks/native/include/dhcp_event.h
+@@ -22,6 +22,9 @@
+ #include "iservice_registry.h"
+ #endif
+ #include <map>
++#include <iostream>
++#include <mutex>
++#include <stdlib.h>
+ #include "securec.h"
+ #include "dhcp_errcode.h"
+ #include "kits/c/dhcp_result_event.h"
+diff --git a/frameworks/native/include/dhcp_ipc_lite_adapter.h b/frameworks/native/include/dhcp_ipc_lite_adapter.h
+index 3ba872f..a4da595 100755
+--- a/frameworks/native/include/dhcp_ipc_lite_adapter.h
++++ b/frameworks/native/include/dhcp_ipc_lite_adapter.h
+@@ -15,7 +15,7 @@
+ 
+ #ifndef OHOS_DHCP_IPC_LITE_ADAPTER_H
+ #define OHOS_DHCP_IPC_LITE_ADAPTER_H
+-
++#include "ipc_skeleton.h"
+ #define DHCP_CLIENT_LITE "dhcpclientlite"
+ #define DHCP_FEATRUE_CLIENT "dhcpclient"
+ 
+diff --git a/frameworks/native/src/dhcp_client_callback_stub_lite.cpp b/frameworks/native/src/dhcp_client_callback_stub_lite.cpp
+index 0001022..a7d4792 100755
+--- a/frameworks/native/src/dhcp_client_callback_stub_lite.cpp
++++ b/frameworks/native/src/dhcp_client_callback_stub_lite.cpp
+@@ -123,6 +123,10 @@ void DhcpClientCallBackStub::OnIpFailChanged(int status, const std::string& ifna
+ int DhcpClientCallBackStub::RemoteOnIpSuccessChanged(uint32_t code, IpcIo *data)
+ {
+     DHCP_LOGI("run %{public}s code %{public}u", __func__, code);
++    if (data == nullptr) {
++        DHCP_LOGE("DhcpClientCallBackStub::RemoteOnIpSuccessChanged, data is nullptr!");
++        return -1;
++    }
+     size_t readLen;
+     int state = 0;
+     (void)ReadInt32(data, &state);
+@@ -134,18 +138,54 @@ int DhcpClientCallBackStub::RemoteOnIpSuccessChanged(uint32_t code, IpcIo *data)
+     (void)ReadUint32(data, &result.uLeaseTime);
+     (void)ReadUint32(data, &result.uAddTime);
+     (void)ReadUint32(data, &result.uGetTime);
+-    result.strYourCli = (char *)ReadString(data, &readLen);
+-    result.strServer = (char *)ReadString(data, &readLen);
+-    result.strSubnet = (char *)ReadString(data, &readLen);
+-    result.strDns1 = (char *)ReadString(data, &readLen);
+-    result.strDns2 = (char *)ReadString(data, &readLen);
+-    result.strRouter1 = (char *)ReadString(data, &readLen);
+-    result.strRouter2 = (char *)ReadString(data, &readLen);
+-    result.strVendor = (char *)ReadString(data, &readLen);
+-    result.strLinkIpv6Addr = (char *)ReadString(data, &readLen);
+-    result.strRandIpv6Addr = (char *)ReadString(data, &readLen);
+-    result.strLocalAddr1 = (char *)ReadString(data, &readLen);
+-    result.strLocalAddr2 = (char *)ReadString(data, &readLen);
++    const char* strYourCli = (char *)ReadString(data, &readLen);
++    if (strYourCli != nullptr) {
++        result.strYourCli = strYourCli;
++    }
++    const char* strServer = (char *)ReadString(data, &readLen);
++    if (strServer != nullptr) {
++        result.strServer = strServer;
++    }
++    const char* strSubnet = (char *)ReadString(data, &readLen);
++    if (strSubnet != nullptr) {
++        result.strSubnet = strSubnet;
++    }
++    const char* strDns1 = (char *)ReadString(data, &readLen);
++    if (strDns1 != nullptr) {
++        result.strDns1 = strDns1;
++    }
++    const char* strDns2 = (char *)ReadString(data, &readLen);
++    if (strDns2 != nullptr) {
++        result.strDns2 = strDns2;
++    }
++    const char* strRouter1 = (char *)ReadString(data, &readLen);
++    if (strRouter1 != nullptr) {
++        result.strRouter1 = strRouter1;
++    }
++    const char* strRouter2 = (char *)ReadString(data, &readLen);
++    if (strRouter2 != nullptr) {
++        result.strRouter2 = strRouter2;
++    }
++    const char* strVendor = (char *)ReadString(data, &readLen);
++    if (strVendor != nullptr) {
++        result.strVendor = strVendor;
++    }
++    const char* strLinkIpv6Addr = (char *)ReadString(data, &readLen);
++    if (strLinkIpv6Addr != nullptr) {
++        result.strLinkIpv6Addr = strLinkIpv6Addr;
++    }
++    const char* strRandIpv6Addr = (char *)ReadString(data, &readLen);
++    if (strRandIpv6Addr != nullptr) {
++        result.strRandIpv6Addr = strRandIpv6Addr;
++    }
++    const char* strLocalAddr1 = (char *)ReadString(data, &readLen);
++    if (strLocalAddr1 != nullptr) {
++        result.strLocalAddr1 = strLocalAddr1;
++    }
++    const char* strLocalAddr2 = (char *)ReadString(data, &readLen);
++    if (strLocalAddr2 != nullptr) {
++        result.strLocalAddr2 = strLocalAddr2;
++    }
+     OnIpSuccessChanged(state, ifname, result);
+     return 0;
+ }
+diff --git a/frameworks/native/src/dhcp_client_impl.cpp b/frameworks/native/src/dhcp_client_impl.cpp
+index 440a282..6d93d4a 100755
+--- a/frameworks/native/src/dhcp_client_impl.cpp
++++ b/frameworks/native/src/dhcp_client_impl.cpp
+@@ -57,7 +57,7 @@ bool DhcpClientImpl::Init(int systemAbilityId)
+         DHCP_LOGE("get dhcp client proxy failed.");
+         return false;
+     }
+-    if (clientProxy->Init() != DHCP_OPT_SUCCESS) {
++    if (clientProxy->Initialize() != true) {
+         DHCP_LOGE("dhcp client proxy init failed.");
+         DhcpClientProxy::ReleaseInstance();
+         return false;
+diff --git a/frameworks/native/src/dhcp_client_proxy.h b/frameworks/native/src/dhcp_client_proxy.h
+index 5c3fc6d..8b4fd6e 100755
+--- a/frameworks/native/src/dhcp_client_proxy.h
++++ b/frameworks/native/src/dhcp_client_proxy.h
+@@ -54,6 +54,7 @@ public:
+     ErrCode StopClientSa(void) override;
+ #ifdef OHOS_ARCH_LITE
+     void OnRemoteDied(void);
++    bool Initialize() const;
+ private:
+     static DhcpClientProxy *g_instance;
+     IClientProxy *remote_ = nullptr;
+diff --git a/frameworks/native/src/dhcp_client_proxy_lite.cpp b/frameworks/native/src/dhcp_client_proxy_lite.cpp
+index 38179bd..b840b2d 100755
+--- a/frameworks/native/src/dhcp_client_proxy_lite.cpp
++++ b/frameworks/native/src/dhcp_client_proxy_lite.cpp
+@@ -18,6 +18,11 @@
+ #include "dhcp_c_utils.h"
+ #include "dhcp_errcode.h"
+ #include "dhcp_logger.h"
++#include "samgr_lite.h"
++#include "dhcp_ipc_lite_adapter.h"
++#include "dhcp_error_code.h"
++#include "dhcp_define.h"
++#include "dhcp_sdk_define.h"
+ 
+ DEFINE_DHCPLOG_DHCP_LABEL("DhcpClientProxyLite");
+ 
+@@ -26,6 +31,8 @@ namespace DHCP {
+ static SvcIdentity g_sid;
+ static IpcObjectStub g_objStub;
+ static DhcpClientCallBackStub g_dhcpClientCallBackStub;
++const int RETRY_TIMES = 30;
++const int ERROR_SLEEP_TIMES = 300;
+ 
+ DhcpClientProxy *DhcpClientProxy::g_instance = nullptr;
+ DhcpClientProxy::DhcpClientProxy() : remoteDied_(false)
+@@ -62,16 +69,16 @@ static int IpcCallback(void *owner, int code, IpcIo *reply)
+     if (code != 0 || owner == nullptr || reply == nullptr) {
+         DHCP_LOGE("Callback error, code:%{public}d, owner:%{public}d, reply:%{public}d",
+             code, owner == nullptr, reply == nullptr);
+-        return ERR_FAILED;
++        return DHCP_FAILED;
+     }
+ 
+     struct IpcOwner *data = (struct IpcOwner *)owner;
+     (void)ReadInt32(reply, &data->exception);
+     (void)ReadInt32(reply, &data->retCode);
+     if (data->exception != 0 || data->retCode != DHCP_OPT_SUCCESS || data->variable == nullptr) {
+-        return ERR_FAILED;
++        return DHCP_FAILED;
+     }
+-    return ERR_NONE;
++    return DHCP_SUCCESS;
+ }
+ 
+ static int AsyncCallback(uint32_t code, IpcIo *data, IpcIo *reply, MessageOption option)
+@@ -83,13 +90,40 @@ static int AsyncCallback(uint32_t code, IpcIo *data, IpcIo *reply, MessageOption
+     return g_dhcpClientCallBackStub.OnRemoteRequest(code, data);
+ }
+ 
++bool DhcpClientProxy::Initialize() const
++{
++    if (remote_ != nullptr) {
++        return true;
++    }
++    int retry = RETRY_TIMES;
++    IUnknown *iUnknown = nullptr;
++    while (retry--) {
++        iUnknown = SAMGR_GetInstance()->GetFeatureApi(DHCP_CLIENT_LITE, DHCP_FEATRUE_CLIENT);
++        if (iUnknown == nullptr) {
++            usleep(ERROR_SLEEP_TIMES); // sleep 300ms
++            continue;
++        }
++        (void)iUnknown->QueryInterface(iUnknown, CLIENT_PROXY_VER, (void **)&remote_);
++        if (remote_ == nullptr) {
++            DHCP_LOGE("dhcp client remote_ is null");
++            usleep(ERROR_SLEEP_TIMES); // sleep 300ms
++            continue;
++        }
++        return true;
++    }
++    if (iUnknown == nullptr) {
++        DHCP_LOGE("iUnknown is null");
++    }
++    return false;
++}
++
+ ErrCode DhcpClientProxy::RegisterDhcpClientCallBack(const std::string& ifname,
+     const std::shared_ptr<IDhcpClientCallBack> &callback)
+ {
+     if (remoteDied_ || remote_ == nullptr) {
+         DHCP_LOGE("failed to %{public}s, remoteDied_: %{public}d, remote_: %{public}d",
+             __func__, remoteDied_, remote_ == nullptr);
+-        return DHCP_OPT_FAILED;
++        return DHCP_E_FAILED;
+     }
+     g_objStub.func = AsyncCallback;
+     g_objStub.args = nullptr;
+@@ -106,13 +140,13 @@ ErrCode DhcpClientProxy::RegisterDhcpClientCallBack(const std::string& ifname,
+     IpcIoInit(&req, data, IPC_DATA_SIZE_SMALL, MAX_IPC_OBJ_COUNT);
+     if (!WriteInterfaceToken(&req, DECLARE_INTERFACE_DESCRIPTOR_L1, DECLARE_INTERFACE_DESCRIPTOR_L1_LENGTH)) {
+         DHCP_LOGE("Write interface token error: %{public}s", __func__);
+-        return DHCP_OPT_FAILED;
++        return DHCP_E_FAILED;
+     }
+     (void)WriteInt32(&req, 0);
+     bool writeRemote = WriteRemoteObject(&req, &g_sid);
+     if (!writeRemote) {
+         DHCP_LOGE("WriteRemoteObject failed.");
+-        return DHCP_OPT_FAILED;
++        return DHCP_E_FAILED;
+     }
+ 
+     (void)WriteString(&req, ifname.c_str());
+@@ -139,7 +173,7 @@ ErrCode DhcpClientProxy::StartDhcpClient(const RouterConfig &config)
+     if (remoteDied_ || remote_ == nullptr) {
+         DHCP_LOGE("failed to %{public}s, remoteDied_: %{public}d, remote_: %{public}d",
+             __func__, remoteDied_, remote_ == nullptr);
+-        return DHCP_OPT_FAILED;
++        return DHCP_E_FAILED;
+     }
+ 
+     IpcIo req;
+@@ -149,7 +183,7 @@ ErrCode DhcpClientProxy::StartDhcpClient(const RouterConfig &config)
+     IpcIoInit(&req, data, IPC_DATA_SIZE_SMALL, MAX_IPC_OBJ_COUNT);
+     if (!WriteInterfaceToken(&req, DECLARE_INTERFACE_DESCRIPTOR_L1, DECLARE_INTERFACE_DESCRIPTOR_L1_LENGTH)) {
+         DHCP_LOGE("Write interface token error: %{public}s", __func__);
+-        return DHCP_OPT_FAILED;
++        return DHCP_E_FAILED;
+     }
+ 
+     (void)WriteInt32(&req, 0);
+@@ -180,7 +214,7 @@ ErrCode DhcpClientProxy::DealWifiDhcpCache(int32_t cmd, const IpCacheInfo &ipCac
+     if (remoteDied_ || remote_ == nullptr) {
+         DHCP_LOGE("failed to %{public}s, remoteDied_: %{public}d, remote_: %{public}d",
+             __func__, remoteDied_, remote_ == nullptr);
+-        return DHCP_OPT_FAILED;
++        return DHCP_E_FAILED;
+     }
+ 
+     IpcIo req;
+@@ -190,7 +224,7 @@ ErrCode DhcpClientProxy::DealWifiDhcpCache(int32_t cmd, const IpCacheInfo &ipCac
+     IpcIoInit(&req, data, IPC_DATA_SIZE_SMALL, MAX_IPC_OBJ_COUNT);
+     if (!WriteInterfaceToken(&req, DECLARE_INTERFACE_DESCRIPTOR_L1, DECLARE_INTERFACE_DESCRIPTOR_L1_LENGTH)) {
+         DHCP_LOGE("Write interface token error: %{public}s", __func__);
+-        return DHCP_OPT_FAILED;
++        return DHCP_E_FAILED;
+     }
+ 
+     (void)WriteInt32(&req, 0);
+@@ -219,7 +253,7 @@ ErrCode DhcpClientProxy::StopDhcpClient(const std::string& ifname, bool bIpv6)
+     if (remoteDied_ || remote_ == nullptr) {
+         DHCP_LOGE("failed to %{public}s, remoteDied_: %{public}d, remote_: %{public}d",
+             __func__, remoteDied_, remote_ == nullptr);
+-        return DHCP_OPT_FAILED;
++        return DHCP_E_FAILED;
+     }
+     IpcIo req;
+     char data[IPC_DATA_SIZE_SMALL];
+@@ -228,7 +262,7 @@ ErrCode DhcpClientProxy::StopDhcpClient(const std::string& ifname, bool bIpv6)
+     IpcIoInit(&req, data, IPC_DATA_SIZE_SMALL, MAX_IPC_OBJ_COUNT);
+     if (!WriteInterfaceToken(&req, DECLARE_INTERFACE_DESCRIPTOR_L1, DECLARE_INTERFACE_DESCRIPTOR_L1_LENGTH)) {
+         DHCP_LOGE("Write interface token error: %{public}s", __func__);
+-        return DHCP_OPT_FAILED;
++        return DHCP_E_FAILED;
+     }
+ 
+     (void)WriteInt32(&req, 0);
+@@ -251,5 +285,18 @@ ErrCode DhcpClientProxy::StopDhcpClient(const std::string& ifname, bool bIpv6)
+     DHCP_LOGI("StopDhcpClient ok, exception:%{public}d", owner.exception);
+     return DHCP_E_SUCCESS;
+ }
++
++ErrCode DhcpClientProxy::StopClientSa(void)
++{
++    return DHCP_E_SUCCESS;
++}
++
++bool DhcpClientProxy::IsRemoteDied(void)
++{
++    if (remoteDied_) {
++        DHCP_LOGW("IsRemoteDied! remote is died now!");
++    }
++    return remoteDied_;
++}
+ }  // namespace DHCP
+ }  // namespace OHOS
+diff --git a/frameworks/native/src/dhcp_event.cpp b/frameworks/native/src/dhcp_event.cpp
+index 7534909..07a1548 100755
+--- a/frameworks/native/src/dhcp_event.cpp
++++ b/frameworks/native/src/dhcp_event.cpp
+@@ -29,47 +29,88 @@ DhcpClientCallBack::~DhcpClientCallBack()
+ 
+ void DhcpClientCallBack::ResultInfoCopy(DhcpResult &dhcpResult, OHOS::DHCP::DhcpResult& result)
+ {
+-    if (strcpy_s(dhcpResult.strOptClientId, DHCP_MAX_FILE_BYTES, result.strYourCli.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptClientId strcpy_s failed!");
++    if (!result.strYourCli.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strYourCli %{public}s", result.strYourCli.c_str());
++        if (strcpy_s(dhcpResult.strOptClientId, DHCP_MAX_FILE_BYTES, result.strYourCli.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptClientId strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptServerId, DHCP_MAX_FILE_BYTES, result.strServer.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptServerId strcpy_s failed!");
++    if (!result.strServer.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strServer %{public}s", result.strServer.c_str());
++        if (strcpy_s(dhcpResult.strOptServerId, DHCP_MAX_FILE_BYTES, result.strServer.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptServerId strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptSubnet, DHCP_MAX_FILE_BYTES, result.strSubnet.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptSubnet strcpy_s failed!");
++    if (!result.strSubnet.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strSubnet %{public}s", result.strSubnet.c_str());
++        if (strcpy_s(dhcpResult.strOptSubnet, DHCP_MAX_FILE_BYTES, result.strSubnet.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptSubnet strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptDns1, DHCP_MAX_FILE_BYTES, result.strDns1.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptDns1 strcpy_s failed!");
++    if (!result.strDns1.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strDns1 %{public}s", result.strDns1.c_str());
++        if (strcpy_s(dhcpResult.strOptDns1, DHCP_MAX_FILE_BYTES, result.strDns1.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptDns1 strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptDns2, DHCP_MAX_FILE_BYTES, result.strDns2.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptDns2 strcpy_s failed!");
++    if (!result.strDns2.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strDns2 %{public}s", result.strDns2.c_str());
++        if (strcpy_s(dhcpResult.strOptDns2, DHCP_MAX_FILE_BYTES, result.strDns2.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptDns2 strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptRouter1, DHCP_MAX_FILE_BYTES, result.strRouter1.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptRouter1 strcpy_s failed!");
++    if (!result.strRouter1.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strRouter1 %{public}s", result.strRouter1.c_str());
++        if (strcpy_s(dhcpResult.strOptRouter1, DHCP_MAX_FILE_BYTES, result.strRouter1.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptRouter1 strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptRouter2, DHCP_MAX_FILE_BYTES, result.strRouter2.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptRouter2 strcpy_s failed!");
++    if (!result.strRouter2.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strRouter2 %{public}s", result.strRouter2.c_str());
++        if (strcpy_s(dhcpResult.strOptRouter2, DHCP_MAX_FILE_BYTES, result.strRouter2.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptRouter2 strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptVendor, DHCP_MAX_FILE_BYTES, result.strVendor.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptVendor strcpy_s failed!");
++    if (!result.strVendor.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strVendor %{public}s", result.strVendor.c_str());
++        if (strcpy_s(dhcpResult.strOptVendor, DHCP_MAX_FILE_BYTES, result.strVendor.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptVendor strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptLinkIpv6Addr, DHCP_MAX_FILE_BYTES, result.strLinkIpv6Addr.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptLinkIpv6Addr strcpy_s failed!");
++    if (!result.strLinkIpv6Addr.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strLinkIpv6Addr %{public}s", result.strLinkIpv6Addr.c_str());
++        if (strcpy_s(dhcpResult.strOptLinkIpv6Addr, DHCP_MAX_FILE_BYTES, result.strLinkIpv6Addr.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptLinkIpv6Addr strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptRandIpv6Addr, DHCP_MAX_FILE_BYTES, result.strRandIpv6Addr.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptRandIpv6Addr strcpy_s failed!");
++    if (!result.strRandIpv6Addr.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strRandIpv6Addr %{public}s", result.strRandIpv6Addr.c_str());
++        if (strcpy_s(dhcpResult.strOptRandIpv6Addr, DHCP_MAX_FILE_BYTES, result.strRandIpv6Addr.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptRandIpv6Addr strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptLocalAddr1, DHCP_MAX_FILE_BYTES, result.strLocalAddr1.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptLocalAddr1 strcpy_s failed!");
++    if (!result.strLocalAddr1.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strLocalAddr1 %{public}s", result.strLocalAddr1.c_str());
++        if (strcpy_s(dhcpResult.strOptLocalAddr1, DHCP_MAX_FILE_BYTES, result.strLocalAddr1.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptLocalAddr1 strcpy_s failed!");
++        }
+     }
+-    if (strcpy_s(dhcpResult.strOptLocalAddr2, DHCP_MAX_FILE_BYTES, result.strLocalAddr2.c_str()) != EOK) {
+-        DHCP_LOGE("ResultInfoCopy strOptLocalAddr2 strcpy_s failed!");
++    if (!result.strLocalAddr2.empty()) {
++        DHCP_LOGI("ResultInfoCopy result.strLocalAddr2 %{public}s", result.strLocalAddr2.c_str());
++        if (strcpy_s(dhcpResult.strOptLocalAddr2, DHCP_MAX_FILE_BYTES, result.strLocalAddr2.c_str()) != EOK) {
++            DHCP_LOGE("ResultInfoCopy strOptLocalAddr2 strcpy_s failed!");
++        }
+     }
+     for (size_t i = 0; i < result.vectorDnsAddr.size(); i++) {
+         if (i >= DHCP_DNS_MAX_NUMBER) {
+             DHCP_LOGE("ResultInfoCopy break, i:%{public}zu, dns max number:%{public}d", i, DHCP_DNS_MAX_NUMBER);
+             break;
+         }
++        if (result.vectorDnsAddr[i].empty()) {
++            DHCP_LOGE("ResultInfoCopy vectorDnsAddr[%{public}zu] is empty!", i);
++            continue;
++        }
++        DHCP_LOGI("ResultInfoCopy result.vectorDnsAddr[%{public}zu] %s", i, result.vectorDnsAddr[i].c_str());
+         if (strncpy_s(dhcpResult.dnsList.dnsAddr[i], DHCP_DNS_DATA_MAX_LEN, result.vectorDnsAddr[i].c_str(),
+             result.vectorDnsAddr[i].length()) != EOK) {
+             DHCP_LOGE("ResultInfoCopy, strncpy_s failed, i:%{public}zu", i);
+diff --git a/frameworks/native/src/dhcp_server_impl.cpp b/frameworks/native/src/dhcp_server_impl.cpp
+index 8312ad7..17664df 100755
+--- a/frameworks/native/src/dhcp_server_impl.cpp
++++ b/frameworks/native/src/dhcp_server_impl.cpp
+@@ -57,12 +57,12 @@ bool DhcpServerImpl::Init(int systemAbilityId)
+         DHCP_LOGE("get dhcp server proxy failed.");
+         return false;
+     }
+-    if (clientProxy->Init() != DHCP_OPT_SUCCESS) {
++    if (serverProxy->Init() != DHCP_OPT_SUCCESS) {
+         DHCP_LOGE("dhcp server proxy init failed.");
+         DhcpServerProxy::ReleaseInstance();
+         return false;
+     }
+-    client_ = clientProxy;
++    client_ = serverProxy;
+     return true;
+ #else
+     systemAbilityId_ = systemAbilityId;
+diff --git a/interfaces/kits/c/dhcp_lite_c_client_api.h b/interfaces/kits/c/dhcp_lite_c_client_api.h
+new file mode 100644
+index 0000000..89456e8
+--- /dev/null
++++ b/interfaces/kits/c/dhcp_lite_c_client_api.h
+@@ -0,0 +1,62 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++#ifndef DHCP_LITE_C_CLIENT_API_H
++#define DHCP_LITE_C_CLIENT_API_H
++
++#include "dhcp_error_code.h"
++#include "dhcp_result_event.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++    /**
++     * @Description : Obtain the dhcp result of specified interface asynchronously.
++     *
++     * @param ifname - interface name, eg:wlan0 [in]
++     * @param pResultNotify - dhcp result notify [in]
++     * @Return : success - DHCP_SUCCESS, failed - others.
++     */
++    DhcpErrorCode RegisterDhcpClientCallBack(const char *ifname, const ClientCallBack *event);
++
++    /**
++     * @Description : add dhcp cache
++     *
++     * @param ipCacheInfo - ip Cache Infomation
++     * @Return : success - DHCP_SUCCESS, failed - others.
++     */
++    DhcpErrorCode DealWifiDhcpCache(int32_t cmd, const IpCacheInfo &ipCacheInfo);
++
++    /**
++     * @Description : Start dhcp client service of specified interface.
++     *
++     * @param config - config
++     * @Return : success - DHCP_SUCCESS, failed - others.
++     */
++    DhcpErrorCode StartDhcpClient(const RouterConfig &config);
++
++    /**
++     * @Description : Stop dhcp client service of specified interface.
++     *
++     * @param ifname - interface name, eg:wlan0 [in]
++     * @param bIpv6 - can or not get ipv6 [in]
++     * @Return : success - DHCP_SUCCESS, failed - others.
++     */
++    DhcpErrorCode StopDhcpClient(const char *ifname, bool bIpv6);
++
++#ifdef __cplusplus
++}
++#endif
++#endif
+\ No newline at end of file
+diff --git a/services/dhcp_client/BUILD.gn b/services/dhcp_client/BUILD.gn
+index 27d9c36..628a3bf 100644
+--- a/services/dhcp_client/BUILD.gn
++++ b/services/dhcp_client/BUILD.gn
+@@ -46,6 +46,10 @@ if (defined(ohos_lite)) {
+       "src/dhcp_options.cpp",
+       "src/dhcp_result.cpp",
+       "src/dhcp_socket.cpp",
++      "src/dhcp_result_store_manager.cpp",
++      "src/dhcp_thread.cpp",
++      "src/dhcp_client_feature_lite.cpp",
++      "src/dhcp_client_mgr_service_lite.cpp"
+     ]
+ 
+     include_dirs = local_base_include_dirs
+@@ -54,11 +58,14 @@ if (defined(ohos_lite)) {
+       "//third_party/bounds_checking_function/include",
+       "//foundation/systemabilitymgr/samgr_lite/interfaces/innerkits/registry",
+       "//foundation/systemabilitymgr/samgr_lite/interfaces/innerkits/samgr",
++      "//foundation/communication/dhcp/services/utils/include",
++      "//commonlibrary/c_utils/base/include",
+     ]
+ 
+     deps = [
+       "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared",
+       "//foundation/systemabilitymgr/samgr_lite/samgr:samgr",
++      "//foundation/communication/dhcp/services/utils:dhcp_utils"
+     ]
+     external_deps = [ "bounds_checking_function:libsec_shared" ]
+     defines = [
+diff --git a/services/dhcp_client/include/dhcp_client_mgr_service_lite.h b/services/dhcp_client/include/dhcp_client_mgr_service_lite.h
+new file mode 100644
+index 0000000..0f23342
+--- /dev/null
++++ b/services/dhcp_client/include/dhcp_client_mgr_service_lite.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++#ifndef DHCP_CLIENT_MGR_SERVICE_LITE_H
++#define DHCP_CLIENT_MGR_SERVICE_LITE_H
++
++#include "nocopyable.h"
++#include "service.h"
++
++namespace OHOS {
++class DhcpClientMgrService : public Service {
++public:
++    static DhcpClientMgrService *GetInstance()
++    {
++        static DhcpClientMgrService instance;
++        return &instance;
++    }
++    ~DhcpClientMgrService() = default;
++    const Identity *GetIdentity();
++
++private:
++    DhcpClientMgrService();
++    static const char *GetServiceName(Service *service);
++    static BOOL ServiceInitialize(Service *service, Identity identity);
++    static TaskConfig GetServiceTaskConfig(Service *service);
++    static BOOL ServiceMessageHandle(Service *service, Request *request);
++
++private:
++    Identity identity_;
++    DISALLOW_COPY_AND_MOVE(DhcpClientMgrService);
++};
++} // namespace OHOS
++#endif // DHCP_CLIENT_MGR_SERVICE_LITE_H
+\ No newline at end of file
+diff --git a/services/dhcp_client/src/dhcp_client_feature_lite.cpp b/services/dhcp_client/src/dhcp_client_feature_lite.cpp
+index d3ff692..61bea99 100755
+--- a/services/dhcp_client/src/dhcp_client_feature_lite.cpp
++++ b/services/dhcp_client/src/dhcp_client_feature_lite.cpp
+@@ -23,6 +23,9 @@
+ #include "service.h"
+ #include "dhcp_ipc_lite_adapter.h"
+ #include "dhcp_client_service_impl.h"
++#include "dhcp_logger.h"
++
++DEFINE_DHCPLOG_DHCP_LABEL("DhcpClientFeatureLite");
+ 
+ using namespace OHOS::DHCP;
+ static std::shared_ptr<DhcpClientServiceImpl> g_dhcpClientServiceImpl = DhcpClientServiceImpl::GetInstance();
+@@ -75,14 +78,14 @@ static BOOL OnMessage(Feature *feature, Request *request)
+ 
+ static int Invoke(IServerProxy *proxy, int funcId, void *origin, IpcIo *req, IpcIo *reply)
+ {
+-    LOGI("[DhcpClientFeature] begin to call Invoke, funcId is %{public}d", funcId);
++    DHCP_LOGI("[DhcpClientFeature] begin to call Invoke, funcId is %{public}d", funcId);
+     if (g_dhcpClientServiceImpl != NULL) {
+         return g_dhcpClientServiceImpl->OnRemoteRequest(funcId, req, reply);
+     }
+     return EC_FAILURE;
+ }
+ 
+-static DhcpServerFeature g_serverFeature = {
++static DhcpClientFeature  g_serverFeature = {
+     .GetName = GetName,
+     .OnInitialize = OnInitialize,
+     .OnStop = OnStop,
+@@ -95,16 +98,16 @@ static DhcpServerFeature g_serverFeature = {
+ 
+ static void Init(void)
+ {
+-    LOGI("[DhcpClientFeature] Init start.");
++    DHCP_LOGI("[DhcpClientFeature] Init start.");
+     BOOL ret = SAMGR_GetInstance()->RegisterFeature(DHCP_CLIENT_LITE, (Feature *)&g_serverFeature);
+     if (ret == FALSE) {
+-        LOGE("[DhcpClientFeature] register feature fail.");
++        DHCP_LOGE("[DhcpClientFeature] register feature fail.");
+         return;
+     }
+     ret = SAMGR_GetInstance()->RegisterFeatureApi(DHCP_CLIENT_LITE,
+         DHCP_FEATRUE_CLIENT, GET_IUNKNOWN(g_serverFeature));
+     if (ret == FALSE) {
+-        LOGE("[DhcpClientFeature] register feature api fail.");
++        DHCP_LOGE("[DhcpClientFeature] register feature api fail.");
+     }
+ }
+ SYSEX_FEATURE_INIT(Init);
+diff --git a/services/dhcp_client/src/dhcp_client_mgr_service_lite.cpp b/services/dhcp_client/src/dhcp_client_mgr_service_lite.cpp
+new file mode 100644
+index 0000000..33fa7ae
+--- /dev/null
++++ b/services/dhcp_client/src/dhcp_client_mgr_service_lite.cpp
+@@ -0,0 +1,82 @@
++/*
++ * Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++#include "dhcp_client_mgr_service_lite.h"
++#include "dhcp_ipc_lite_adapter.h"
++#include "ohos_init.h"
++#include "samgr_lite.h"
++#include "dhcp_logger.h"
++
++DEFINE_DHCPLOG_DHCP_LABEL("DhcpClientMgrLite");
++namespace OHOS {
++const int QUEUE_SIZE = 20;
++const int DHCP_CLIENT_TASK_STACK_SIZE = 1024;
++
++DhcpClientMgrService::DhcpClientMgrService() : Service(), identity_()
++{
++    this->Service::GetName = DhcpClientMgrService::GetServiceName;
++    this->Service::Initialize = DhcpClientMgrService::ServiceInitialize;
++    this->Service::MessageHandle = DhcpClientMgrService::ServiceMessageHandle;
++    this->Service::GetTaskConfig = DhcpClientMgrService::GetServiceTaskConfig;
++}
++
++static void Init()
++{
++    SamgrLite *sm = SAMGR_GetInstance();
++    if (sm == nullptr) {
++        DHCP_LOGE("get samgr error");
++        return;
++    }
++    BOOL result = sm->RegisterService(DhcpClientMgrService::GetInstance());
++    DHCP_LOGI("DhcpClientMgrService ams starts %{public}s", result ? "successfully" : "unsuccessfully");
++}
++SYSEX_SERVICE_INIT(Init);
++
++const char *DhcpClientMgrService::GetServiceName(Service *service)
++{
++    (void)service;
++    return DHCP_CLIENT_LITE;
++}
++
++const Identity *DhcpClientMgrService::GetIdentity()
++{
++    return &identity_;
++}
++
++BOOL DhcpClientMgrService::ServiceInitialize(Service *service, Identity identity)
++{
++    if (service == nullptr) {
++        return FALSE;
++    }
++    DhcpClientMgrService *dhcpClientManagerService = static_cast<DhcpClientMgrService *>(service);
++    dhcpClientManagerService->identity_ = identity;
++    return TRUE;
++}
++
++BOOL DhcpClientMgrService::ServiceMessageHandle(Service *service, Request *request)
++{
++    if (request == nullptr) {
++        return FALSE;
++    }
++    return TRUE;
++}
++
++TaskConfig DhcpClientMgrService::GetServiceTaskConfig(Service *service)
++{
++    TaskConfig config = {LEVEL_HIGH, PRI_NORMAL, DHCP_CLIENT_TASK_STACK_SIZE, QUEUE_SIZE, SINGLE_TASK};
++    return config;
++}
++
++}
++
+diff --git a/services/dhcp_client/src/dhcp_client_service_impl.cpp b/services/dhcp_client/src/dhcp_client_service_impl.cpp
+index 9ae151a..bc23d24 100755
+--- a/services/dhcp_client/src/dhcp_client_service_impl.cpp
++++ b/services/dhcp_client/src/dhcp_client_service_impl.cpp
+@@ -33,6 +33,14 @@
+ #endif
+ #endif
+ 
++#ifdef OHOS_ARCH_LITE
++#include <unistd.h>
++#include <sys/wait.h>
++#include <fcntl.h>
++#include <cstring>
++#include <iostream>
++#endif
++
+ DEFINE_DHCPLOG_DHCP_LABEL("DhcpClientServiceImpl");
+ 
+ namespace OHOS {
+@@ -400,6 +408,73 @@ ErrCode DhcpClientServiceImpl::StopClientSa(void)
+ #endif
+ }
+ 
++#ifdef OHOS_ARCH_LITE
++static int ExecRouteAdd(const char *router, const char *iface)
++{
++    pid_t pid = fork();
++    if (pid < 0) {
++        perror("fork failed");
++        return -1;
++    }
++
++    if (pid == 0) {
++        // child
++        execl("/bin/route", "route",
++              "add", "default",
++              "gw", router,
++              "dev", iface,
++              (char *)nullptr);
++        perror("exec route failed");
++        _exit(127);
++    }
++
++    // parent
++    int status = 0;
++    waitpid(pid, &status, 0);
++    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
++}
++
++static int WriteResolvConf(const char *dns1, const char *dns2)
++{
++    int fd = open("/etc/resolv.conf",
++                  O_WRONLY | O_CREAT | O_TRUNC,
++                  0644);
++    if (fd < 0) {
++        perror("open resolv.conf failed");
++        return -1;
++    }
++
++    std::string content;
++    content += "nameserver ";
++    content += dns1;
++    content += "\n";
++
++    if (dns2 && dns2[0] != '\0') {
++        content += "nameserver ";
++        content += dns2;
++        content += "\n";
++    }
++
++    ssize_t ret = write(fd, content.c_str(), content.size());
++    close(fd);
++
++    return (ret == (ssize_t)content.size()) ? 0 : -1;
++}
++
++static void SaveDefaultRouteAndDns(OHOS::DHCP::DhcpResult &result, std::string &ifname)
++{
++    if (!result.strRouter1.empty()) {
++        DHCP_LOGI("SaveDefaultRouteAndDns result.strRouter1 %{public}s", result.strRouter1.c_str());
++        ExecRouteAdd(result.strRouter1.c_str(), ifname.c_str());
++    }
++    if (!result.strDns1.empty() || !result.strDns2.empty()) {
++        DHCP_LOGI("SaveDefaultRouteAndDns result.strDns1 %{public}s", result.strDns1.c_str());
++        DHCP_LOGI("SaveDefaultRouteAndDns result.strDns2 %{public}s", result.strDns2.c_str());
++        WriteResolvConf(result.strDns1.c_str(), result.strDns2.c_str());
++    }
++}
++#endif
++
+ int DhcpClientServiceImpl::DhcpIpv4ResultSuccess(struct DhcpIpResult &ipResult)
+ {
+     std::string ifname = ipResult.ifname;
+@@ -444,6 +519,9 @@ int DhcpClientServiceImpl::DhcpIpv4ResultSuccess(struct DhcpIpResult &ipResult)
+         return DHCP_OPT_FAILED;
+     }
+     (iter->second)->OnIpSuccessChanged(DHCP_OPT_SUCCESS, ifname, result);
++#ifdef OHOS_ARCH_LITE
++    SaveDefaultRouteAndDns(result, ifname);
++#endif
+     return DHCP_OPT_SUCCESS;
+ }
+ #ifndef OHOS_ARCH_LITE
+diff --git a/services/dhcp_client/src/dhcp_client_stub_lite.cpp b/services/dhcp_client/src/dhcp_client_stub_lite.cpp
+index 7ea32ef..20be3a2 100755
+--- a/services/dhcp_client/src/dhcp_client_stub_lite.cpp
++++ b/services/dhcp_client/src/dhcp_client_stub_lite.cpp
+@@ -117,14 +117,6 @@ int DhcpClientStub::OnStartDhcpClient(uint32_t code, IpcIo *req, IpcIo *reply)
+ {
+     DHCP_LOGI("run %{public}s code %{public}u", __func__, code);
+     ErrCode ret = DHCP_E_FAILED;
+-    SvcIdentity sid;
+-    bool readSid = ReadRemoteObject(req, &sid);
+-    if (!readSid) {
+-        DHCP_LOGE("read SvcIdentity failed");
+-        (void)WriteInt32(reply, 0);
+-        (void)WriteInt32(reply, ret);
+-        return DHCP_OPT_FAILED;
+-    }
+ 
+     size_t readLen;
+     RouterConfig config;
+@@ -134,6 +126,12 @@ int DhcpClientStub::OnStartDhcpClient(uint32_t code, IpcIo *req, IpcIo *reply)
+     (void)ReadBool(req, &config.prohibitUseCacheIp);
+     (void)ReadBool(req, &config.bIpv6);
+     (void)ReadBool(req, &config.bSpecificNetwork);
++    if (!ifname.empty()) {
++        config.ifname = ifname;
++    }
++    if (!bssid.empty()) {
++        config.bssid = bssid;
++    }
+     DHCP_LOGI("ifname:%{public}s prohibitUseCacheIp:%{public}d, bIpv6:%{public}d, bSpecificNetwork:%{public}d",
+         ifname.c_str(), config.prohibitUseCacheIp, config.bIpv6, config.bSpecificNetwork);
+ 
+@@ -147,14 +145,6 @@ int DhcpClientStub::OnStopDhcpClient(uint32_t code, IpcIo *req, IpcIo *reply)
+ {
+     DHCP_LOGI("run %{public}s code %{public}u", __func__, code);
+     ErrCode ret = DHCP_E_FAILED;
+-    SvcIdentity sid;
+-    bool readSid = ReadRemoteObject(req, &sid);
+-    if (!readSid) {
+-        DHCP_LOGE("read SvcIdentity failed");
+-        (void)WriteInt32(reply, 0);
+-        (void)WriteInt32(reply, ret);
+-        return DHCP_OPT_FAILED;
+-    }
+ 
+     size_t readLen;
+     bool bIpv6;
+diff --git a/services/utils/BUILD.gn b/services/utils/BUILD.gn
+index c97878a..6ea2602 100644
+--- a/services/utils/BUILD.gn
++++ b/services/utils/BUILD.gn
+@@ -25,11 +25,14 @@ if (defined(ohos_lite)) {
+     sources = [
+       "src/dhcp_arp_checker.cpp",
+       "src/dhcp_common_utils.cpp",
++      "src/dhcp_permission_utils.cpp"
+     ]
+ 
+     include_dirs = [
+       "$DHCP_ROOT_DIR/services",
+       "$DHCP_ROOT_DIR/services/utils/include",
++      "//third_party/bounds_checking_function/include",
++      "//base/hiviewdfx/hilog_lite/interfaces/native/innerkits"
+     ]
+     configs -= [ "//build/lite/config:language_cpp" ]
+     cflags = [
+@@ -41,8 +44,10 @@ if (defined(ohos_lite)) {
+       "-fno-rtti",
+     ]
+ 
+-    deps = []
+-    external_deps = []
++    deps = [
++      "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared"
++    ]
++    external_deps = [ "bounds_checking_function:libsec_shared" ]
+     defines = [
+       "_GNU_SOURCE",
+       "OHOS_ARCH_LITE",

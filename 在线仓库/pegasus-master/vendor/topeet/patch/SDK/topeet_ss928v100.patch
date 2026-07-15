@@ -1,0 +1,24 @@
+diff --git a/osdrv/Makefile b/osdrv/Makefile
+index ad178d9..1157e54 100644
+--- a/osdrv/Makefile
++++ b/osdrv/Makefile
+@@ -41,7 +41,8 @@ endif
+ ifeq ($(BOOT_MEDIA), emmc)
+ MEDIUM_FLAG = _emmc_
+ ifeq ($(CHIP),ss928v100)
+-REGBIN_XLSM ?= SS928V100_demo_8L_LPDDR4x_3733M-8GB_32bitx2-A55_1400M-emmc.xlsm
++#REGBIN_XLSM ?= SS928V100_demo_8L_LPDDR4x_3733M-8GB_32bitx2-A55_1400M-emmc.xlsm
++REGBIN_XLSM = SS928V100_LPDDR4x_3733M-4GB_2GBX2-A55_1400M-emmc.xlsm
+ endif
+ ifeq ($(CHIP),ss927v100)
+ REGBIN_XLSM ?= SS927V100_demo_8L_LPDDR4x_2666M-8GB_32bitx2-A55_1400M-eMMC.xlsm
+@@ -55,7 +56,8 @@ ifeq ($(CHIP),ss927v100)
+ REGBIN_XLSM ?= SS927V100_demo_8L_LPDDR4x_2666M-8GB_32bitx2-A55_1400M.xlsm
+ endif
+ 
+-export KERNEL_CFG:=$(CHIP)$(MEDIUM_FLAG)defconfig
++#export KERNEL_CFG:=$(CHIP)$(MEDIUM_FLAG)defconfig
++export KERNEL_CFG:=$(CHIP)$(MEDIUM_FLAG)ubuntu_defconfig
+ export UBOOT_CONFIG:=$(CHIP)$(MEDIUM_FLAG)defconfig
+ 
+ ATF_VER:=arm-trusted-firmware-2.2

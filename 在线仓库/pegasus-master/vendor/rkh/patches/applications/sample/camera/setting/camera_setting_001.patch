@@ -1,0 +1,13 @@
+diff --git a/setting/src/main/cpp/setting_about_ability_slice.h b/setting/src/main/cpp/setting_about_ability_slice.h
+index eafddbe..4946b80 100755
+--- a/setting/src/main/cpp/setting_about_ability_slice.h
++++ b/setting/src/main/cpp/setting_about_ability_slice.h
+@@ -60,7 +60,7 @@ private:
+     constexpr static int SCROLL_ITEM_NUM = 9;
+     const char *itemInfo_[SCROLL_ITEM_NUM][2];
+     constexpr static int ITEM_X = 0;
+-    constexpr static int ITEM_INFO_X = 465;
++    constexpr static int ITEM_INFO_X = 1225;
+     constexpr static int ITEM_INFO_Y = 36;
+ };
+ } // namespace OHOS

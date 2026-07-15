@@ -1,0 +1,11 @@
+#Copyright (c) 2025 Beijing Xunwei Electronics Co., Ltd
+[Unit]
+Description=TOPEET Hi3403V100 Start Ubuntu Script
+ 
+[Service]
+Type=oneshot
+ExecStart=/etc/init.d/topeet-start.sh
+RemainAfterExit=true
+ 
+[Install]
+WantedBy=sysinit.target

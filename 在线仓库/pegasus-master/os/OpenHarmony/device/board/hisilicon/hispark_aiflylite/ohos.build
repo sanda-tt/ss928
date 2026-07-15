@@ -1,0 +1,13 @@
+{
+  "parts": {
+    "device_hispark_aiflylite": {
+      "module_list": [
+        "//device/board/hisilicon/${device_name}:hispark_aiflylite"
+      ],
+      "test_list": [
+                "//kernel/linux/build/test:linuxkerneltest"
+      ]
+    }
+  },
+  "subsystem": "device_hispark_aiflylite"
+}

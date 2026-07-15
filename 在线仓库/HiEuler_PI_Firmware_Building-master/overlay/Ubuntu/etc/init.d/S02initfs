@@ -1,0 +1,11 @@
+#!/bin/sh
+
+RESIZE_DONE_FLAG="/etc/.resize2fs_done"
+if [ ! -f "$RESIZE_DONE_FLAG" ]; then
+	root=$(grep -o 'root=[^ ]*' /proc/cmdline | cut -d= -f2)
+	if resize2fs "$root"; then
+		touch "$RESIZE_DONE_FLAG"
+	fi
+fi
+
+

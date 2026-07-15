@@ -1,0 +1,254 @@
+From 29945882a653b8d09466e04ae069bca44eb6f759 Mon Sep 17 00:00:00 2001
+From: wgm2022 <1480559020@qq.com>
+Date: Sun, 4 Jan 2026 18:16:18 +0800
+Subject: [PATCH] support eulerpi uvc and ethernet
+
+---
+ arch/arm64/boot/dts/vendor/ss928v100-demb.dts | 49 +++++++++++++++----
+ arch/arm64/boot/dts/vendor/ss928v100.dtsi     | 38 ++++++++++++--
+ drivers/net/ethernet/vendor/gmac/gmac.h       |  1 +
+ .../net/ethernet/vendor/gmac/gmac_phy_fixup.c | 27 ++++++++++
+ 4 files changed, 103 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/vendor/ss928v100-demb.dts b/arch/arm64/boot/dts/vendor/ss928v100-demb.dts
+index d90c5d5cf..568a49088 100644
+--- a/arch/arm64/boot/dts/vendor/ss928v100-demb.dts
++++ b/arch/arm64/boot/dts/vendor/ss928v100-demb.dts
+@@ -125,26 +125,39 @@
+ };
+ 
+ &uart1 {
+-	status = "disabled";
++	status = "okay";
+ };
+ 
+ &uart2 {
+-	status = "disabled";
++	status = "okay";
+ };
+ 
+ &uart3 {
+-	status = "disabled";
++	status = "okay";
+ };
+ 
+ &uart4 {
+-	status = "disabled";
++	status = "okay";
+ };
+ &uart5 {
+-	status = "disabled";
++	status = "okay";
+ };
+ 
+ &i2c_bus0 {
+ 	status = "okay";
++
++	pcf8563: pcf8563@51 {
++		compatible = "nxp,pcf8563";
++		reg = <0x51>;
++		epson,vdet-disable;
++		trickle-diode-disable;
++	};
++
++	oled@3c {
++		compatible = "i2c,oled-0.96";
++		reg = <0x3c>;
++		id = <1>;
++	};
+ };
+ 
+ &i2c_bus1 {
+@@ -167,9 +180,17 @@
+ 	status = "okay";
+ };
+ 
++&i2c_bus6 {
++	status = "okay";
++};
++
++&i2c_bus7 {
++	status = "okay";
++};
++
+ &spi_bus0{
+ 	status = "okay";
+- 
++/*
+ 	spidev@0 {
+ 		compatible = "rohm,dh2228fv";
+ 		reg = <0>;
+@@ -177,6 +198,16 @@
+ 		pl022,com-mode = <0>;
+ 		spi-max-frequency = <25000000>;
+ 	};
++*/
++	can0: can@0 {
++		compatible = "microchip,mcp2515";
++		reg = <0>;
++		clocks = <&clk_20m>;
++		spi-max-frequency = <2000000>;
++		interrupt-parent = <&gpio_chip4>;
++		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
++		status = "okay";
++	};
+ };
+  
+ &spi_bus1{
+@@ -322,9 +353,9 @@
+ };
+ 
+ &mdio1 {
+-    ethphy1: ethernet-phy@3 {
+-        reg = <3>;
+-    };
++	ethphy1: ethernet-phy@1 {
++		reg = <1>;
++	};
+ };
+ 
+ &gmac {
+diff --git a/arch/arm64/boot/dts/vendor/ss928v100.dtsi b/arch/arm64/boot/dts/vendor/ss928v100.dtsi
+index 491959516..5c88f8a6f 100644
+--- a/arch/arm64/boot/dts/vendor/ss928v100.dtsi
++++ b/arch/arm64/boot/dts/vendor/ss928v100.dtsi
+@@ -21,6 +21,7 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include "ss928v100_family_usb.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	#address-cells = <2>;
+@@ -144,6 +145,12 @@
+ 			clock-frequency = <3000000>;
+ 		};
+ 
++		clk_20m: clk_20m {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <20000000>;
++		};
++
+ 		i2c_bus0: i2c@11060000 {
+ 			compatible = "vendor,i2c";
+ 			reg = <0x11060000 0x1000>;
+@@ -211,7 +218,29 @@
+ 			/* dmas = <&edmacv310_0 10 10>, <&edmacv310_0 11 11>; */
+ 			/* dma-names = "rx","tx"; */
+ 			status = "disabled";
+-		};		
++		};
++
++		i2c_bus6: i2c@0 {
++			compatible = "i2c,soft";
++			reg = <0x0 0x0>;
++			#address-cells = <0x1>;
++			#size-cells = <0x0>;
++			gpio-scl = <&gpio_chip1 0x7 GPIO_ACTIVE_HIGH>;
++			gpio-sda = <&gpio_chip1 0x6 GPIO_ACTIVE_HIGH>;
++			clock-frequency = <100000>; // 100K
++			status = "disabled";
++		};
++
++		i2c_bus7: i2c@1 {
++			compatible ="i2c,soft";
++			reg = <0x1 0x0>;
++			#address-cells = <0x1>;
++			#size-cells = <0x0>;
++			gpio-scl = <&gpio_chip2 0x2 GPIO_ACTIVE_HIGH>;
++			gpio-sda = <&gpio_chip2 0x0 GPIO_ACTIVE_HIGH>;
++			clock-frequency = <100000>; // 100K
++			status = "disabled";
++		};
+ 
+ 		amba {
+ 			compatible = "arm,amba-bus";
+@@ -428,6 +457,9 @@
+ 				clocks = <&clock SS928V100_FIXED_50M>;
+ 				clock-names = "apb_pclk";
+ 				status = "disabled";
++
++				interrupt-controller;
++				#interrupt-cells = <2>;
+ 			};
+ 
+ 			gpio_chip5: gpio_chip@11095000 {
+@@ -752,8 +784,8 @@
+ 					0x0 0x0 0x0 0x3 &gic GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH
+ 					0x0 0x0 0x0 0x4 &gic GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+ 			/* msi interrupts */
+-			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+-			interrupt-names = "msi";
++			//interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
++			//interrupt-names = "msi";
+ 
+ 			pcie_controller = <0>;
+ 			dev_mem_size = <0x10000000>;
+diff --git a/drivers/net/ethernet/vendor/gmac/gmac.h b/drivers/net/ethernet/vendor/gmac/gmac.h
+index 52a472311..d1132ce13 100644
+--- a/drivers/net/ethernet/vendor/gmac/gmac.h
++++ b/drivers/net/ethernet/vendor/gmac/gmac.h
+@@ -312,6 +312,7 @@ enum gmac_tx_err {
+ #define PHY_ID_UNKNOWN                  0x00221513
+ #define DEFAULT_PHY_MASK                0xfffffff0
+ #define REALTEK_PHY_ID_8211E            0x001cc915
++#define REALTEK_PHY_ID_8211FS     	    0x001cc916
+ #define REALTEK_PHY_MASK                0x001fffff
+ #define PHY_ID_RTL8211F                 0x001cc916
+ #define PHY_ID_MASK_RTL8211F            0x001fffff
+diff --git a/drivers/net/ethernet/vendor/gmac/gmac_phy_fixup.c b/drivers/net/ethernet/vendor/gmac/gmac_phy_fixup.c
+index 595bc9fdd..778ee1941 100644
+--- a/drivers/net/ethernet/vendor/gmac/gmac_phy_fixup.c
++++ b/drivers/net/ethernet/vendor/gmac/gmac_phy_fixup.c
+@@ -288,6 +288,31 @@ static int rtl8211e_phy_fix(struct phy_device *phy_dev)
+ 	return 0;
+ }
+ 
++static int rtl8211fs_phy_fix(struct phy_device *phy_dev)
++{
++	u32 v;
++	// RX or TX delay
++	phy_write(phy_dev, 0x1F, 0xd08);
++	v = phy_read(phy_dev, 17);
++	v |= (1 << 8);
++	phy_write(phy_dev, 17, v);
++	// LED control
++	phy_write(phy_dev, 0x1F, 0xd04);
++	v = 0x235b;
++	phy_write(phy_dev, 0x10, v);
++	v = 0x03e9;
++	phy_write(phy_dev, 0x12, v);
++	//close phy-eee
++	phy_write(phy_dev, 0x1F, 0xa43);
++	v = phy_read(phy_dev, 0x19); // bit5 phy-eeee 1->enable 0->disable
++	v &= ~BIT(5);
++	phy_write(phy_dev, 0x19, v);
++	// change back to page0
++	phy_write(phy_dev, 0x1F, 0);
++
++	return 0;
++}
++
+ #define RTL8211F_PAGE_SELECT	0x1f
+ #define RTL8211F_TX_DELAY	BIT(8)
+ static int rtl8211f_phy_fix(struct phy_device *phy_dev)
+@@ -349,6 +374,7 @@ void gmac_phy_register_fixups(struct gmac_netdev_local *priv)
+ 	phy_register_fixup_for_uid(ATH8035_PHY_ID, ATH_PHY_ID_MASK, at803x_phy_fix);
+ 	phy_register_fixup_for_uid(REALTEK_PHY_ID_8211E, REALTEK_PHY_MASK, rtl8211e_phy_fix);
+ 	phy_register_fixup_for_uid(PHY_ID_RTL8211F, PHY_ID_MASK_RTL8211F, rtl8211f_phy_fix);
++	phy_register_fixup_for_uid(REALTEK_PHY_ID_8211FS, REALTEK_PHY_MASK, rtl8211fs_phy_fix);
+ 
+ 	ret = of_property_count_u32_elems(np, PHY_FIXUP_ID_STR);
+ 	if (ret < 0) {
+@@ -400,6 +426,7 @@ void gmac_phy_unregister_fixups(struct gmac_netdev_local *priv)
+ 	phy_unregister_fixup_for_uid(PHY_ID_KSZ9031RNX, DEFAULT_PHY_MASK);
+ 	phy_unregister_fixup_for_uid(ATH8035_PHY_ID, ATH_PHY_ID_MASK);
+ 	phy_unregister_fixup_for_uid(REALTEK_PHY_ID_8211E, REALTEK_PHY_MASK);
++	phy_unregister_fixup_for_uid(REALTEK_PHY_ID_8211FS, REALTEK_PHY_MASK);
+ 	phy_unregister_fixup_for_uid(PHY_ID_RTL8211F, PHY_ID_MASK_RTL8211F);
+ 
+ 	for (i = 0; i < priv->phy_fixup_phycnt; i++) {
+-- 
+2.34.1
+

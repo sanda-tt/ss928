@@ -1,0 +1,482 @@
+[
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "embodied_intelligence/Pi0",
+    "chip": "Hi3591P",
+    "buildDef": "Hi3591P",
+    "needSmoke": "false",
+    "description": "具身智能"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "embodied_intelligence/GraspNet",
+    "chip": "Hi3591P",
+    "buildDef": "Hi3591P",
+    "needSmoke": "false",
+    "description": "具身智能"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "audio/FastSpeech2",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "文本转语音"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/ResNet50",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/ResNet50",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "detection/PFLD",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "识别网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "detection/PFLD",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "pfld人脸关键点检测"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "count/CrowdCount",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "crowdcount人群计数"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "count/CrowdCount",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "crowdcount人群计数"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "recognition/FaceNet",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "facenet人脸识别"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "recognition/FaceNet",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "facenet人脸识别"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "detection/yolov4",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "yolov4目标检测"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/EfficientNetV2",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "point/SuperPoint",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "特征点检测"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "depth/Depth-Anything-v2",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "单目深度"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/Chinese-CLIP",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "图文检索"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/Chinese-CLIP",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "图文检索"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/EfficientNetV2",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/EfficientNetV2",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/InceptionV3",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/InceptionV3",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/SEResNet50",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/SEResNet50",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/Vit-B-16",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/EfficientNetV2",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/EfficientNetV2",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "super_resolution/CodeFormer",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "detection/yolov4",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "point/SuperPoint",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "特征点检测"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "ocr/PaddleOCRv4-det",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "文字检测"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "ocr/PaddleOCRv4-rec",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "文字识别"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "depth/LRStereo-B",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "双目深度"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "segmentation/TinySam",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分隔"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "pose/HRNet",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "人体姿态估计"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "pose/HRNet",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "人体姿态估计"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "detection/yolov4",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "super_resolution/CodeFormer",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/Vit-B-16",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "ocr/CRNN",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "ocr/CRNN",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/ResNet101",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/ResNet101",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/ShuffleNetV2",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/ShuffleNetV2",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/DenseNet121",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/MobileNetV2",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/DenseNet121",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/MobileNetV2",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/Swin-Transformer",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/Swin-Transformer",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/SqueezeNet1_1",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/SqueezeNet1_1",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "classification/ResNet18",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "分类网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "tracking/deepsort",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "目标跟踪"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "ocr/PaddleOCRv4-rec",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "文字识别"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "recognition/SiameseNetwork",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "recognition/SiameseNetwork",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "super_resolution/VDSR",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "super_resolution/VDSR",
+    "chip": "SS928V100",
+    "buildDef": "OPTG",
+    "needSmoke": "false",
+    "description": "检测网"
+  },
+  {
+    "buildTarget": "modelzoo-app",
+    "relativePath": "vlm/MiniCPM",
+    "chip": "SS928V100",
+    "buildDef": "SS928V100",
+    "needSmoke": "false",
+    "description": "VLM"
+  }
+]

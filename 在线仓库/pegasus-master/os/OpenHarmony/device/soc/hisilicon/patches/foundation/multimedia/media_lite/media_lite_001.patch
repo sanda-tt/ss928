@@ -1,0 +1,1934 @@
+diff --git a/frameworks/player_lite/BUILD.gn b/frameworks/player_lite/BUILD.gn
+index 6dd21ca..d8abe56 100755
+--- a/frameworks/player_lite/BUILD.gn
++++ b/frameworks/player_lite/BUILD.gn
+@@ -68,7 +68,6 @@ if (ohos_kernel_type != "liteos_m") {
+       ldflags += [ "-laudio_hw" ]
+       ldflags += [ "-lcodec" ]
+       ldflags += [ "-lformat_hw" ]
+-      ldflags += [ "-lhdi_videodisplayer" ]
+     }
+ 
+     public_configs = [ ":player_external_library_config" ]
+@@ -78,6 +77,11 @@ if (ohos_kernel_type != "liteos_m") {
+       "//foundation/multimedia/media_utils_lite:media_common",
+       "//third_party/bounds_checking_function:libsec_shared",
+     ]
++
++    ldflags += [ "-ldisplay_layer" ]
++    public_deps += [
++      "//device/soc/hisilicon/common/hal/display:display_layer",
++    ]
+   }
+ 
+   config("player_external_library_config") {
+diff --git a/frameworks/player_lite/passthrough/liteplayer/player_client.cpp b/frameworks/player_lite/passthrough/liteplayer/player_client.cpp
+index 8be5cd4..606b5a7 100644
+--- a/frameworks/player_lite/passthrough/liteplayer/player_client.cpp
++++ b/frameworks/player_lite/passthrough/liteplayer/player_client.cpp
+@@ -13,6 +13,8 @@
+  * limitations under the License.
+  */
+ 
++#include <cstdio>
++#include "player_client.h"
+ #include "player_impl.h"
+ 
+ namespace OHOS {
+diff --git a/frameworks/recorder_lite/passthrough/recorder_client.cpp b/frameworks/recorder_lite/passthrough/recorder_client.cpp
+index 50bc495..d7d2998 100644
+--- a/frameworks/recorder_lite/passthrough/recorder_client.cpp
++++ b/frameworks/recorder_lite/passthrough/recorder_client.cpp
+@@ -13,6 +13,8 @@
+  * limitations under the License.
+  */
+ 
++#include "recorder_client.h"
++
+ #include "media_log.h"
+ 
+ namespace OHOS {
+diff --git a/interfaces/kits/recorder_lite/recorder.h b/interfaces/kits/recorder_lite/recorder.h
+index 6699d13..5992c85 100755
+--- a/interfaces/kits/recorder_lite/recorder.h
++++ b/interfaces/kits/recorder_lite/recorder.h
+@@ -100,6 +100,8 @@ enum OutputFormatType : int32_t {
+     FORMAT_MPEG_4,
+     /** TS format */
+     FORMAT_TS,
++    /** MP4A format */
++    FORMAT_M4A,
+ };
+ 
+ /**
+diff --git a/services/BUILD.gn b/services/BUILD.gn
+index acbb444..9617469 100755
+--- a/services/BUILD.gn
++++ b/services/BUILD.gn
+@@ -43,6 +43,7 @@ executable("media_server") {
+     "//foundation/multimedia/media_lite/services/player_lite",
+     "//foundation/multimedia/audio_lite/services/impl",
+     "//foundation/multimedia/audio_lite/services/server/include",
++    "//foundation/multimedia/media_lite/interfaces/kits/recorder_lite",
+     "//foundation/multimedia/media_lite/services/recorder_lite/impl/include",
+     "//foundation/multimedia/media_lite/services/recorder_lite/server/include",
+   ]
+@@ -52,12 +53,16 @@ executable("media_server") {
+     "-laudio_hw",
+     "-lformat_hw",
+     "-lhdi_camera",
+-    "-lhdi_videodisplayer",
++    "-ldisplay_layer",
+     "-lpthread",
+     "-Wl,-rpath-link=$ohos_root_path/$root_out_dir",
+   ]
+   deps = [
++    ":camera_config",
++    ":codec_config",
++    ":media_config",
+     "//foundation/multimedia/camera_lite/services:camera_server",
++    "//foundation/multimedia/media_lite/services/recorder_lite:recorder_impl",
+     "//foundation/systemabilitymgr/samgr_lite/samgr:samgr",
+   ]
+   if (enable_media_passthrough_mode == false) {
+@@ -70,23 +75,35 @@ executable("media_server") {
+   }
+ }
+ 
+-#copy("camera_config") {
+-#  if (board_name == "hi3516dv300" || board_name == "hispark_taurus") {
+-#    sources = [ "cameradev_imx335_5M.ini" ]
+-#  } else if ((board_name == "hi3518ev300" || board_name == "hispark_aries") &&
+-#             ohos_build_compiler == "clang") {
+-#    sources = [ "cameradev_jxf23.ini" ]
+-#  } else {
+-#    sources = [ "cameradev_imx307.ini" ]
+-#  }
+-#  outputs = [ "$root_out_dir/data/cameradev00.ini" ]
+-#}
+-#if (board_name == "hi3516dv300" || board_name == "hispark_taurus") {
+-#  copy("camera_config01") {
+-#    sources = [ "cameradev_imx335_4M.ini" ]
+-#    outputs = [ "$root_out_dir/data/cameradev01.ini" ]
+-#  }
+-#}
++copy("camera_config") {
++  if (board_name == "hispark_aifly" ||board_name == "hispark_aiflylite") {
++    sources = [ "cameradev_hy_s0603_928.ini" ]
++  } else if (board_name == "hi3516dv300" || board_name == "hispark_taurus") {
++    sources = [ "cameradev_imx335_5M.ini" ]
++  } else if ((board_name == "hi3518ev300" || board_name == "hispark_aries") &&
++              ohos_build_compiler == "clang") {
++    sources = [ "cameradev_jxf23.ini" ]
++  } else {
++    sources = [ "cameradev_imx307.ini" ]
++  }
++  outputs = [ "$root_out_dir/data/cameradev00.ini" ]
++}
++if (board_name == "hi3516dv300" || board_name == "hispark_taurus") {
++ copy("camera_config01") {
++   sources = [ "cameradev_imx335_4M.ini" ]
++   outputs = [ "$root_out_dir/data/cameradev01.ini" ]
++ }
++}
++copy("codec_config") {
++  sources = [ "codec_config.ini" ]
++  outputs = [ "$root_out_dir/data/codec_config.ini" ]
++}
++
++copy("media_config") {
++  sources = [ "media_config.ini" ]
++  outputs = [ "$root_out_dir/data/media_config.ini" ]
++}
++
+ lite_component("media_lite") {
+   features = [
+     ":media_server",
+diff --git a/services/bundle.json b/services/bundle.json
+new file mode 100644
+index 0000000..ca7faf6
+--- /dev/null
++++ b/services/bundle.json
+@@ -0,0 +1,49 @@
++{
++    "name": "@ohos/media_service",
++    "description": "Multi media service for mini and small system.",
++    "version": "3.1",
++    "license": "Apache License 2.0",
++    "publishAs": "code-segment",
++    "segment": {
++        "destPath": "foundation/multimedia/media_lite/services"
++    },
++    "dirs": {},
++    "scripts": {},
++    "component": {
++        "name": "media_service",
++        "subsystem": "multimedia",
++        "syscap": [],
++        "features": [],
++        "adapted_system_type": [
++            "mini",
++            "small"
++        ],
++        "rom": "",
++        "ram": "",
++        "deps": {
++            "components": [
++                "hilog_lite",
++                "audio_manager_lite",
++                "camera_lite",
++                "permission",
++                "ui_lite",
++                "init"
++            ],
++            "third_party": [
++                "bounds_checking_function",
++                "iniparser"
++            ]
++        },
++        "build": {
++            "sub_component": [
++                "//foundation/multimedia/media_lite/services:media_lite",
++                "//foundation/multimedia/camera_lite/test:lite_camera_test",
++                "//foundation/multimedia/media_lite/test/unittest:lite_medialite_test",
++                "//foundation/multimedia/audio_lite/test:lite_audio_test",
++                "//foundation/multimedia/media_lite/interfaces/kits/player_lite/js/builtin:audio_lite_api"
++            ],
++            "inner_kits": [],
++            "test": []
++        }
++    }
++}
+\ No newline at end of file
+diff --git a/services/cameradev_hy_s0603_928.ini b/services/cameradev_hy_s0603_928.ini
+new file mode 100644
+index 0000000..c17d84d
+--- /dev/null
++++ b/services/cameradev_hy_s0603_928.ini
+@@ -0,0 +1,114 @@
++;
++; Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++; Licensed under the Apache License, Version 2.0 (the "License");
++; you may not use this file except in compliance with the License.
++; You may obtain a copy of the License at
++;
++;     http://www.apache.org/licenses/LICENSE-2.0
++;
++; Unless required by applicable law or agreed to in writing, software
++; distributed under the License is distributed on an "AS IS" BASIS,
++; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++; See the License for the specific language governing permissions and
++; limitations under the License.
++;
++; ============= VideoMode Specified Configure =============
++[common]
++mediamode          = "HI_PARAM_MEDIAMODE_1080P_30"
++sensorcnt          = "1"
++[common.vcap0.pipe.0]
++vcappipe_hdl       = "0"
++vivpssmode         = "0"; 0:vi offline,vpss offline, 1:vi offline,vpss online,2:vi online,vpss offline,3:vi online,vpss online,4:vi parallel,vpss offline,5:vi parallel,vpss parallel,6:butt
++[common.vcap0.pipe.1]
++vcappipe_hdl       = "0"
++vivpssmode         = "0"; 0:vi offline,vpss offline, 1:vi offline,vpss online,2:vi online,vpss offline,3:vi online,vpss online,4:vi parallel,vpss offline,5:vi parallel,vpss parallel,6:butt
++
++; ============= VB Configure =============
++[vb]
++max_poolcnt        = 2
++[vb.pool.0]
++image_width        = "1920"
++image_height       = "1080"
++pix_format         = "28"
++data_bitwidth      = "0"
++compress_mode      = "1"
++default_align      = "8"
++blk_count          = "15"
++[vb.pool.1]
++image_width        = "1920"
++image_height       = "1080"
++pix_format         = "28"
++data_bitwidth      = "0"
++compress_mode      = "1"
++default_align      = "8"
++blk_count          = "15"
++; ============= Vcapture 0 Configure =============
++
++[vcap0.dev]
++sensor_type        = "0"; 0 WIDE_ANGLE  1 FISH_EYE 2 TRUE_DEAPTH
++sensor_lib         = "/usr/lib/libsns_hy_s0603.so"
++sensor_obj         = "g_sns_hy_s0603_obj"
++sensor_width       = "1920";stSize.u32Width
++sensor_height      = "1080";stSize.u32Width
++pipecnt            = "1"
++
++[vcap0.mipi]
++enable             = "1";
++combo_dev_t        = "0";combo_dev_t
++input_mode_t       = "0";0:INPUT_MODE_MIPI
++mipi_data_rate_t   = "0";0:MIPI_DATA_RATE_X1
++img_rect_x         = "0"
++img_rect_y         = "0"
++img_rect_w         = "1920"
++img_rect_h         = "1080"
++data_type_t        = "2"    ;2:DATA_TYPE_RAW_12BIT
++mipi_wdr_mode_t    = "0"
++lane_id_num        = "8"
++lane_id_0          = "0"
++lane_id_1          = "1"
++lane_id_2          = "2"
++lane_id_3          = "3"
++lane_id_4          = "-1"
++lane_id_5          = "-1"
++lane_id_6          = "-1"
++lane_id_7          = "-1"
++
++[vcap0.isp_pub]
++enable             = "1";
++stWndRect_x        = "0";
++stWndRect_y        = "0";
++stWndRect_w        = "1920";
++stWndRect_h        = "1080";
++outImageSize_x     = "1920";
++outImageSize_y     = "1080";
++frameRate          = "30"
++bayer_format       = "3";OT_ISP_BAYER_BGGR
++wdrMode            = "0";WDR_MODE_NONE
++snsMode            = "0"
++busId              = "2";
++
++[vcap0.pipe.0]
++chncnt             = "1"
++pipe_bypass_mode   = "0";
++isp_bypass         = "0";
++width              = "1920";
++height             = "1080";
++pixel_format       = "21";
++compress_mode      = "4";
++src_framerate      = "30";FRAME_RATE_CTRL_S
++dst_framerate      = "30";FRAME_RATE_CTRL_S
++interrupt_type     = "2"; 0 is start, 1 is early, 2 is early_end
++earlyline          = "100";
++
++[vcap0.pipe.0.chl.0]
++out_width          = "1920"
++out_height         = "1080"
++pixel_format       = "28";
++dynamic_range      = "0";
++video_format       = "0";
++compress_mode      = "0";
++mirror_en          = "0"
++flip_en            = "0"
++depth              = "0"
++src_framerate      = "30";FRAME_RATE_CTRL_S
++dst_framerate      = "30";FRAME_RATE_CTRL_S
+diff --git a/services/codec_config.ini b/services/codec_config.ini
+new file mode 100644
+index 0000000..80dffc7
+--- /dev/null
++++ b/services/codec_config.ini
+@@ -0,0 +1,18 @@
++;
++; Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
++; Licensed under the Apache License, Version 2.0 (the "License");
++; you may not use this file except in compliance with the License.
++; You may obtain a copy of the License at
++;
++;     http://www.apache.org/licenses/LICENSE-2.0
++;
++; Unless required by applicable law or agreed to in writing, software
++; distributed under the License is distributed on an "AS IS" BASIS,
++; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++; See the License for the specific language governing permissions and
++; limitations under the License.
++;
++; ============= Codec module specified configuration =============
++[venc.DeBreathEffect]
++s32Strength0       = "20"; Range:[0, 35]; The Strength0 of DeBreathEffect
++s32Strength1       = "20"; Range:[0, 35]; The Strength1 of DeBreathEffect
+diff --git a/services/media_config.ini b/services/media_config.ini
+new file mode 100644
+index 0000000..999d39b
+--- /dev/null
++++ b/services/media_config.ini
+@@ -0,0 +1,10 @@
++[module]
++module_num         = "2"
++module1            = "camera_dev"
++module2            = "audio_vqe"
++
++[camera_dev]
++cfg_filename       = "cameradev00.ini"
++
++[audio_vqe]
++cfg_filename       = "audio_vqe.ini"
+\ No newline at end of file
+diff --git a/services/media_main.cpp b/services/media_main.cpp
+index e989447..8f3d105 100755
+--- a/services/media_main.cpp
++++ b/services/media_main.cpp
+@@ -20,6 +20,11 @@
+ #include "camera_server.h"
+ #include "recorder_service.h"
+ #include "audio_capturer_server.h"
++
++#ifdef ENABLE_DH
++#include "kvstore_data_server.h"
++#include "distributed_hardware_server.h"
++#endif
+ #include "ohos_init.h"
+ 
+ #include <csignal>
+@@ -29,6 +34,11 @@
+ 
+ using namespace OHOS;
+ using namespace OHOS::Media;
++#ifdef ENABLE_DH
++using namespace OHOS::DistributedKv;
++using namespace OHOS::DistributedHardware;
++#endif
++
+ extern "C" void __attribute__((weak)) OHOS_SystemInit(void)
+ {
+     SAMGR_Bootstrap();
+@@ -48,6 +58,13 @@ int main()
+ 
+     cout << "AudioCapturer server start" << endl;
+     AudioCapturerServer::GetInstance()->AudioCapturerServerInit();
++#endif
++#ifdef ENABLE_DH
++    cout << "kvstore_data_server start." << endl;
++    KvStoreDataServer::GetInstance()->KvStoreDataServerInit();
++
++    cout << "DistributedHardwareServer start." << endl;
++    DistributedHardwareServer::GetInstance()->DistributedHardwareServerInit();
+ #endif
+     cout << "Media server initialize succeed." << endl;
+ 
+@@ -65,3 +82,7 @@ int main()
+ SYSEX_SERVICE_INIT(RecorderServiceReg);
+ SYSEX_SERVICE_INIT(AudioCapturerServiceReg);
+ #endif
++#ifdef ENABLE_DH
++SYSEX_SERVICE_INIT(KvStoreDataServerReg);
++SYSEX_SERVICE_INIT(DistributedHardwareServerReg);
++#endif
+diff --git a/services/player_lite/BUILD.gn b/services/player_lite/BUILD.gn
+index e6bf7e8..87ea173 100755
+--- a/services/player_lite/BUILD.gn
++++ b/services/player_lite/BUILD.gn
+@@ -10,6 +10,7 @@
+ # limitations under the License.
+ 
+ import("//build/lite/config/component/lite_component.gni")
++import("//foundation/multimedia/media_utils_lite/config.gni")
+ 
+ shared_library("player_impl") {
+   sources = [
+@@ -47,13 +48,19 @@ shared_library("player_impl") {
+   ldflags += [ "-laudio_hw" ]
+   ldflags += [ "-lcodec" ]
+   ldflags += [ "-lformat_hw" ]
+-  ldflags += [ "-lhdi_videodisplayer" ]
+   public_deps = [
++    "//device/soc/hisilicon/common/hal/media:hardware_media_sdk",
+     "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared",
+     "//foundation/graphic/surface_lite:surface_lite",
+     "//foundation/multimedia/media_utils_lite:media_common",
+     "//third_party/bounds_checking_function:libsec_shared",
+   ]
++
++  ldflags += [ "-ldisplay_layer" ]
++  public_deps += [
++    "//device/soc/hisilicon/common/hal/display:display_layer",
++  ]
++
+   ldflags += [ "-lstdc++" ]
+   cflags = [
+     "-fPIC",
+@@ -61,6 +68,9 @@ shared_library("player_impl") {
+     "-Wno-format",
+   ]
+   cflags_cc = cflags
++  if (enable_distributed_dfx == true) {
++    defines = ["ENABLE_DFX"]
++  }
+ }
+ 
+ config("player_impl_external_library_config") {
+diff --git a/services/player_lite/impl/buffersource/include/buffer_source.h b/services/player_lite/impl/buffersource/include/buffer_source.h
+index 5aa70dc..fe59ecd 100644
+--- a/services/player_lite/impl/buffersource/include/buffer_source.h
++++ b/services/player_lite/impl/buffersource/include/buffer_source.h
+@@ -64,7 +64,7 @@ typedef enum TagBufferFlag {
+ 
+ class BufferSource {
+ #define QUEUE_SIZE 20
+-#define BUFFER_SIZE       (2* 1024)  /* 2KB */
++#define BUFFER_SIZE       (4* 1024)  /* 2KB */
+ 
+ public:
+     BufferSource(void);
+diff --git a/services/player_lite/impl/player_control/decoder/decoder.cpp b/services/player_lite/impl/player_control/decoder/decoder.cpp
+index b5a45f6..edba262 100644
+--- a/services/player_lite/impl/player_control/decoder/decoder.cpp
++++ b/services/player_lite/impl/player_control/decoder/decoder.cpp
+@@ -25,6 +25,8 @@ extern "C"
+ namespace OHOS {
+ namespace Media {
+ const int PARAM_MAX_NUM = 30;
++const uint32_t DEFAULT_REF_FRAME_NUM = 5;
++const uint32_t DEFAULT_ADEC_CACHE_FRAME_NUM = 50;
+ Decoder::Decoder()
+     : codecHandle_(nullptr)
+ {
+@@ -59,8 +61,12 @@ static bool ConvertAdecAttributToParams(AvAttribute &attr, Param *param,
+     param[index].val = (void *)&(attr.type);
+     param[index].size = sizeof(attr.type);
+     index++;
++    param[index].key = KEY_ADEC_CACHE_FRAME_NUM;
++    param[index].val = static_cast<void*>(const_cast<uint32_t*>(&(DEFAULT_ADEC_CACHE_FRAME_NUM)));
++    param[index].size = sizeof(uint32_t);
++    index++;
+     if (attr.adecAttr.mime == MEDIA_MIMETYPE_AUDIO_PCM) {
+-        param[index].key = KEY_AUDIO_CHANNEL_COUNT;
++        param[index].key = KEY_CHANNEL_COUNT;
+         param[index].val = (void *)&attr.adecAttr.channelCnt;
+         param[index].size = sizeof(uint32_t);
+         index++;
+@@ -78,25 +84,29 @@ static bool ConvertVdecAttributToParams(AvAttribute &attr, Param *param,
+ {
+     int index = 0;
+     param[index].key = KEY_MIMETYPE;
+-    param[index].val = (void*)&(attr.vdecAttr.mime);
++    param[index].val = static_cast<void*>(&(attr.vdecAttr.mime));
+     param[index].size = sizeof(attr.vdecAttr.mime);
+     index++;
+-    param[index].key = KEY_VIDEO_WIDTH;
+-    param[index].val = (void*)&(attr.vdecAttr.maxWidth);
++    param[index].key = KEY_WIDTH;
++    param[index].val = static_cast<void*>(&(attr.vdecAttr.maxWidth));
+     param[index].size = sizeof(attr.vdecAttr.maxWidth);
+     index++;
+-    param[index].key = KEY_VIDEO_HEIGHT;
+-    param[index].val = (void*)&(attr.vdecAttr.maxHeight);
++    param[index].key = KEY_HEIGHT;
++    param[index].val = static_cast<void*>(&(attr.vdecAttr.maxHeight));
+     param[index].size = sizeof(attr.vdecAttr.maxHeight);
+     index++;
+     param[index].key = KEY_BUFFERSIZE;
+-    param[index].val = (void*)&(attr.vdecAttr.bufSize);
++    param[index].val = static_cast<void*>(&(attr.vdecAttr.bufSize));
+     param[index].size = sizeof(attr.vdecAttr.bufSize);
+     index++;
+     param[index].key = KEY_CODEC_TYPE;
+-    param[index].val = (void*)&(attr.type);
++    param[index].val = static_cast<void*>(&(attr.type));
+     param[index].size = sizeof(attr.type);
+     index++;
++    param[index].key = KEY_REF_FRAME_NUM;
++    param[index].val = static_cast<void*>(const_cast<uint32_t*>(&(DEFAULT_REF_FRAME_NUM)));
++    param[index].size = sizeof(uint32_t);
++    index++;
+     actualLen = index;
+     if (actualLen > maxLen) {
+         MEDIA_ERR_LOG("anylsis vdec param too much");
+@@ -140,27 +150,12 @@ int32_t Decoder::CreateHandle(const std::string &name, AvAttribute &attr)
+         MEDIA_ERR_LOG("convert fail");
+     }
+ 
+-    AvCodecMime mime = MEDIA_MIMETYPE_INVALID;
+-    if (attr.type == AUDIO_DECODER) {
+-        mime = attr.adecAttr.mime;
+-    } else if (attr.type == VIDEO_DECODER) {
+-        mime = attr.vdecAttr.mime;
+-    } else {
+-        MEDIA_ERR_LOG("not find CodecType");
+-    }
+-
+-    int32_t ret = CodecCreateByType(attr.type, mime, &codecHandle_);
++    int32_t ret = CodecCreate(name.c_str(), param, actualLen, &codecHandle_);
+     if (ret != CODEC_SUCCESS) {
+         MEDIA_ERR_LOG("CodecCreateByType failed ret=%d", ret);
+         return CODEC_FAILURE;
+     }
+-
+-    ret = CodecSetParameter(codecHandle_, param, actualLen);
+-    if (ret != CODEC_SUCCESS) {
+-        MEDIA_ERR_LOG("CodecSetParameter failed ret=%d", ret);
+-        CodecDestroy(codecHandle_);
+-    }
+-    return ret;
++    return CODEC_SUCCESS;
+ }
+ 
+ int32_t Decoder::DestroyHandle()
+@@ -173,9 +168,9 @@ int32_t Decoder::DestroyHandle()
+     return CODEC_SUCCESS;
+ }
+ 
+-int32_t Decoder::SetPortBufferMode(DirectionType direct, AllocateBufferMode mode, BufferType type)
++int32_t Decoder::SetPortBufferMode(DirectionType type, BufferMode mode)
+ {
+-    int32_t ret = CodecSetPortMode(codecHandle_, direct, mode, type);
++    int32_t ret = CodecSetPortMode(codecHandle_, type, mode);
+     if (ret != CODEC_SUCCESS) {
+         return CODEC_FAILURE;
+     }
+@@ -227,33 +222,33 @@ int32_t Decoder::FlushDec()
+     return CODEC_SUCCESS;  
+ }
+ 
+-int32_t Decoder::QueueInputBuffer(CodecBuffer* inputData, uint32_t timeoutMs)
++int32_t Decoder::QueueInputBuffer(InputInfo &inputData, uint32_t timeoutMs)
+ {
+-    int32_t ret = CodecQueueInput(codecHandle_, inputData, timeoutMs, 0);
++    int32_t ret = CodecQueueInput(codecHandle_, &inputData, timeoutMs);
+     return ret;
+ }
+ 
+-int32_t Decoder::DequeInputBuffer(CodecBuffer* inputData, uint32_t timeoutMs)
++int32_t Decoder::DequeInputBuffer(InputInfo &inputData, uint32_t timeoutMs)
+ {
+-    int32_t ret = CodecDequeueInput(codecHandle_, timeoutMs, nullptr, inputData);
++    int32_t ret = CodecDequeInput(codecHandle_, timeoutMs, &inputData);
+     if (ret != CODEC_SUCCESS) {
+         return CODEC_FAILURE;
+     }
+     return CODEC_SUCCESS;
+ }
+ 
+-int32_t Decoder::QueueOutputBuffer(CodecBuffer* outInfo, uint32_t timeoutMs)
++int32_t Decoder::QueueOutputBuffer(OutputInfo &outInfo, uint32_t timeoutMs)
+ {
+-    int32_t ret = CodecQueueOutput(codecHandle_, outInfo, timeoutMs, -1);
++    int32_t ret = CodecQueueOutput(codecHandle_, &outInfo, timeoutMs, -1);
+     if (ret != CODEC_SUCCESS) {
+         return CODEC_FAILURE;
+     }
+     return CODEC_SUCCESS;
+ }
+ 
+-int32_t Decoder::DequeueOutputBuffer(CodecBuffer* outInfo, uint32_t timeoutMs)
++int32_t Decoder::DequeueOutputBuffer(OutputInfo &outInfo, uint32_t timeoutMs)
+ {
+-    int32_t ret = CodecDequeueOutput(codecHandle_, timeoutMs, nullptr, outInfo);
++    int32_t ret = CodecDequeueOutput(codecHandle_, timeoutMs, nullptr, &outInfo);
+     return ret;
+ }
+ 
+diff --git a/services/player_lite/impl/player_control/decoder/decoder.h b/services/player_lite/impl/player_control/decoder/decoder.h
+index 50e6278..a33d74f 100644
+--- a/services/player_lite/impl/player_control/decoder/decoder.h
++++ b/services/player_lite/impl/player_control/decoder/decoder.h
+@@ -23,10 +23,10 @@ namespace Media {
+ const int CODEC_SUCCESS = 0;
+ const int CODEC_FAILURE = -1;
+ 
+-typedef struct {
+-    CodecBuffer info;
+-    CodecBufferInfo buffer;
+-} PlayerBufferInfo;
++// typedef struct {
++//     CodecBuffer info;
++//     CodecBufferInfo buffer;
++// } PlayerBufferInfo;
+ 
+ typedef struct {
+     AvCodecMime mime;
+@@ -64,7 +64,7 @@ public:
+ 
+     int32_t DestroyHandle();
+ 
+-    int32_t SetPortBufferMode(DirectionType direct, AllocateBufferMode mode, BufferType type);
++    int32_t SetPortBufferMode(DirectionType type, BufferMode mode);
+ 
+     int32_t SetMetadata(const Param *params, int paramCnt);
+ 
+@@ -76,13 +76,13 @@ public:
+ 
+     int32_t FlushDec();
+ 
+-    int32_t QueueInputBuffer(CodecBuffer* inputData, uint32_t timeoutMs);
++    int32_t QueueInputBuffer(InputInfo &inputData, uint32_t timeoutMs);
+ 
+-    int32_t DequeInputBuffer(CodecBuffer* inputData, uint32_t timeoutMs);
++    int32_t DequeInputBuffer(InputInfo &inputData, uint32_t timeoutMs);
+ 
+-    int32_t QueueOutputBuffer(CodecBuffer* outInfo, uint32_t timeoutMs);
++    int32_t QueueOutputBuffer(OutputInfo &outInfo, uint32_t timeoutMs);
+ 
+-    int32_t DequeueOutputBuffer(CodecBuffer* outInfo, uint32_t timeoutMs);
++    int32_t DequeueOutputBuffer(OutputInfo &outInfo, uint32_t timeoutMs);
+ 
+     int32_t SetCallback(CodecCallback &cb, UINTPTR instance);
+ 
+diff --git a/services/player_lite/impl/player_control/include/hi_demuxer.h b/services/player_lite/impl/player_control/include/hi_demuxer.h
+index ddb59ea..8556ec1 100644
+--- a/services/player_lite/impl/player_control/include/hi_demuxer.h
++++ b/services/player_lite/impl/player_control/include/hi_demuxer.h
+@@ -61,31 +61,6 @@ typedef enum {
+     HI_FORMAT_AUDIO_TYPE_BUTT
+ } HI_FORMAT_AUDIO_TYPE_E;
+ 
+-typedef struct {
+-    int32_t s32VideoStreamIndex; /**< the index of the video stream */
+-    uint32_t u32Width;            /**< The height of the media file's resolution */
+-    uint32_t u32Height;           /**< The width of the media file's resolution */
+-    CodecFormat enVideoType;
+-} StreamResolution;
+-
+-typedef struct {
+-    char *formatName;  /**< File format name, in the unit of byte. */
+-    int64_t s64FileSize;  /**< File size, in the unit of byte. */
+-    int64_t s64StartTime; /* the media file begin time */
+-    int64_t s64Duration;  /**< Total duration of a file, in the unit of ms. */
+-    StreamResolution stSteamResolution[HI_DEMUXER_RESOLUTION_CNT];
+-    int32_t s32UsedVideoStreamIndex; /* <default used video index> */
+-    float fFrameRate;            /**< the frame rate of the stream */
+-    uint32_t u32Bitrate;              /**< File bit rate, in the unit of bit/s. */
+-    uint32_t u32AudioChannelCnt;
+-    uint32_t u32SampleRate;           /**< the sample rate of the audio stream */
+-    int32_t s32UsedAudioStreamIndex; /**< the index of the audio stream. one file may have many audio streams */
+-    uint32_t u32Width;            /**< The height of the media file's resolution */
+-    uint32_t u32Height;           /**< The width of the media file's resolution */
+-    CodecFormat enVideoType;
+-    CodecFormat enAudioType;
+-} FormatFileInfo;
+-
+ #ifdef __cplusplus
+ #if __cplusplus
+ }
+diff --git a/services/player_lite/impl/player_control/include/player_define.h b/services/player_lite/impl/player_control/include/player_define.h
+index df7c249..de10734 100644
+--- a/services/player_lite/impl/player_control/include/player_define.h
++++ b/services/player_lite/impl/player_control/include/player_define.h
+@@ -35,6 +35,9 @@ extern "C" {
+ 
+ #define MAX_AUD_DECODER_PATH_LEN  256
+ 
++#define AV_INVALID_PTS (-1)
++#define MS_SCALE (1000)
++
+ typedef enum {
+     MEDIA_TYPE_VIDEO,
+     MEDIA_TYPE_VIDEO_AUDIO,
+diff --git a/services/player_lite/impl/player_control/player/liteplayer.cpp b/services/player_lite/impl/player_control/player/liteplayer.cpp
+index ae410d6..bc12785 100644
+--- a/services/player_lite/impl/player_control/player/liteplayer.cpp
++++ b/services/player_lite/impl/player_control/player/liteplayer.cpp
+@@ -42,6 +42,7 @@ const uint32_t DECODER_DEFAULT_HEIGHT = 1080;
+ const uint32_t QUEUE_BUFFER_FULL_SLEEP_TIME_US = 5000u;
+ const uint32_t NO_DATA_READ_SLEEP_TIME_US = 5000u;
+ const uint32_t MAX_EVENT_MESSAGE_NUM = 128;
++const uint32_t MAX_AUDIO_SEND_FRAME_FULL_NUM = 10;
+ 
+ struct CodecFormatAndMimePair {
+     CodecFormat format;
+@@ -133,9 +134,9 @@ static void CondTimeWait(pthread_cond_t &cond, pthread_mutex_t &mutex, uint32_t
+ static void GetCurVideoSolution(FormatFileInfo &info, uint32_t &width, uint32_t &height)
+ {
+     for (int i = 0; i < HI_DEMUXER_RESOLUTION_CNT; i++) {
+-        if (info.stSteamResolution[i].s32VideoStreamIndex == info.s32UsedVideoStreamIndex) {
+-            width = info.stSteamResolution[i].u32Width;
+-            height = info.stSteamResolution[i].u32Height;
++        if (info.stStreamResolution[i].s32VideoStreamIndex == info.s32UsedVideoStreamIndex) {
++            width = info.stStreamResolution[i].u32Width;
++            height = info.stStreamResolution[i].u32Height;
+             break;
+         }
+     }
+@@ -151,7 +152,7 @@ PlayerControl::PlayerControl() : stateMachine_(nullptr), observer_(nullptr), isI
+     schThreadExit_(false), loop_(false), hasRenderAudioEos_(false), hasRenderVideoEos_(false), renderSleepTime_(0),
+     leftVolume_(-1.0f), rightVolume_(-1.0f), schProcess_(0), seekToTimeMs_(-1), firstAudioFrameAfterSeek_(false),
+     firstVideoFrameAfterSeek_(false), sourceType_(SOURCE_TYPE_BUT), fd_(-1), playerSource_(nullptr),
+-    sinkManager_(nullptr), audioDecoder_(nullptr), videoDecoder_(nullptr), audioStreamType_(0)
++    sinkManager_(nullptr), audioDecoder_(nullptr), videoDecoder_(nullptr), audioStreamType_(0), continuousAudFull_(0)
+ {
+     eventCallback_.player = nullptr;
+     eventCallback_.callbackFun = nullptr;
+@@ -796,20 +797,20 @@ void PlayerControl::DestroyDecoder()
+ 
+ void PlayerControl::StopSinkAndDecoder()
+ {
+-    PlayerBufferInfo outInfo;
++    OutputInfo outInfo;
+ 
+     if (sinkManager_ != nullptr) {
+         sinkManager_->Stop();
+     }
+     if (audioDecoder_ != nullptr && sinkManager_ != nullptr) {
+         while (sinkManager_->DequeReleaseFrame(true, outInfo) == 0) {
+-            audioDecoder_->QueueOutputBuffer((CodecBuffer *)&outInfo, GET_BUFFER_TIMEOUT_MS);
++            audioDecoder_->QueueOutputBuffer(outInfo, GET_BUFFER_TIMEOUT_MS);
+         }
+         audioDecoder_->StopDec();
+     }
+     if (videoDecoder_ != nullptr && sinkManager_ != nullptr) {
+         while (sinkManager_->DequeReleaseFrame(false, outInfo) == 0) {
+-            videoDecoder_->QueueOutputBuffer((CodecBuffer *)&outInfo, GET_BUFFER_TIMEOUT_MS);
++            videoDecoder_->QueueOutputBuffer(outInfo, GET_BUFFER_TIMEOUT_MS);
+         }
+         videoDecoder_->StopDec();
+     }
+@@ -909,11 +910,11 @@ int32_t PlayerControl::GetVideoResolution(int32_t streamIdx, StreamResolution &r
+     }
+ 
+     for (uint32_t i = 0; i < HI_DEMUXER_RESOLUTION_CNT; i++) {
+-        if (fmtFileInfo_.stSteamResolution[i].s32VideoStreamIndex == streamIdx) {
+-            resolution.enVideoType = fmtFileInfo_.stSteamResolution[i].enVideoType;
+-            resolution.s32VideoStreamIndex = fmtFileInfo_.stSteamResolution[i].s32VideoStreamIndex;
+-            resolution.u32Width = fmtFileInfo_.stSteamResolution[i].u32Width;
+-            resolution.u32Height = fmtFileInfo_.stSteamResolution[i].u32Height;
++        if (fmtFileInfo_.stStreamResolution[i].s32VideoStreamIndex == streamIdx) {
++            resolution.enVideoType = fmtFileInfo_.stStreamResolution[i].enVideoType;
++            resolution.s32VideoStreamIndex = fmtFileInfo_.stStreamResolution[i].s32VideoStreamIndex;
++            resolution.u32Width = fmtFileInfo_.stStreamResolution[i].u32Width;
++            resolution.u32Height = fmtFileInfo_.stStreamResolution[i].u32Height;
+             return HI_SUCCESS;
+         }
+     }
+@@ -979,19 +980,23 @@ void PlayerControl::ReleaseADecoderOutputFrame(void)
+         return;
+     }
+     while (true) {
+-        PlayerBufferInfo outInfo;
++        OutputInfo outInfo;
+         if (sinkManager_->DequeReleaseFrame(true, outInfo) != 0) {
+             break;
+         }
+-        audioDecoder_->QueueOutputBuffer((CodecBuffer *)&outInfo, GET_BUFFER_TIMEOUT_MS);
++        audioDecoder_->QueueOutputBuffer(outInfo, GET_BUFFER_TIMEOUT_MS);
+     }
+ }
+ 
+-static void InitOutputBuffer(CodecBuffer &outInfo, CodecType type)
++static void InitOutputBuffer(OutputInfo &outInfo, CodecType type)
+ {
+     outInfo.bufferCnt = 0;
++    outInfo.buffers = nullptr;
+     outInfo.timeStamp = -1;
++    outInfo.sequence = 0;
+     outInfo.flag = 0;
++    outInfo.type = type;
++    outInfo.vendorPrivate = nullptr;
+ }
+ 
+ void PlayerControl::RenderAudioFrame(void)
+@@ -1000,15 +1005,15 @@ void PlayerControl::RenderAudioFrame(void)
+         return;
+     }
+ 
+-    PlayerBufferInfo outInfo;
+-    int ret = audioDecoder_->DequeueOutputBuffer((CodecBuffer *)&outInfo, GET_BUFFER_TIMEOUT_MS);
++    OutputInfo outInfo;
++    int ret = audioDecoder_->DequeueOutputBuffer(outInfo, GET_BUFFER_TIMEOUT_MS);
+     if (ret != 0) {
+-        InitOutputBuffer(outInfo.info, AUDIO_DECODER);
++        InitOutputBuffer(outInfo, AUDIO_DECODER);
+         if (ret == CODEC_RECEIVE_EOS && strmReadEnd_) {
+             sinkManager_->RenderEos(true);  /* all frame have been send to audio sink */
+         }
+     }
+-    ret = sinkManager_->RenderFrame(outInfo, AUDIO_DECODER);
++    ret = sinkManager_->RenderFrame(outInfo);
+     if (ret == SINK_RENDER_FULL || ret == SINK_RENDER_DELAY) {
+         renderSleepTime_ = RENDER_FULL_SLEEP_TIME_US;
+     } else if (ret == SINK_QUE_EMPTY) {
+@@ -1031,11 +1036,11 @@ void PlayerControl::ReleaseVDecoderOutputFrame(void)
+         return;
+     }
+     while (true) {
+-        PlayerBufferInfo outInfo;
++        OutputInfo outInfo;
+         if (sinkManager_->DequeReleaseFrame(false, outInfo) != 0) {
+             break;
+         }
+-        videoDecoder_->QueueOutputBuffer((CodecBuffer *)&outInfo, GET_BUFFER_TIMEOUT_MS);
++        videoDecoder_->QueueOutputBuffer(outInfo, GET_BUFFER_TIMEOUT_MS);
+     }
+ }
+ 
+@@ -1045,17 +1050,16 @@ void PlayerControl::RenderVideoFrame(void)
+         return;
+     }
+ 
+-    PlayerBufferInfo outInfo;
+-    outInfo.info.bufferCnt = 1;
+-    int ret = videoDecoder_->DequeueOutputBuffer((CodecBuffer *)&outInfo, GET_BUFFER_TIMEOUT_MS);
++    OutputInfo outInfo;
++    int ret = videoDecoder_->DequeueOutputBuffer(outInfo, GET_BUFFER_TIMEOUT_MS);
+     if (ret != 0) {
+-        InitOutputBuffer(outInfo.info, VIDEO_DECODER);
++        InitOutputBuffer(outInfo, VIDEO_DECODER);
+         if (ret == CODEC_RECEIVE_EOS) {
+             sinkManager_->RenderEos(false); /* all frame have been send to video sink */
+         }
+     }
+ 
+-    ret = sinkManager_->RenderFrame(outInfo, VIDEO_DECODER);
++    ret = sinkManager_->RenderFrame(outInfo);
+     if (ret == SINK_RENDER_FULL || ret == SINK_RENDER_DELAY) {
+         renderSleepTime_ = RENDER_FULL_SLEEP_TIME_US;
+     } else if (ret == SINK_QUE_EMPTY) {
+@@ -1225,75 +1229,87 @@ inline static bool IsValidPacket(FormatFrame &packet)
+ 
+ void PlayerControl::PushPacketToADecoder(void)
+ {
++    InputInfo inputData;
++    CodecBufferInfo inBufInfo;
+     if (audioDecoder_ == nullptr) {
+         return;
+     }
+-    PlayerBufferInfo inputData = {};
+-    CodecBufferInfo inBufInfo;
++    inputData.bufferCnt = 0;
++    inputData.buffers = nullptr;
++    inputData.pts = 0;
++    inputData.flag = 0;
+     if (memset_s(&inBufInfo, sizeof(inBufInfo), 0, sizeof(CodecBufferInfo)) != EOK) {
+         return;
+     }
+-
+-    inBufInfo.type = BUFFER_TYPE_VIRTUAL;
+-    inBufInfo.buf = (intptr_t)formatPacket_.data;
+-    inBufInfo.length = formatPacket_.len;
+-    inputData.info.bufferCnt = 1;
+-    inputData.info.buffer[0] = inBufInfo;
+-    inputData.info.timeStamp = formatPacket_.timestampUs;
+-    inputData.info.flag = 0;
+-
+-    int32_t ret = audioDecoder_->QueueInputBuffer((CodecBuffer *)&inputData, GET_BUFFER_TIMEOUT_MS);
+-    if (ret == CODEC_ERR_UNKOWN) { // CODEC_ERR_STREAM_BUF_FULL
+-        renderSleepTime_ = QUEUE_BUFFER_FULL_SLEEP_TIME_US;
++    int32_t ret = audioDecoder_->DequeInputBuffer(inputData, GET_BUFFER_TIMEOUT_MS);
++    if (ret != 0) {
+         return;
+     }
+-    PlayerBufferInfo outData;
+-    ret = audioDecoder_->DequeInputBuffer((CodecBuffer *)&outData, GET_BUFFER_TIMEOUT_MS);
+-    if (ret != 0) {
+-        MEDIA_DEBUG_LOG("audio DequeInputBuffer failed");
++    inBufInfo.addr = formatPacket_.data;
++    inBufInfo.length = formatPacket_.len;
++    inputData.bufferCnt = 1;
++    inputData.buffers = &inBufInfo;
++    inputData.pts = formatPacket_.timestampUs;
++    inputData.flag = 0;
++    ret = audioDecoder_->QueueInputBuffer(inputData, GET_BUFFER_TIMEOUT_MS);
++    if (ret == CODEC_ERR_STREAM_BUF_FULL) {
++        continuousAudFull_++;
++        if (continuousAudFull_ == MAX_AUDIO_SEND_FRAME_FULL_NUM) {
++            MEDIA_INFO_LOG("adec continue full reach to max num %d \n", MAX_AUDIO_SEND_FRAME_FULL_NUM);
++            continuousAudFull_ = 0;
++            ClearCachePacket();
++        } else {
++            renderSleepTime_ = QUEUE_BUFFER_FULL_SLEEP_TIME_US;
++        }
+         return;
+     }
++    continuousAudFull_ = 0;
+     if (firstAudioFrameAfterSeek_ && IsValidPacket(formatPacket_)) {
+         firstAudioFrameAfterSeek_ = false;
+-        MEDIA_INFO_LOG("push firstAudioFrameAfterSeek_ success, pts:%lld", inputData.info.timeStamp);
++        MEDIA_INFO_LOG("push firstAudioFrameAfterSeek_ success, pts:%lld", inputData.pts);
+     }
+     if (formatPacket_.data != nullptr || formatPacket_.len != 0) {
+         lastSendAdecPts_ = formatPacket_.timestampUs;
+     }
+     ClearCachePacket();
++#ifdef ENABLE_DFX
++    MEDIA_DFX_LOG("send frame data success, dataSize = %d", inBufInfo.length);
++#endif
+ }
+ 
+ void PlayerControl::PushPacketToVDecoder(void)
+ {
++    InputInfo inputData;
++    CodecBufferInfo inBufInfo;
+     if (videoDecoder_ == nullptr) {
+         return;
+     }
+-    PlayerBufferInfo inputData = {};
+-    CodecBufferInfo inBufInfo;
++    inputData.bufferCnt = 0;
++    inputData.buffers = nullptr;
++    inputData.pts = 0;
++    inputData.flag = 0;
+     if (memset_s(&inBufInfo, sizeof(inBufInfo), 0, sizeof(CodecBufferInfo)) != EOK) {
+         return;
+     }
+-    inBufInfo.type = BUFFER_TYPE_VIRTUAL;
+-    inBufInfo.buf = (intptr_t)formatPacket_.data;
+-    inBufInfo.length = formatPacket_.len;
+-    inputData.info.bufferCnt = 1;
+-    inputData.info.buffer[0] = inBufInfo;
+-    inputData.info.timeStamp = formatPacket_.timestampUs;
+-    inputData.info.flag = 0;
+-    int32_t ret = videoDecoder_->QueueInputBuffer((CodecBuffer *)&inputData, GET_BUFFER_TIMEOUT_MS);
+-    if (ret == CODEC_ERR_UNKOWN) { // CODEC_ERR_STREAM_BUF_FULL
+-        renderSleepTime_ = QUEUE_BUFFER_FULL_SLEEP_TIME_US;
++    int32_t ret = videoDecoder_->DequeInputBuffer(inputData, GET_BUFFER_TIMEOUT_MS);
++    if (ret != 0) {
+         return;
+     }
+-    PlayerBufferInfo outData;
+-    ret = videoDecoder_->DequeInputBuffer((CodecBuffer *)&outData, GET_BUFFER_TIMEOUT_MS);
+-    if (ret != 0) {
+-        MEDIA_DEBUG_LOG("video DequeInputBuffer failed");
++    inBufInfo.addr = formatPacket_.data;
++    inBufInfo.length = formatPacket_.len;
++    inputData.bufferCnt = 1;
++    inputData.buffers = &inBufInfo;
++    inputData.pts = formatPacket_.timestampUs;
++    inputData.flag = 0;
++    ret = videoDecoder_->QueueInputBuffer(inputData, GET_BUFFER_TIMEOUT_MS);
++    if (ret == CODEC_ERR_STREAM_BUF_FULL) {
++        renderSleepTime_ = QUEUE_BUFFER_FULL_SLEEP_TIME_US;
+         return;
+     }
+     if (firstVideoFrameAfterSeek_ && IsValidPacket(formatPacket_)) {
+         firstVideoFrameAfterSeek_ = false;
+-        MEDIA_INFO_LOG("push firstVideoFrameAfterSeek_ success, pts:%lld", inputData.info.timeStamp);
++        MEDIA_INFO_LOG("push firstVideoFrameAfterSeek_ success, pts:%lld", inputData.pts);
++        EventCallback(PLAYERCONTROL_FIRST_VIDEO_FRAME, reinterpret_cast<void *>(&inputData.pts));
+     }
+     if (formatPacket_.data != nullptr && formatPacket_.len != 0) {
+         lastSendVdecPts_ = formatPacket_.timestampUs;
+@@ -1505,12 +1521,18 @@ int32_t PlayerControl::DoGetFileInfo(FormatFileInfo &fileInfo)
+ int32_t PlayerControl::DoSetMedia(PlayerControlStreamAttr &mediaAttr)
+ {
+     CHECK_NULL_RETURN(playerSource_, HI_ERR_PLAYERCONTROL_NULL_PTR, "playerSource_ nullptr");
+-    int32_t ret = playerSource_->SelectTrack(0, mediaAttr.s32VidStreamId);
+-    CHECK_FAILED_RETURN(ret, 0, HI_ERR_PLAYERCONTROL_DEMUX_ERROR, "SelectTrack failed");
+-    ret = playerSource_->SelectTrack(0, mediaAttr.s32AudStreamId);
+-    CHECK_FAILED_RETURN(ret, 0, HI_ERR_PLAYERCONTROL_DEMUX_ERROR, "SelectTrack failed");
+-    fmtFileInfo_.s32UsedVideoStreamIndex = mediaAttr.s32VidStreamId;
+-    fmtFileInfo_.s32UsedAudioStreamIndex = mediaAttr.s32AudStreamId;
++    int32_t ret = HI_SUCCESS;
++    if (mediaAttr.s32VidStreamId != -1) {
++        ret = playerSource_->SelectTrack(0, mediaAttr.s32VidStreamId);
++        CHECK_FAILED_RETURN(ret, 0, HI_ERR_PLAYERCONTROL_DEMUX_ERROR, "SelectTrack failed");
++        fmtFileInfo_.s32UsedVideoStreamIndex = mediaAttr.s32VidStreamId;
++    }
++    if (mediaAttr.s32AudStreamId != -1) {
++        ret = playerSource_->SelectTrack(0, mediaAttr.s32AudStreamId);
++        CHECK_FAILED_RETURN(ret, 0, HI_ERR_PLAYERCONTROL_DEMUX_ERROR, "SelectTrack failed");
++        fmtFileInfo_.s32UsedAudioStreamIndex = mediaAttr.s32AudStreamId;
++    }
++
+     return HI_SUCCESS;
+ }
+ 
+diff --git a/services/player_lite/impl/player_control/player/liteplayer.h b/services/player_lite/impl/player_control/player/liteplayer.h
+index 6836d7f..6b06218 100644
+--- a/services/player_lite/impl/player_control/player/liteplayer.h
++++ b/services/player_lite/impl/player_control/player/liteplayer.h
+@@ -235,6 +235,7 @@ private:
+     std::vector<PalayControlEventItem> eventQueue;
+     int32_t audioStreamType_;
+     int64_t seekTabel_[0x2] = {-1, -1};
++    uint32_t continuousAudFull_;
+ private:
+     PlayerControl(const PlayerControl &);
+     PlayerControl &operator=(const PlayerControl &);
+diff --git a/services/player_lite/impl/player_control/player/liteplayer_define.h b/services/player_lite/impl/player_control/player/liteplayer_define.h
+index 1306b19..65e15ae 100644
+--- a/services/player_lite/impl/player_control/player/liteplayer_define.h
++++ b/services/player_lite/impl/player_control/player/liteplayer_define.h
+@@ -24,8 +24,9 @@
+ extern "C" {
+ #endif
+ #endif /* End of #ifdef __cplusplus */
++namespace OHOS {
++namespace Media {
+ 
+-static const uint32_t  MS_SCALE   = 1000;
+ static const int64_t INVALID_PTS = -1;
+ 
+ static const uint32_t FULL_TPLAY_FRAMERATE_LIMIT = 30;
+@@ -70,7 +71,6 @@ static const uint32_t PLAYER_MPF_BUF_EXTRA = 2048;
+ /* PLAYER_MPF_ESBUF_MIN: (32 * 1024) */
+ static const uint32_t PLAYER_MPF_ESBUF_MIN = 32768;
+ 
+-static const int32_t AV_INVALID_PTS = -1;
+ 
+ static const uint32_t NO_WAIT = 0;
+ 
+@@ -111,6 +111,8 @@ enum PlayerTplaySeekOffset {
+     TPLAY_SEEK_OFFSET_64X = 3200,
+     TPLAY_SEEK_OFFSET_128X = 6400
+ };
++}
++}
+ 
+ #ifdef __cplusplus
+ #if __cplusplus
+diff --git a/services/player_lite/impl/player_control/sink/player_audio_sink.cpp b/services/player_lite/impl/player_control/sink/player_audio_sink.cpp
+index 8eb0d5a..b6a78f8 100644
+--- a/services/player_lite/impl/player_control/sink/player_audio_sink.cpp
++++ b/services/player_lite/impl/player_control/sink/player_audio_sink.cpp
+@@ -154,11 +154,11 @@ void AudioSink::GetStatus(AudioSinkStatus &status)
+     status.audFrameCount = rendFrameCnt_;
+ }
+ 
+-void AudioSink::UpdateAudioPts(int64_t lastPts, int64_t &timestamp, CodecBuffer &renderFrame)
++void AudioSink::UpdateAudioPts(int64_t lastPts, int64_t &timestamp, OutputInfo &renderFrame)
+ {
+     if (renderFrame.timeStamp == -1) {
+-        float sampleCnt = (renderFrame.buffer[0].length / attr_.audAttr.channel) / AUDIO_SAMPLE_WIDTH_BYTE;
+-        float duration = (static_cast<int64_t>(sampleCnt) * MS_SCALE) / attr_.audAttr.sampleRate;
++        float sampleCnt = (renderFrame.buffers[0].length / attr_.audAttr.channel) / AUDIO_SAMPLE_WIDTH_BYTE;
++        float duration = (sampleCnt / attr_.audAttr.sampleRate) * MS_SCALE;
+         renderFrame.timeStamp = lastPts + duration;
+     }
+     timestamp = renderFrame.timeStamp;
+@@ -168,10 +168,10 @@ void AudioSink::UpdateAudioPts(int64_t lastPts, int64_t &timestamp, CodecBuffer
+     }
+ }
+ 
+-void AudioSink::QueueRenderFrame(const PlayerBufferInfo &frame, const bool cacheQueue)
++void AudioSink::QueueRenderFrame(const OutputInfo &frame, const bool cacheQueue)
+ {
+     std::lock_guard<std::mutex> lock(mutex_);
+-    if (frame.info.bufferCnt == 0) {
++    if (frame.type != AUDIO_DECODER || frame.bufferCnt == 0) {
+         return;
+     }
+     if (cacheQueue) {
+@@ -181,11 +181,11 @@ void AudioSink::QueueRenderFrame(const PlayerBufferInfo &frame, const bool cache
+     }
+ }
+ 
+-int32_t AudioSink::GetRenderFrame(PlayerBufferInfo &renderFrame, const PlayerBufferInfo &frame)
++int32_t AudioSink::GetRenderFrame(OutputInfo &renderFrame, const OutputInfo &frame)
+ {
+     std::lock_guard<std::mutex> lock(mutex_);
+     int32_t ret = SINK_QUE_EMPTY;
+-    if (frame.info.bufferCnt != 0) {
++    if (frame.type == AUDIO_DECODER &&  frame.bufferCnt != 0) {
+         frameCacheQue_.push_back(frame);
+     }
+     if (frameCacheQue_.size() != 0) {
+@@ -199,7 +199,7 @@ void AudioSink::ReleaseQueHeadFrame(void)
+ {
+     std::lock_guard<std::mutex> lock(mutex_);
+     if (frameCacheQue_.size() != 0) {
+-        PlayerBufferInfo frame = frameCacheQue_[0];
++        OutputInfo frame = frameCacheQue_[0];
+         frameCacheQue_.erase(frameCacheQue_.begin());
+         frameReleaseQue_.push_back(frame);
+     }
+@@ -220,7 +220,7 @@ void AudioSink::ReleaseQueAllFrame(void)
+     frameCacheQue_.clear();
+ }
+ 
+-int32_t AudioSink::DequeReleaseFrame(PlayerBufferInfo &frame)
++int32_t AudioSink::DequeReleaseFrame(OutputInfo &frame)
+ {
+     std::lock_guard<std::mutex> lock(mutex_);
+     if (frameReleaseQue_.size() == 0) {
+@@ -244,18 +244,17 @@ void AudioSink::RenderRptEvent(EventCbType event)
+     }
+ }
+ 
+-int32_t AudioSink::WriteToAudioDevice(CodecBuffer &renderFrame)
++int32_t AudioSink::WriteToAudioDevice(OutputInfo &renderFrame)
+ {
+     int32_t ret;
+     uint64_t writeLen = 0;
+-    if ((audioRender_ == nullptr) || (&renderFrame.buffer[0] == nullptr)) {
++    if ((audioRender_ == nullptr) || (renderFrame.buffers == nullptr)) {
+         ReleaseQueHeadFrame();
+         return SINK_RENDER_ERROR;
+     }
+-
+-    ret = audioRender_->RenderFrame(audioRender_, (void*)(renderFrame.buffer[0].buf + renderFrame.buffer[0].offset),
+-        static_cast<uint64_t>(renderFrame.buffer[0].length), &writeLen);
+-    if ((unsigned long)renderFrame.buffer[0].length != writeLen) {
++    ret = audioRender_->RenderFrame(audioRender_, renderFrame.buffers[0].addr + renderFrame.buffers[0].offset,
++        static_cast<uint64_t>(renderFrame.buffers[0].length), &writeLen);
++    if ((unsigned long)renderFrame.buffers[0].length != writeLen) {
+         return SINK_RENDER_FULL;
+     } else if (ret != HI_SUCCESS) {
+         ReleaseQueHeadFrame();
+@@ -266,12 +265,12 @@ int32_t AudioSink::WriteToAudioDevice(CodecBuffer &renderFrame)
+     return HI_SUCCESS;
+ }
+ 
+-int32_t AudioSink::RenderFrame(PlayerBufferInfo &frame)
++int32_t AudioSink::RenderFrame(OutputInfo &frame)
+ {
+     SyncRet syncRet = SYNC_RET_PLAY;
+     int64_t crtPlayPts = 0;
+     uint64_t frameCnt;
+-    PlayerBufferInfo renderFrame;
++    OutputInfo renderFrame;
+     struct AudioTimeStamp timestamp;
+ 
+     if (!reportedFirstFrame && renderMode_ == RENDER_MODE_PAUSE_AFTER_PLAY) {
+@@ -307,15 +306,15 @@ int32_t AudioSink::RenderFrame(PlayerBufferInfo &frame)
+         return SINK_RENDER_ERROR;
+     }
+ 
+-    UpdateAudioPts(lastRendPts_, crtPlayPts, renderFrame.info);
++    UpdateAudioPts(lastRendPts_, crtPlayPts, renderFrame);
+     ret = (syncHdl_ != nullptr) ? syncHdl_->ProcAudFrame(crtPlayPts, syncRet) : HI_SUCCESS;
+     if (ret != HI_SUCCESS) {
+-        MEDIA_ERR_LOG("ProcAudFrame pts: %lld failed", renderFrame.info.timeStamp);
++        MEDIA_ERR_LOG("ProcAudFrame pts: %lld failed", renderFrame.timeStamp);
+         ReleaseQueHeadFrame();
+         return SINK_RENDER_ERROR;
+     }
+     if (syncRet == SYNC_RET_PLAY) {
+-        ret = WriteToAudioDevice(renderFrame.info);
++        ret = WriteToAudioDevice(renderFrame);
+     } else if (syncRet == SYNC_RET_DROP) {
+         ReleaseQueHeadFrame();
+         ret = SINK_SUCCESS;
+@@ -328,7 +327,7 @@ int32_t AudioSink::RenderFrame(PlayerBufferInfo &frame)
+     }
+ 
+     if (ret == SINK_SUCCESS || ret == SINK_RENDER_ERROR) {
+-        lastRendPts_ = renderFrame.info.timeStamp;
++        lastRendPts_ = renderFrame.timeStamp;
+         rendFrameCnt_++;
+     }
+     return ret;
+diff --git a/services/player_lite/impl/player_control/sink/player_audio_sink.h b/services/player_lite/impl/player_control/sink/player_audio_sink.h
+index 6d8c8c7..279f62c 100644
+--- a/services/player_lite/impl/player_control/sink/player_audio_sink.h
++++ b/services/player_lite/impl/player_control/sink/player_audio_sink.h
+@@ -45,7 +45,7 @@ public:
+     int32_t SetSpeed(float speed);
+     int32_t GetSpeed(float &speed);
+     int32_t GetState(int32_t &state);
+-    int32_t RenderFrame(PlayerBufferInfo &frame);
++    int32_t RenderFrame(OutputInfo &frame);
+     void SetRenderMode(RenderMode mode);
+     int32_t SetVolume(float left, float right);
+     int32_t GetVolume(float &left, float &right);
+@@ -57,20 +57,20 @@ public:
+     int32_t RegisterCallBack(PlayEventCallback &callback);
+     void GetStatus(AudioSinkStatus &status);
+     void RenderEos(void);
+-    int DequeReleaseFrame(PlayerBufferInfo &frame);
++    int DequeReleaseFrame(OutputInfo &frame);
+     void GetRenderPosition(int64_t &position);
+     void SetAudioStreamType(int32_t &type);
+ 
+ private:
+     void ResetRendStartTime();
+     void SendAudioEndOfStream();
+-    void UpdateAudioPts(int64_t lastPts, int64_t& timestamp, CodecBuffer &renderFrame);
+-    int GetRenderFrame(PlayerBufferInfo &renderFrame, const PlayerBufferInfo &frame);
++    void UpdateAudioPts(int64_t lastPts, int64_t& timestamp, OutputInfo &renderFrame);
++    int GetRenderFrame(OutputInfo &renderFrame, const OutputInfo &frame);
+     void ReleaseQueHeadFrame(void);
+     void ReleaseQueAllFrame(void);
+     void RenderRptEvent(EventCbType event);
+-    int32_t WriteToAudioDevice(CodecBuffer &renderFrame);
+-    void QueueRenderFrame(const PlayerBufferInfo &frame, bool cacheQueue);
++    int32_t WriteToAudioDevice(OutputInfo &renderFrame);
++    void QueueRenderFrame(const OutputInfo &frame, bool cacheQueue);
+ 
+     bool started_;
+     bool paused_;
+@@ -91,8 +91,8 @@ private:
+     int64_t eosPts_;
+     bool receivedEos_;
+     std::mutex mutex_;
+-    std::vector<PlayerBufferInfo> frameCacheQue_;
+-    std::vector<PlayerBufferInfo> frameReleaseQue_;
++    std::vector<OutputInfo> frameCacheQue_;
++    std::vector<OutputInfo> frameReleaseQue_;
+     struct AudioManager *audioManager_;
+     struct AudioAdapter *audioAdapter_;
+     struct AudioRender *audioRender_;
+diff --git a/services/player_lite/impl/player_control/sink/player_sink_manager.cpp b/services/player_lite/impl/player_control/sink/player_sink_manager.cpp
+index 9c6e2f3..effc3b8 100644
+--- a/services/player_lite/impl/player_control/sink/player_sink_manager.cpp
++++ b/services/player_lite/impl/player_control/sink/player_sink_manager.cpp
+@@ -292,15 +292,15 @@ int32_t SinkManager::GetSpeed(float &speed, TplayDirect  &tplayDirect)
+     return 0;
+ }
+ 
+-int32_t SinkManager::RenderFrame(PlayerBufferInfo &frame, CodecType type)
++int32_t SinkManager::RenderFrame(OutputInfo &frame)
+ {
+     int ret;
+-    if (type == AUDIO_DECODER) {
++    if (frame.type == AUDIO_DECODER) {
+         ret = audioSinkInfo_[0].sink->RenderFrame(frame);
+-    } else if (type == VIDEO_DECODER) {
++    } else if (frame.type == VIDEO_DECODER) {
+         ret = videoSinkInfo_[0].sink->RenderFrame(frame);
+     } else {
+-        MEDIA_ERR_LOG("RenderFrame not support frame type: %d", type);
++        MEDIA_ERR_LOG("RenderFrame not support frame type: %d", frame.type);
+         ret = -1;
+     }
+     return ret;
+@@ -425,7 +425,7 @@ void SinkManager::RenderEos(bool isAudio)
+     }
+ }
+ 
+-int32_t SinkManager::DequeReleaseFrame(bool audioSink, PlayerBufferInfo &frame)
++int32_t SinkManager::DequeReleaseFrame(bool audioSink, OutputInfo &frame)
+ {
+     if (audioSinkInfo_[0].sink != nullptr && audioSink == true) {
+         return audioSinkInfo_[0].sink->DequeReleaseFrame(frame);
+diff --git a/services/player_lite/impl/player_control/sink/player_sink_manager.h b/services/player_lite/impl/player_control/sink/player_sink_manager.h
+index a33c07a..67f50e3 100644
+--- a/services/player_lite/impl/player_control/sink/player_sink_manager.h
++++ b/services/player_lite/impl/player_control/sink/player_sink_manager.h
+@@ -68,7 +68,7 @@ public:
+     int32_t Resume(void);
+     int32_t SetSpeed(float speed, TplayDirect  tplayDirect);
+     int32_t GetSpeed(float &speed, TplayDirect  &tplayDirect);
+-    int32_t RenderFrame(PlayerBufferInfo &frame, CodecType type);
++    int32_t RenderFrame(OutputInfo &frame);
+     int32_t SetVolume(float left, float right);
+     int32_t GetVolume(float &left, float &right);
+     int32_t SetParam(const char *key, dataType type, void* value);
+@@ -77,7 +77,7 @@ public:
+     int32_t RegisterCallBack(PlayEventCallback &callback);
+     int32_t GetStatus(PlayerStreamInfo &info);
+     void RenderEos(bool isAudio);
+-    int DequeReleaseFrame(bool audioSink, PlayerBufferInfo &frame);
++    int DequeReleaseFrame(bool audioSink, OutputInfo &frame);
+     void GetRenderPosition(int64_t &position);
+     void SetAudioStreamType(int32_t &type);
+ 
+diff --git a/services/player_lite/impl/player_control/sink/player_video_sink.cpp b/services/player_lite/impl/player_control/sink/player_video_sink.cpp
+index 01917f6..adbdb33 100644
+--- a/services/player_lite/impl/player_control/sink/player_video_sink.cpp
++++ b/services/player_lite/impl/player_control/sink/player_video_sink.cpp
+@@ -80,6 +80,7 @@ VideoSink::VideoSink(void)
+     callBack_.priv = nullptr;
+     frameCacheQue_.clear();
+     frameReleaseQue_.clear();
++    layerId_ = 0;
+ }
+ 
+ VideoSink::~VideoSink()
+@@ -90,7 +91,6 @@ VideoSink::~VideoSink()
+ int32_t VideoSink::DeInit()
+ {
+     int32_t ret = HI_SUCCESS;
+-    layerFuncs_->DeinitDisplay(0);
+     return ret;
+ }
+ 
+@@ -98,7 +98,6 @@ int32_t VideoSink::Init(SinkAttr &attr)
+ {
+     attr_ = attr;
+     (void)LayerInitialize(&layerFuncs_);
+-    layerFuncs_->InitDisplay(0);
+     return 0;
+ }
+ 
+@@ -153,7 +152,6 @@ void VideoSink::CreateAndConfigLayer(void)
+     int32_t h;
+     IRect attr;
+     uint32_t devId = 0;
+-    uint32_t layerId = 0;
+     int32_t right = lastConfigRegionX_ + lastConfigRegionW_ - 1;
+     int32_t botttom = lastConfigRegionY_ + lastConfigRegionH_ - 1;
+     /* Make sure the coordinates are even */
+@@ -170,9 +168,12 @@ void VideoSink::CreateAndConfigLayer(void)
+     LayerInfo lInfo;
+     lInfo.width = w;
+     lInfo.height = h;
++    lInfo.type = LAYER_TYPE_OVERLAY;
++    lInfo.bpp = 8;
++    lInfo.pixFormat = PIXEL_FMT_YCRCB_420_SP;
+     if (layerFuncs_ != nullptr) {
+-        layerFuncs_->CreateLayer(devId, &lInfo, &layerId);
+-        layerFuncs_->SetLayerSize(devId, layerId, &attr);
++        layerFuncs_->CreateLayer(devId, &lInfo, &layerId_);
++        layerFuncs_->SetLayerSize(devId, layerId_, &attr);
+     }
+ 
+ }
+@@ -217,7 +218,7 @@ int32_t VideoSink::Stop()
+     ResetRendStartTime();
+     renderFrameCnt_ = 0;
+     if (layerFuncs_ != nullptr) {
+-        layerFuncs_->CloseLayer(0, 0);
++        layerFuncs_->CloseLayer(0, layerId_);
+     }
+     started_ = false;
+     return HI_SUCCESS;
+@@ -286,10 +287,10 @@ int32_t VideoSink::RegisterCallBack(PlayEventCallback &callback)
+     return 0;
+ }
+ 
+-void VideoSink::QueueRenderFrame(PlayerBufferInfo &frame, bool cacheQueue)
++void VideoSink::QueueRenderFrame(OutputInfo &frame, bool cacheQueue)
+ {
+     std::lock_guard<std::mutex> lock(mutex_);
+-    if (frame.info.bufferCnt == 0) {
++    if (frame.type != AUDIO_DECODER || frame.bufferCnt == 0) {
+         return;
+     }
+     if (cacheQueue) {
+@@ -299,11 +300,11 @@ void VideoSink::QueueRenderFrame(PlayerBufferInfo &frame, bool cacheQueue)
+     }
+ }
+ 
+-int32_t VideoSink::GetRenderFrame(PlayerBufferInfo &renderFrame, PlayerBufferInfo &frame)
++int32_t VideoSink::GetRenderFrame(OutputInfo &renderFrame, OutputInfo &frame)
+ {
+     std::lock_guard<std::mutex> lock(mutex_);
+     int32_t ret = SINK_QUE_EMPTY;
+-    if (frame.info.bufferCnt != 0) {
++    if (frame.type == VIDEO_DECODER && frame.bufferCnt != 0) {
+         frameCacheQue_.push_back(frame);
+     }
+     if (frameCacheQue_.size() != 0) {
+@@ -317,7 +318,7 @@ void VideoSink::ReleaseQueHeadFrame(void)
+ {
+     std::lock_guard<std::mutex> lock(mutex_);
+     if (frameCacheQue_.size() != 0) {
+-        PlayerBufferInfo frame = frameCacheQue_[0];
++        OutputInfo frame = frameCacheQue_[0];
+         frameCacheQue_.erase(frameCacheQue_.begin());
+         frameReleaseQue_.push_back(frame);
+     }
+@@ -338,7 +339,7 @@ void VideoSink::ReleaseQueAllFrame(void)
+     frameCacheQue_.clear();
+ }
+ 
+-int32_t VideoSink::DequeReleaseFrame(PlayerBufferInfo &frame)
++int32_t VideoSink::DequeReleaseFrame(OutputInfo &frame)
+ {
+     std::lock_guard<std::mutex> lock(mutex_);
+     if (frameReleaseQue_.size() == 0) {
+@@ -362,22 +363,22 @@ void VideoSink::RenderRptEvent(EventCbType event)
+     }
+ }
+ 
+-int32_t VideoSink::WriteToVideoDevice(CodecBuffer &renderFrame)
++int32_t VideoSink::WriteToVideoDevice(OutputInfo &renderFrame)
+ {
+     if (layerFuncs_ != nullptr) {
+         LayerBuffer layerBuf;
+-        layerBuf.data.virAddr = (void *)renderFrame.buffer[0].buf;
+-        layerFuncs_->Flush(0, 0, &layerBuf);
++        layerBuf.data.virAddr = renderFrame.vendorPrivate;
++        layerFuncs_->Flush(0, layerId_, &layerBuf);
+     }
+     ReleaseQueHeadFrame();
+     return SINK_SUCCESS;
+ }
+ 
+-int32_t VideoSink::RenderFrame(PlayerBufferInfo &frame)
++int32_t VideoSink::RenderFrame(OutputInfo &frame)
+ {
+     SyncRet syncRet = SYNC_RET_PLAY;
+     int64_t crtPlayPts = 0;
+-    PlayerBufferInfo renderFrame;
++    OutputInfo renderFrame;
+ 
+     /* the frame should be save to queue at state paused and none-started */
+     if (!started_ || paused_ || (renderMode_ == RENDER_MODE_PAUSE_AFTER_PLAY && renderFrameCnt_ == 1)) {
+@@ -393,22 +394,22 @@ int32_t VideoSink::RenderFrame(PlayerBufferInfo &frame)
+         return SINK_QUE_EMPTY;
+     }
+ 
+-    crtPlayPts = renderFrame.info.timeStamp;
++    crtPlayPts = renderFrame.timeStamp;
+     int32_t ret = (syncHdl_ != nullptr) ? syncHdl_->ProcVidFrame(crtPlayPts, syncRet) : HI_SUCCESS;
+     if (ret != HI_SUCCESS) {
+         ReleaseQueHeadFrame();
+-        MEDIA_ERR_LOG("ProcVidFrame pts: %llu failed", renderFrame.info.timeStamp);
++        MEDIA_ERR_LOG("ProcVidFrame pts: %llu failed", renderFrame.timeStamp);
+         return SINK_RENDER_ERROR;
+     }
+ 
+     if (syncRet == SYNC_RET_PLAY) {
+-        ret = WriteToVideoDevice(renderFrame.info);
++        ret = WriteToVideoDevice(renderFrame);
+         if (renderFrameCnt_ == 0) {
+-            callBack_.onEventCallback(callBack_.priv, EVNET_FIRST_VIDEO_REND, 0, 0);
++            callBack_.onEventCallback(callBack_.priv, EVNET_FIRST_VIDEO_REND, renderFrame.timeStamp, 0);
+         }
+         renderFrameCnt_++;
+     } else if (syncRet == SYNC_RET_DROP) {
+-        MEDIA_INFO_LOG("too late, drop, pts: %lld", renderFrame.info.timeStamp);
++        MEDIA_INFO_LOG("too late, drop, pts: %lld", renderFrame.timeStamp);
+         ReleaseQueHeadFrame();
+         ret = SINK_SUCCESS;
+     } else if (syncRet == SYNC_RET_REPEAT) {
+@@ -421,7 +422,7 @@ int32_t VideoSink::RenderFrame(PlayerBufferInfo &frame)
+ 
+     /* render pts update after the frame that have been processed */
+     if (ret == SINK_SUCCESS || ret == SINK_RENDER_ERROR) {
+-        lastRendPts_ = (renderFrame.info.timeStamp > lastRendPts_) ? renderFrame.info.timeStamp : lastRendPts_;
++        lastRendPts_ = renderFrame.timeStamp;
+     }
+     return ret;
+ }
+diff --git a/services/player_lite/impl/player_control/sink/player_video_sink.h b/services/player_lite/impl/player_control/sink/player_video_sink.h
+index 4234f94..a0979cc 100644
+--- a/services/player_lite/impl/player_control/sink/player_video_sink.h
++++ b/services/player_lite/impl/player_control/sink/player_video_sink.h
+@@ -45,7 +45,7 @@ public:
+     int32_t SetSpeed(float speed);
+     int32_t GetSpeed(float &speed);
+     int32_t GetState(int32_t &state);
+-    int32_t RenderFrame(PlayerBufferInfo &frame);
++    int32_t RenderFrame(OutputInfo &frame);
+     void SetRenderMode(RenderMode mode);
+     void SetSync(PlayerSync *sync);
+     int32_t SetParam(const char *key, dataType type, void* value);
+@@ -53,17 +53,17 @@ public:
+     int32_t RegisterCallBack(PlayEventCallback &callback);
+     void GetStatus(VideoSinkStatus &status);
+     void RenderEos(void);
+-    int DequeReleaseFrame(PlayerBufferInfo &frame);
++    int DequeReleaseFrame(OutputInfo &frame);
+     void GetRenderPosition(int64_t &position);
+ 
+ private:
+     void ResetRendStartTime();
+-    int GetRenderFrame(PlayerBufferInfo &renderFrame, PlayerBufferInfo &frame);
++    int GetRenderFrame(OutputInfo &renderFrame, OutputInfo &frame);
+     void ReleaseQueHeadFrame(void);
+     void ReleaseQueAllFrame(void);
+     void RenderRptEvent(EventCbType event);
+-    int32_t WriteToVideoDevice(CodecBuffer &renderFrame);
+-    void QueueRenderFrame(PlayerBufferInfo &frame, bool cacheQueue);
++    int32_t WriteToVideoDevice(OutputInfo &renderFrame);
++    void QueueRenderFrame(OutputInfo &frame, bool cacheQueue);
+     void CheckConfigVideoOutput(void);
+     void SetDefaultDisplayRegionInfo(void);
+     void UpdateDisplayRegionInfo(int32_t x, int32_t y, int32_t w, int32_t h);
+@@ -89,12 +89,13 @@ private:
+     bool eosSended_;
+     std::mutex mutex_;
+     LayerFuncs *layerFuncs_;
+-    std::vector<PlayerBufferInfo> frameCacheQue_;
+-    std::vector<PlayerBufferInfo> frameReleaseQue_;
++    std::vector<OutputInfo> frameCacheQue_;
++    std::vector<OutputInfo> frameReleaseQue_;
+     int32_t lastConfigRegionX_;
+     int32_t lastConfigRegionY_;
+     int32_t lastConfigRegionW_;
+     int32_t lastConfigRegionH_;
++    uint32_t layerId_;
+ };
+ }  // namespace Media
+ }  // namespace OHOS
+diff --git a/services/player_lite/impl/player_control/source/player_demux.cpp b/services/player_lite/impl/player_control/source/player_demux.cpp
+index 6796d74..5cafab5 100644
+--- a/services/player_lite/impl/player_control/source/player_demux.cpp
++++ b/services/player_lite/impl/player_control/source/player_demux.cpp
+@@ -156,77 +156,8 @@ int32_t PlayerDemuxer::Prepare(void)
+ 
+ int32_t PlayerDemuxer::GetFileInfo(FormatFileInfo &fileInfo)
+ {
+-    uint32_t i;
+-    FileInfo info;
+-    int programId = -1;
+-    int trackId[0x2] = {-1, -1};
+-    int trackNum = 0x2;
+-    ProgramInfo *programInfo = nullptr;
+-    CHECK_FAILED_RETURN(prepared_, true, -1, "not prepared");
+-    CHECK_FAILED_RETURN(FormatDemuxerGetFileInfo(demuxer_, &info), 0, -1, "");
+-    CHECK_FAILED_RETURN(FormatDemuxerGetSelectedTrack(demuxer_, &programId, trackId, &trackNum), 0, -1, "");
+-
+-    if (programId == -1 || trackNum == 0 || trackId[0] == -1) {
+-        MEDIA_ERR_LOG("FormatDemuxerGetSelectedTrack failed");
+-        return -1;
+-    }
+-
+-    fileInfo.s64FileSize = -1;
+-    fileInfo.s64StartTime = 0;
+-    fileInfo.u32Bitrate = info.bitrate;
+-    if (info.programNum == 1) {
+-        programInfo = &info.programInfo[0];
+-    } else {
+-        for (i = 0; i < info.programNum; i++) {
+-            if (info.programInfo[i].programId == programId) {
+-                programInfo = &info.programInfo[i];
+-                break;
+-            }
+-        }
+-    }
+-    if (programInfo == nullptr) {
+-        MEDIA_ERR_LOG("can not find the program");
+-        return -1;
+-    }
+-    fileInfo.s64Duration = programInfo->durationMs;
+-    fileInfo.s32UsedVideoStreamIndex = -1;
+-    fileInfo.s32UsedAudioStreamIndex = -1;
+-    for (i = 0; i < programInfo->trackNum; i++) {
+-        if (programInfo->track[i].trackId == trackId[0] || programInfo->track[i].trackId == trackId[1]) {
+-            if (programInfo->track[i].trackType == TRACK_TYPE_VIDEO) {
+-                fileInfo.s32UsedVideoStreamIndex = programInfo->track[i].trackId;
+-                fileInfo.u32Width = programInfo->track[i].vidTrack.width;
+-                fileInfo.u32Height = programInfo->track[i].vidTrack.height;
+-                fileInfo.enVideoType = programInfo->track[i].vidTrack.format;
+-            } else if (programInfo->track[i].trackType == TRACK_TYPE_AUDIO) {
+-                fileInfo.s32UsedAudioStreamIndex = programInfo->track[i].trackId;
+-                fileInfo.u32AudioChannelCnt = programInfo->track[i].audTrack.channels;
+-                fileInfo.u32SampleRate = programInfo->track[i].audTrack.sampleRate;
+-                fileInfo.enAudioType = programInfo->track[i].audTrack.format;
+-            }
+-        }
+-    }
+-    int index = 0;
+-    uint32_t j;
+-    for (i = 0; i < info.programNum; i++) {
+-        programInfo = &info.programInfo[i];
+-        for (j = 0; j < programInfo->trackNum; j++) {
+-            if (programInfo->track[j].trackType == TRACK_TYPE_VIDEO && index < HI_DEMUXER_RESOLUTION_CNT) {
+-                fileInfo.stSteamResolution[index].s32VideoStreamIndex = programInfo->track[j].trackId;
+-                fileInfo.stSteamResolution[index].u32Width = programInfo->track[j].vidTrack.width;
+-                fileInfo.stSteamResolution[index].u32Height = programInfo->track[j].vidTrack.height;
+-                fileInfo.stSteamResolution[index].enVideoType = programInfo->track[j].vidTrack.format;
+-                index++;
+-            }
+-        }
+-    }
+-    for (; index < HI_DEMUXER_RESOLUTION_CNT; index++) {
+-        fileInfo.stSteamResolution[index].s32VideoStreamIndex = -1;
+-        fileInfo.stSteamResolution[index].u32Width = 0;
+-        fileInfo.stSteamResolution[index].u32Height = 0;
+-    }
++    CHECK_FAILED_RETURN(FormatDemuxerGetFileInfo(demuxer_, &fileInfo), 0, -1, "");
+ 
+-    fileInfo.formatName = info.formatName;
+     return 0;
+ }
+ 
+diff --git a/services/player_lite/impl/player_impl.cpp b/services/player_lite/impl/player_impl.cpp
+index bdf527f..e6d17b4 100644
+--- a/services/player_lite/impl/player_impl.cpp
++++ b/services/player_lite/impl/player_impl.cpp
+@@ -171,7 +171,7 @@ int32_t PlayerImpl::SetSource(const Source &source)
+ static void ShowFileInfo(const FormatFileInfo *fileInfo)
+ {
+     for (int i = 0; i < HI_DEMUXER_RESOLUTION_CNT; i++) {
+-        const StreamResolution *resolution = &fileInfo->stSteamResolution[i];
++        const StreamResolution *resolution = &fileInfo->stStreamResolution[i];
+         if (resolution->u32Width == 0 || resolution->u32Height == 0) {
+             break;
+         }
+@@ -258,10 +258,10 @@ void PlayerImpl::PlayerControlEventCb(void* pPlayer, PlayerControlEvent enEvent,
+ void PlayerImpl::ReportVideoSizeChange(void)
+ {
+     for (int i = 0; i < HI_DEMUXER_RESOLUTION_CNT; i++) {
+-        if (formatFileInfo_.stSteamResolution[i].s32VideoStreamIndex == formatFileInfo_.s32UsedVideoStreamIndex) {
++        if (formatFileInfo_.stStreamResolution[i].s32VideoStreamIndex == formatFileInfo_.s32UsedVideoStreamIndex) {
+             if (callback_ != nullptr) {
+-                callback_->OnVideoSizeChanged(formatFileInfo_.stSteamResolution[i].u32Width,
+-                    formatFileInfo_.stSteamResolution[i].u32Height);
++                callback_->OnVideoSizeChanged(formatFileInfo_.stStreamResolution[i].u32Width,
++                    formatFileInfo_.stStreamResolution[i].u32Height);
+             }
+             break;
+         }
+@@ -333,7 +333,7 @@ int32_t PlayerImpl::SetMediaStream(void)
+     }
+ 
+     for (int i = 0; i < HI_DEMUXER_RESOLUTION_CNT; i++) {
+-        StreamResolution *resolution = &formatFileInfo_.stSteamResolution[i];
++        StreamResolution *resolution = &formatFileInfo_.stStreamResolution[i];
+         if (resolution->s32VideoStreamIndex == mediaAttr_.s32VidStreamId) {
+             MEDIA_INFO_LOG("used video w=%u,h=%u,index=%d",
+                 resolution->u32Width, resolution->u32Height, mediaAttr_.s32VidStreamId);
+@@ -628,8 +628,8 @@ int32_t PlayerImpl::GetVideoWidth(int32_t &videoWidth)
+         return -1;
+     }
+     for (int i = 0; i < HI_DEMUXER_RESOLUTION_CNT; i++) {
+-        if (formatFileInfo_.stSteamResolution[i].s32VideoStreamIndex == formatFileInfo_.s32UsedVideoStreamIndex) {
+-            videoWidth = formatFileInfo_.stSteamResolution[i].u32Width;
++        if (formatFileInfo_.stStreamResolution[i].s32VideoStreamIndex == formatFileInfo_.s32UsedVideoStreamIndex) {
++            videoWidth = formatFileInfo_.stStreamResolution[i].u32Width;
+             break;
+         }
+     }
+@@ -653,8 +653,8 @@ int32_t PlayerImpl::GetVideoHeight(int32_t &videoHeight)
+     }
+ 
+     for (int i = 0; i < HI_DEMUXER_RESOLUTION_CNT; i++) {
+-        if (formatFileInfo_.stSteamResolution[i].s32VideoStreamIndex == formatFileInfo_.s32UsedVideoStreamIndex) {
+-            videoHeight = formatFileInfo_.stSteamResolution[i].u32Height;
++        if (formatFileInfo_.stStreamResolution[i].s32VideoStreamIndex == formatFileInfo_.s32UsedVideoStreamIndex) {
++            videoHeight = formatFileInfo_.stStreamResolution[i].u32Height;
+             break;
+         }
+     }
+diff --git a/services/player_lite/server/src/player_server.cpp b/services/player_lite/server/src/player_server.cpp
+index 0f5f2a7..79f53e2 100644
+--- a/services/player_lite/server/src/player_server.cpp
++++ b/services/player_lite/server/src/player_server.cpp
+@@ -30,8 +30,8 @@ extern "C"
+ #include <sys/prctl.h>
+ #include "securec.h"
+ }
+-
+-#define READ_LEN  (1024)
++constexpr int32_t SURFACE_SIZE = 4096;
++constexpr int32_t SURFACE_QUEUE_SIZE = 10;
+ 
+ typedef struct TagIdleBuffer {
+     size_t idx;
+@@ -302,7 +302,8 @@ void PlayerServer::SetStreamSource(IpcIo *reply)
+     if (ret == 0) {
+         Surface* surface = Surface::CreateSurface();
+         surface->SetUsage(BUFFER_CONSUMER_USAGE_HARDWARE);
+-        surface->SetSize(READ_LEN);
++        surface->SetQueueSize(SURFACE_QUEUE_SIZE);
++        surface->SetSize(SURFACE_SIZE);
+         if (sid_ == nullptr) {
+             sid_ = new SvcIdentity();
+         }
+@@ -645,7 +646,7 @@ void PlayerServer::SetParameter(IpcIo *req, IpcIo *reply)
+     int32_t count;
+     ReadInt32(req, &count);
+     for (int32_t i = 0; i < count; i++) {
+-        uint32_t size;
++        size_t size;
+         char *key = (char *)ReadString(req, &size);
+         FormatDataType type;
+         ReadInt32(req, (int32_t *)&type);
+diff --git a/services/recorder_lite/impl/src/recorder_sink.cpp b/services/recorder_lite/impl/src/recorder_sink.cpp
+index bff6bf7..3b4583c 100644
+--- a/services/recorder_lite/impl/src/recorder_sink.cpp
++++ b/services/recorder_lite/impl/src/recorder_sink.cpp
+@@ -16,6 +16,7 @@
+ #include "recorder_sink.h"
+ #include <unistd.h>
+ #include <sys/prctl.h>
++#include <sys/stat.h>
+ #include "format_interface.h"
+ #include "media_log.h"
+ #include "securec.h"
+@@ -31,7 +32,7 @@ RecorderSink::RecorderSink()
+     :formatMuxerHandle_(nullptr),
+      prepared_(false),
+      started_(false),
+-     outputFormat_(OUTPUT_FORMAT_INVALID),
++     outputFormat_(OUTPUT_FORMAT_MPEG_4),
+      outputFd_(-1),
+      outputNextFd_(-1),
+      path_("/userdata"),
+@@ -362,7 +363,7 @@ int32_t RecorderSink::Start()
+             return -1;
+         }
+     }
+-
++    umask(0);
+     int32_t ret = FormatMuxerStart(formatMuxerHandle_);
+     if (ret != SUCCESS) {
+         MEDIA_ERR_LOG("FormatMuxerStart failed 0x%x", ret);
+@@ -434,7 +435,7 @@ int32_t RecorderSink::Reset()
+     }
+     CloseFd();
+     prepared_ = false;
+-    outputFormat_ = OUTPUT_FORMAT_INVALID;
++    outputFormat_ = OUTPUT_FORMAT_MPEG_4;
+     maxFileSize_ = -1;
+     maxDuration_ = -1;
+     return SUCCESS;
+diff --git a/test/BUILD.gn b/test/BUILD.gn
+old mode 100755
+new mode 100644
+index 5636d38..a2797fb
+--- a/test/BUILD.gn
++++ b/test/BUILD.gn
+@@ -21,7 +21,8 @@ executable("test_play_file_h265") {
+   include_dirs = [
+     "//third_party/bounds_checking_function/include",
+     "//drivers/peripheral/codec/interfaces/include",
+-    "//foundation/multimedia/media_utils_lite/hals",
++    "//drivers/peripheral/display/interfaces/include",
++    "//drivers/peripheral/base",
+   ]
+ 
+   if (enable_media_passthrough_mode == true) {
+@@ -35,4 +36,8 @@ executable("test_play_file_h265") {
+     "//device/soc/hisilicon/common/hal/media:hardware_media_sdk",
+     "//third_party/bounds_checking_function:libsec_shared",
+   ]
++      ldflags += [ "-ldisplay_layer" ]
++      deps += [
++        "//device/soc/hisilicon/common/hal/display:display_layer",
++      ]
+ }
+diff --git a/test/test_play_file_h265.cpp b/test/test_play_file_h265.cpp
+old mode 100755
+new mode 100644
+index 1bfaf4a..12f9a57
+--- a/test/test_play_file_h265.cpp
++++ b/test/test_play_file_h265.cpp
+@@ -24,6 +24,9 @@
+ 
+ using namespace std;
+ 
++const int32_t DEFAULT_REGION_WIDTH = 480;
++const int32_t DEFAULT_REGION_HEIGHT = 480;
++
+ void PlayManager::Display(CODEC_HANDLETYPE decoderHdl)
+ {
+     OutputInfo outInfo = {};
+@@ -55,6 +58,7 @@ void PlayManager::Display(CODEC_HANDLETYPE decoderHdl)
+ 
+ PlayManager::PlayManager()
+ {
++    layerId_ = 0;
+     InitVideoOutput();
+ }
+ 
+@@ -65,22 +69,37 @@ PlayManager::~PlayManager()
+ 
+ int32_t PlayManager::InitVideoOutput()
+ {
+-    int32_t ret = HalPlayerSysInit();
+-    if (ret != 0) {
+-        DEMO_LOG("hal system init failed.");
+-        return DEMO_ERR;
+-    }
+-
+-    ret = HalPlayerVoInit(&voHdl_);
+-    if (ret != 0) {
+-        DEMO_LOG("video output init failed.");
+-        return DEMO_ERR;
+-    }
+-
+-    ret = HalStartVideoOutput(voHdl_);
+-    if (ret != 0) {
+-        DEMO_LOG("video output start failed.");
+-        return DEMO_ERR;
++    (void)LayerInitialize(&layerFuncs_);
++
++    int32_t lastConfigRegionX_ = 0;
++    int32_t lastConfigRegionY_ = 0;
++    int32_t lastConfigRegionW_ = DEFAULT_REGION_WIDTH;
++    int32_t lastConfigRegionH_ = DEFAULT_REGION_HEIGHT;
++    IRect attr;
++    uint32_t devId = 0;
++    int32_t right = lastConfigRegionX_ + lastConfigRegionW_ - 1;
++    int32_t botttom = lastConfigRegionY_ + lastConfigRegionH_ - 1;
++    /* Make sure the coordinates are even */
++    int32_t x = lastConfigRegionX_ - lastConfigRegionX_ % 0x2;
++    int32_t y = lastConfigRegionY_ - lastConfigRegionY_ % 0x2;
++    int32_t w = right - x + 1;
++    int32_t h = botttom - y + 1;
++    w = w + w % 2;
++    h = h + h % 2;
++    attr.x = x;
++    attr.y = y;
++    attr.w = w;
++    attr.h = h;
++
++    LayerInfo lInfo;
++    lInfo.width = w;
++    lInfo.height = h;
++    lInfo.type = LAYER_TYPE_OVERLAY;
++    lInfo.bpp = 8;
++    lInfo.pixFormat = PIXEL_FMT_YCRCB_420_SP;
++    if (layerFuncs_ != nullptr) {
++        layerFuncs_->CreateLayer(devId, &lInfo, &layerId_);
++        layerFuncs_->SetLayerSize(devId, layerId_, &attr);
+     }
+ 
+     return DEMO_OK;
+@@ -88,35 +107,19 @@ int32_t PlayManager::InitVideoOutput()
+ 
+ int32_t PlayManager::DeinitVideoOutput()
+ {
+-    int32_t ret = HalStopVideoOutput(voHdl_);
+-    if (ret != 0) {
+-        DEMO_LOG("video output start failed.");
+-        return DEMO_ERR;
++    if (layerFuncs_ != nullptr) {
++        layerFuncs_->CloseLayer(0, layerId_);
+     }
+ 
+-    HalPlayerVoDeinit(voHdl_);
+-
+     return DEMO_OK;
+ }
+ 
+ int32_t PlayManager::Write2VideoDevice(OutputInfo &outputInfo)
+ {
+-    int32_t x = 200;
+-    int32_t y = 200;
+-    int32_t w = 960;
+-    int32_t h = 540;
+-
+-    HalVideoOutputAttr voAttr = {x, y, w, h, 0};
+-    int32_t ret = HalConfigVideoOutput(voHdl_, voAttr);
+-    if (ret != 0) {
+-        DEMO_LOG("HalConfigVideoOutput failed.");
+-        return DEMO_ERR;
+-    }
+-
+-    ret = HalWriteVo(voHdl_, outputInfo.vendorPrivate);
+-    if (ret != 0) {
+-        DEMO_LOG("HalWriteVo failed.");
+-        return DEMO_ERR;
++    if (layerFuncs_ != nullptr) {
++        LayerBuffer layerBuf;
++        layerBuf.data.virAddr = outputInfo.vendorPrivate;
++        layerFuncs_->Flush(0, layerId_, &layerBuf);
+     }
+ 
+     return DEMO_OK;
+@@ -136,7 +139,7 @@ int32_t DecodeManager::DecoderCreate()
+ {
+     int index = 0;
+     Param param[PARAM_MAX_NUM];
+-    AvCodecMime mime = MEDIA_MIMETYPE_VIDEO_HEVC;
++    AvCodecMime mime = MEDIA_MIMETYPE_VIDEO_AVC;
+     param[index].key = KEY_MIMETYPE;
+     param[index].val = (void *)&mime;
+     param[index].size = sizeof(AvCodecMime);
+@@ -324,8 +327,7 @@ int main()
+     uint64_t timeStamp = 0;
+     int32_t bufLen = 0;
+     while (file) {
+-        bufLen += ReadH265File(file, static_cast<char *>(buf + bufLen), bufSize - bufLen);
+-
++        bufLen += ReadH265File(file, reinterpret_cast<char *>(buf + bufLen), bufSize - bufLen);
+         int32_t frameSize;
+         int32_t codeSize;
+         int32_t offset = 0;
+@@ -346,6 +348,7 @@ int main()
+             DEMO_LOG("Decode one frame failed.");
+             continue;
+         }
++        this_thread::sleep_for(chrono::microseconds(timeStep));
+     }
+     while (playMng.GetCnt() != decodeMng.GetCnt()) {
+         this_thread::sleep_for(chrono::seconds(1)); // sleep 1s
+diff --git a/test/test_play_file_h265.h b/test/test_play_file_h265.h
+old mode 100755
+new mode 100644
+index 500eca7..6b5b1a4
+--- a/test/test_play_file_h265.h
++++ b/test/test_play_file_h265.h
+@@ -21,7 +21,7 @@
+ #include <queue>
+ 
+ #include "codec_type.h"
+-#include "hal_display.h"
++#include "display_layer.h"
+ 
+ #define FILENAME (__builtin_strrchr(__FILE__, '/') ? __builtin_strrchr(__FILE__, '/') + 1 : __FILE__)
+ #define DEMO_LOG(format, ...) printf("%s[%s:%d]" format "\n", __func__, (FILENAME), __LINE__, ##__VA_ARGS__)
+@@ -42,9 +42,9 @@ public:
+ 
+ private:
+     std::queue<OutputInfo *> playQ_ = {};
+-    HalVideoOutputHdl voHdl_ = 0;
+     int64_t frameCnt_ = 0;
+-
++    LayerFuncs *layerFuncs_;
++    uint32_t layerId_;
+     int32_t InitVideoOutput();
+     int32_t DeinitVideoOutput();
+     int32_t Write2VideoDevice(OutputInfo &outputInfo);

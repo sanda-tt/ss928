@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# 注意事项：
+# - V1.3 及以上版本的底板：
+#   支持 WS73 模块的正常重启，可以直接使用 `reboot` 命令重启开发板。
+#
+# - V1.3 之前的底板：
+#   不支持 WS73 模块的正常重启，如果仅执行 `reboot` 可能会导致 WiFi 模块异常。
+#   必须通过断电再上电的方式重新启动开发板。
+
+echo "=================wifi start=================="
+
+export PATH="/usr/bin:/usr/sbin:/bin:/sbin"
+export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
+
+export LD_LIBRARY_PATH="/usr/local/lib:/usr/lib:/opt/lib"
+
+mcu_tool /dev/i2c-0 0x10 nl off
+sleep 0.5
+mcu_tool /dev/i2c-0 0x10 nl on
+
+/opt/sample/ws73/wifi_sta.sh 0 &
+
+echo "=================wifi end  =================="

@@ -1,0 +1,38 @@
+From c441fffa1d76fd9645707e7f77542bc32275426f Mon Sep 17 00:00:00 2001
+From: limingqiang <limingqiang@ebaina.com>
+Date: Wed, 19 Nov 2025 20:25:42 +0800
+Subject: [PATCH] =?UTF-8?q?feat<linux>:=20=E6=96=B0=E5=A2=9E=E7=BC=96?=
+ =?UTF-8?q?=E8=AF=91=E5=A2=9E=E5=8A=A0=E6=B5=B7=E9=B8=A5=E6=B4=BE=E6=89=93?=
+ =?UTF-8?q?=E8=A1=A5=E4=B8=81=E6=93=8D=E4=BD=9C?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ platform/ss928v100_clang/open_source/linux/Makefile | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/platform/ss928v100_clang/open_source/linux/Makefile b/platform/ss928v100_clang/open_source/linux/Makefile
+index eaee1efa7..2bffa2468 100644
+--- a/platform/ss928v100_clang/open_source/linux/Makefile
++++ b/platform/ss928v100_clang/open_source/linux/Makefile
+@@ -5,6 +5,7 @@ CHIP ?= ss928v100
+ 
+ KERNEL_ORIGIN_VER:=linux-6.6.86
+ KERNEL_VER:=linux-6.6.y
++HiEulerPi_KERNEL_PATCH:=HiEulerPI_clang_linux-6.6.y.patch
+ 
+ LLVM ?= 0
+ ARCH_TYPE ?= arm64
+@@ -39,6 +40,8 @@ ifneq ($(BUILD_DIR)/$(KERNEL_VER), $(wildcard $(BUILD_DIR)/$(KERNEL_VER)))
+ 	@echo -e $(GREEN)"patching kernel..."  $(DONE)
+ 	pushd $(BUILD_DIR);mv $(KERNEL_ORIGIN_VER) $(KERNEL_VER);popd
+ 	pushd $(BUILD_DIR)/$(KERNEL_VER); patch -p1< ../$(KERNEL_ORIGIN_VER).patch;popd
++	@echo -e $(GREEN)"patching kernel for HiEulerPi ..."  $(DONE)
++	pushd $(BUILD_DIR)/$(KERNEL_VER); patch -p1< ../$(HiEulerPi_KERNEL_PATCH);popd
+ endif
+ 	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) $(KERNEL_CFG)
+ 	$(MAKE) -C $(BUILD_DIR)/$(KERNEL_VER) ARCH=$(ARCH_TYPE) $(COMPILE_OPTIONS) uImage
+-- 
+2.34.1
+

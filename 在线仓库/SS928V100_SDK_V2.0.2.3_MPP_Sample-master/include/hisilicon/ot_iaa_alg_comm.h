@@ -1,0 +1,107 @@
+/*
+ * Copyright (c) CompanyNameMagicTag 2024-2024. All rights reserved.
+ * Description:
+ * Author: Software Develop Team
+ * Create: 2024-05-08
+ */
+#ifndef OT_IAA_ALG_COMM_H
+#define OT_IAA_ALG_COMM_H
+
+#include <stdio.h>
+#include <stdlib.h>
+#include "ot_type.h"
+#include "ot_errno.h"
+
+#ifdef __cplusplus
+#if __cplusplus
+extern "C" {
+#endif
+#endif /* __cplusplus */
+
+typedef td_u32 OT_IAA_AlgModelId;
+
+#define OT_IAA_ALG_MAX_DIM 4
+#define OT_ID_IAA_ALG 0x100
+
+#define OT_IAA_ALG_ERR_INVALID_DEV_ID    OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_INVALID_DEV_ID)
+#define OT_IAA_ALG_ERR_INVALID_CHN_ID    OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_INVALID_CHN_ID)
+#define OT_IAA_ALG_ERR_ILLEGAL_PARAM     OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_ILLEGAL_PARAM)
+#define OT_IAA_ALG_ERR_EXIST             OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_EXIST)
+#define OT_IAA_ALG_ERR_UNEXIST           OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_UNEXIST)
+#define OT_IAA_ALG_ERR_NULL_PTR          OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_NULL_PTR)
+#define OT_IAA_ALG_ERR_NOT_CFG           OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_NOT_CFG)
+#define OT_IAA_ALG_ERR_NOT_SUPPORT       OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_NOT_SUPPORT)
+#define OT_IAA_ALG_ERR_NOT_PERM          OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_NOT_PERM)
+#define OT_IAA_ALG_ERR_NO_MEM            OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_NO_MEM)
+#define OT_IAA_ALG_ERR_NO_BUF            OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_NO_BUF)
+#define OT_IAA_ALG_ERR_BUF_EMPTY         OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_BUF_EMPTY)
+#define OT_IAA_ALG_ERR_BUF_FULL          OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_BUF_FULL)
+#define OT_IAA_ALG_ERR_NOT_READY         OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_NOT_READY)
+#define OT_IAA_ALG_ERR_BAD_ADDR          OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_BAD_ADDR)
+#define OT_IAA_ALG_ERR_BUSY              OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_BUSY)
+#define OT_IAA_ALG_ERR_SIZE_NOT_ENOUGH   OT_DEFINE_ERR(OT_ID_IAA_ALG, OT_ERR_LEVEL_ERROR, OT_ERR_SIZE_NOT_ENOUGH)
+
+typedef enum {
+    OT_IAA_ALG_DATA_TYPE_U8 = 0x0,
+    OT_IAA_ALG_DATA_TYPE_S8 = 0x1,
+    OT_IAA_ALG_DATA_TYPE_U10 = 0x2,
+    OT_IAA_ALG_DATA_TYPE_S10 = 0x3,
+    OT_IAA_ALG_DATA_TYPE_U12 = 0x4,
+    OT_IAA_ALG_DATA_TYPE_S12 = 0x5,
+    OT_IAA_ALG_DATA_TYPE_U14 = 0x6,
+    OT_IAA_ALG_DATA_TYPE_S14 = 0x7,
+    OT_IAA_ALG_DATA_TYPE_U16 = 0x8,
+    OT_IAA_ALG_DATA_TYPE_S16 = 0x9,
+    OT_IAA_ALG_DATA_TYPE_FP16 = 0xA,
+    OT_IAA_ALG_DATA_TYPE_U32 = 0xB,
+    OT_IAA_ALG_DATA_TYPE_S32 = 0xC,
+    OT_IAA_ALG_DATA_TYPE_FP32 = 0xD,
+    OT_IAA_ALG_DATA_TYPE_U64 = 0xE,
+    OT_IAA_ALG_DATA_TYPE_S64 = 0xF,
+    OT_IAA_ALG_DATA_TYPE_DOUBLE = 0x10,
+    OT_IAA_ALG_DATA_TYPE_BUTT
+} OT_IAA_AlgDataType;
+
+typedef enum {
+    OT_IAA_ALG_DATA_FORMAT_NORMAL = 0x0,
+    OT_IAA_ALG_DATA_FORMAT_YVU420SP,
+    OT_IAA_ALG_DATA_FORMAT_YVU422SP,
+    OT_IAA_ALG_DATA_FORMAT_YUV420SP,
+    OT_IAA_ALG_DATA_FORMAT_YUV422SP,
+    OT_IAA_ALG_DATA_FORMAT_YUV400,
+    OT_IAA_ALG_DATA_FORMAT_RAW,
+    OT_IAA_ALG_DATA_FORMAT_BUTT
+} OT_IAA_AlgDataFormat;
+
+typedef struct {
+    OT_IAA_AlgDataType type;
+    OT_IAA_AlgDataFormat format;
+    td_u32 dim[OT_IAA_ALG_MAX_DIM];
+    td_u32 dimNum;
+} OT_IAA_AlgDataAttr;
+
+typedef struct {
+    td_phys_addr_t physAddr;
+    td_void *virtAddr;
+    td_u32 size;
+} OT_IAA_AlgMemInfo;
+
+typedef struct {
+    OT_IAA_AlgDataAttr attr;
+    OT_IAA_AlgMemInfo mem;
+    td_u32 stride;
+} OT_IAA_AlgData;
+
+// dfx
+typedef struct {
+    td_bool enableDump;
+    td_bool enablePerformance;
+} OT_IAA_DfxCtrl;
+
+#ifdef __cplusplus
+#if __cplusplus
+}
+#endif
+#endif /* __cplusplus */
+
+#endif // OT_IAA_ALG_COMM_H

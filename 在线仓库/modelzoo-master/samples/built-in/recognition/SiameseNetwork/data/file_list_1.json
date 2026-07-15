@@ -1,0 +1,9 @@
+{
+    "fileList": [
+        [
+            "../../../../../datasets/testdata/13.pgm",
+            "../../../../../datasets/testdata/14.pgm"
+        ]
+    ],
+    "loop": 1
+}

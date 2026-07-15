@@ -1,0 +1,40 @@
+diff --git a/bundle.json b/bundle.json
+index 389eba0..b885054 100644
+--- a/bundle.json
++++ b/bundle.json
+@@ -47,8 +47,7 @@
+        ]
+     },
+     "build": {
+-      "sub_component": [ 
+-      "//foundation/arkui/ace_engine_lite/test:unittest",
++      "sub_component": [
+       "//foundation/arkui/ace_engine_lite/frameworks:jsfwk"
+       ],
+       "inner_kits": [
+diff --git a/frameworks/module_manager/ohos_module_config.h b/frameworks/module_manager/ohos_module_config.h
+index 811f514..b77aab3 100644
+--- a/frameworks/module_manager/ohos_module_config.h
++++ b/frameworks/module_manager/ohos_module_config.h
+@@ -29,9 +29,7 @@ extern void InitAppModule(JSIValue exports);
+ #if (FEATURE_SUPPORT_HTTP == 1)
+ extern void InitFetchModule(JSIValue exports);
+ #endif // FEATURE_SUPPORT_HTTP
+-#if (FEATURE_MODULE_AUDIO == 1)
+-extern void InitAudioModule(JSIValue exports);
+-#endif // FEATURE_MODULE_AUDIO
++
+ #if (FEATURE_ACELITE_DFX_MODULE == 1)
+ extern void InitDfxModule(JSIValue exports);
+ #endif // FEATURE_ACELITE_DFX_MODULE
+@@ -102,9 +100,7 @@ const Module OHOS_MODULES[] = {
+ #if (FEATURE_SUPPORT_HTTP == 1)
+     {"fetch", InitFetchModule},
+ #endif // FEATURE_SUPPORT_HTTP
+-#if (FEATURE_MODULE_AUDIO == 1)
+-    {"audio", InitAudioModule},
+-#endif // FEATURE_MODULE_AUDIO
++
+ #if (FEATURE_ACELITE_DFX_MODULE == 1)
+     {"dfx", InitDfxModule},
+ #endif // FEATURE_ACELITE_DFX_MODULE

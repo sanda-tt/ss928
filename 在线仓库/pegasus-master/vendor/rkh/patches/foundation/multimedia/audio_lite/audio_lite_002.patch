@@ -1,0 +1,837 @@
+diff --git a/bundle.json b/bundle.json
+index ffc8521..17fc930 100755
+--- a/bundle.json
++++ b/bundle.json
+@@ -34,4 +34,4 @@
+             "test": []
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/frameworks/BUILD.gn b/frameworks/BUILD.gn
+index 7f2bd2a..97c2fc5 100644
+--- a/frameworks/BUILD.gn
++++ b/frameworks/BUILD.gn
+@@ -54,6 +54,8 @@ shared_library("audio_capturer_lite") {
+   public_deps = [
+     "//foundation/multimedia/media_utils_lite:media_common",
+     "//third_party/bounds_checking_function:libsec_shared",
++    "//third_party/alsa-lib:asound_shared",
++    "//third_party/alsa-utils:alsa_utils_lite"
+   ]
+ }
+ 
+diff --git a/frameworks/binder/audio_capturer_client.cpp b/frameworks/binder/audio_capturer_client.cpp
+index 0a87200..a234a2f 100644
+--- a/frameworks/binder/audio_capturer_client.cpp
++++ b/frameworks/binder/audio_capturer_client.cpp
+@@ -34,7 +34,10 @@ using namespace std;
+ namespace OHOS {
+ namespace Audio {
+ constexpr int32_t SURFACE_QUEUE_SIZE = 5;
+-constexpr int32_t SURFACE_SIZE = 4096;
++// hihopeos add record buffer use surface buffer
++// when channel = 2, ai output buffer 2048*2 + 12 > 4096, surface size must be 8192
++// constexpr int32_t SURFACE_SIZE = 4096;
++constexpr int32_t SURFACE_SIZE = 8192;
+ constexpr int32_t SURFACE_HEIGHT = 1;
+ constexpr int32_t SURFACE_WIDTH = 8192;
+ constexpr int32_t WAIT_SURFACE_BUFFER_US = 10;
+@@ -101,12 +104,13 @@ static int32_t ProxyCallbackFunc(void *owner, int code, IpcIo *reply)
+         case AUD_CAP_FUNC_GET_INFO: {
+             uint32_t size = 0;
+             ReadUint32(reply, &size);
+-            const char *bufferAdd = reinterpret_cast<const char *>(ReadBuffer(reply, size_t(size)));
+-            if (bufferAdd == nullptr || size == 0) {
++            void *bufferAdd = (void*)ReadBuffer(reply, (size_t)size);
++            if (bufferAdd == nullptr || !size) {
+                 MEDIA_INFO_LOG("Readbuffer info failed");
+                 return -1;
+             }
+-            DeserializeCaptureInfo(bufferAdd, static_cast<AudioCapturerInfo *>(para->data));
++            DeserializeCaptureInfo(static_cast<const char *>(bufferAdd),
++                static_cast<AudioCapturerInfo *>(para->data));
+             break;
+         }
+         case AUD_CAP_FUNC_GET_MIN_FRAME_COUNT:
+@@ -293,7 +297,7 @@ bool AudioCapturer::AudioCapturerClient::GetAudioTime(Timestamp &timestamp, Time
+     return true;
+ }
+ 
+-std::string AudioCapturer::AudioCapturerClient::SerializeCaptureInfo(const AudioCapturerInfo &info) const
++std::string AudioCapturer::AudioCapturerClient::SerializeCaptureInfo(const AudioCapturerInfo &info)
+ {
+     std::stringstream ss;
+     ss << static_cast<int32_t>(info.inputSource) << ' '
+@@ -305,7 +309,7 @@ std::string AudioCapturer::AudioCapturerClient::SerializeCaptureInfo(const Audio
+         << static_cast<int32_t>(info.streamType) << ' '
+         << static_cast<int32_t>(info.bitWidth) << ' '
+         << static_cast<int32_t>(info.deviceType);
+-    MEDIA_INFO_LOG("info.streamType = %d, info.bitWidth = %d, info.deviceType = %d",
++    MEDIA_ERR_LOG("info.streamType = %d, info.bitWidth = %d, info.deviceType = %d",
+         info.streamType, info.bitWidth, info.deviceType);
+     return ss.str();
+ }
+@@ -359,12 +363,12 @@ bool AudioCapturer::AudioCapturerClient::Start()
+     uint8_t tmpData[DEFAULT_IPC_SIZE];
+     IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 0);
+     CallBackPara para = {.funcId = AUD_CAP_FUNC_START, .ret = MEDIA_IPC_FAILED};
+-    
++
+     if (proxy_ == nullptr) {
+         MEDIA_ERR_LOG("Start failed, proxy_ value is nullptr");
+         return false;
+     }
+-    
++
+     int32_t ret = proxy_->Invoke(proxy_, AUD_CAP_FUNC_START, &io, &para, ProxyCallbackFunc);
+     if (ret) {
+         MEDIA_ERR_LOG("Start failed, ret=%d", ret);
+@@ -380,7 +384,7 @@ bool AudioCapturer::AudioCapturerClient::Stop()
+     uint8_t tmpData[DEFAULT_IPC_SIZE];
+     IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 0);
+     CallBackPara para = {.funcId = AUD_CAP_FUNC_STOP, .ret = MEDIA_IPC_FAILED};
+-    
++
+     if (proxy_ == nullptr) {
+         MEDIA_ERR_LOG("Stop failed, proxy_ value is nullptr");
+         return false;
+@@ -401,7 +405,7 @@ bool AudioCapturer::AudioCapturerClient::Release()
+     uint8_t tmpData[DEFAULT_IPC_SIZE];
+     IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 0);
+     CallBackPara para = {.funcId = AUD_CAP_FUNC_RELEASE, .ret = MEDIA_IPC_FAILED};
+-    
++
+     if (proxy_ == nullptr) {
+         MEDIA_ERR_LOG("Release failed, proxy_ value is nullptr");
+         return false;
+@@ -470,7 +474,6 @@ IClientProxy *AudioCapturer::AudioCapturerClient::GetIClientProxy()
+ int32_t AudioCapturer::AudioCapturerClient::AudioCapturerCallback(uint32_t code, IpcIo *data,
+     IpcIo *reply, MessageOption option)
+ {
+-    (void)reply;
+     auto playerCallback = static_cast<AudioManagerDeviceChangeCallback *>(option.args);
+     if (playerCallback == nullptr) {
+         MEDIA_ERR_LOG("call back error, playerCallback is null");
+@@ -483,8 +486,8 @@ int32_t AudioCapturer::AudioCapturerClient::AudioCapturerCallback(uint32_t code,
+             ReadUint32(data, &dhId);
+             uint32_t size = 0;
+             ReadUint32(data, &size);
+-            const char *bufferAdd = reinterpret_cast<const char *>(ReadBuffer(data, size_t(size)));
+-            if (bufferAdd == nullptr || size == 0) {
++            void *bufferAdd = (void *)ReadBuffer(data, (size_t)size);
++            if (bufferAdd == nullptr || !size) {
+                 MEDIA_INFO_LOG("Readbuffer info failed");
+                 return -1;
+             }
+@@ -494,9 +497,9 @@ int32_t AudioCapturer::AudioCapturerClient::AudioCapturerCallback(uint32_t code,
+             ReadInt32(data, &connectStatus);
+             AudioDeviceInfo info;
+             info.dhId = dhId;
+-            info.deviceName = std::string(bufferAdd);
+-            info.deviceType = AudioSystemDeviceType(deviceType);
+-            info.connectStatus = DeviceConnectStatus(connectStatus);
++            info.deviceName = std::string((char *)bufferAdd);
++            info.deviceType = (AudioSystemDeviceType)deviceType;
++            info.connectStatus = (DeviceConnectStatus)connectStatus;
+             playerCallback->OnDeviceChange(info);
+             MEDIA_INFO_LOG("AudioCapturerClient AudioCapturerCallback, ON_DEVICE_CHANGED success\n");
+             break;
+@@ -522,7 +525,7 @@ void AudioCapturer::AudioCapturerClient::SetDeviceChangeCallback(
+     }
+     callback_ = callback;
+     objectStub_.func = AudioCapturerCallback;
+-    objectStub_.args = callback_.get();
++    objectStub_.args = (void *)callback_.get();
+     objectStub_.isRemote = false;
+     sid_->handle = IPC_INVALID_HANDLE;
+     sid_->token = SERVICE_TYPE_ANONYMOUS;
+@@ -536,7 +539,7 @@ void AudioCapturer::AudioCapturerClient::SetDeviceChangeCallback(
+     }
+     CallBackPara para = {};
+     para.funcId = AUD_CAP_FUNC_SET_DEVICE_CHANGE_CALLBACK;
+-    int32_t ans = proxy_->Invoke(proxy_, AUD_CAP_FUNC_SET_DEVICE_CHANGE_CALLBACK, &io, &para, ProxyCallbackFunc);
++    uint32_t ans = proxy_->Invoke(proxy_, AUD_CAP_FUNC_SET_DEVICE_CHANGE_CALLBACK, &io, &para, ProxyCallbackFunc);
+     if (ans != 0) {
+         MEDIA_ERR_LOG("SetDeviceChangeCallback : Invoke failed, ret=%u\n", ans);
+     }
+diff --git a/frameworks/binder/audio_capturer_client.h b/frameworks/binder/audio_capturer_client.h
+index 54e96fa..c265573 100644
+--- a/frameworks/binder/audio_capturer_client.h
++++ b/frameworks/binder/audio_capturer_client.h
+@@ -56,7 +56,7 @@ private:
+     int32_t InitSurface(void);
+     int32_t DeleteSurface(void);
+     void ReleaseAllBuffer();
+-    std::string SerializeCaptureInfo(const AudioCapturerInfo &info) const;
++    std::string SerializeCaptureInfo(const AudioCapturerInfo &info);
+     SvcIdentity *sid_ = nullptr;
+     IpcObjectStub objectStub_;
+     IClientProxy *proxy_ = nullptr;
+diff --git a/interfaces/kits/audio_capturer.h b/interfaces/kits/audio_capturer.h
+index 06a032d..7621fc1 100644
+--- a/interfaces/kits/audio_capturer.h
++++ b/interfaces/kits/audio_capturer.h
+@@ -44,7 +44,7 @@
+ 
+ #include "media_errors.h"
+ #include "media_info.h"
+-#include "audio_manager_device_change_callback.h"
++#include "audio_manager_callback.h"
+ 
+ namespace OHOS {
+ namespace Audio {
+diff --git a/interfaces/kits/audio_device_manager.h b/interfaces/kits/audio_device_manager.h
+index 91869dc..585d61b 100644
+--- a/interfaces/kits/audio_device_manager.h
++++ b/interfaces/kits/audio_device_manager.h
+@@ -15,6 +15,7 @@
+ #ifndef AUDIO_SYSTEM_MANAGER_H
+ #define AUDIO_SYSTEM_MANAGER_H
+ 
++#include <cstddef>
+ #include <cstdint>
+ #include <memory>
+ #include <vector>
+@@ -29,8 +30,8 @@ namespace OHOS {
+             ~AudioDeviceManager();
+             static AudioDeviceManager *GetInstance();
+             std::vector<AudioDeviceInfo> GetAllConnectDevices();
+-            int32_t AddDevice(const AudioDeviceInfo &deviceInfo);
+-            int32_t RemoveDevice(const AudioDeviceInfo &deviceInfo);
++            int32_t AddDevice(const AudioDeviceInfo &deviceinfo);
++            int32_t RemoveDevice(const AudioDeviceInfo &deviceinfo);
+         private:
+             AudioDeviceManager();
+             std::vector<AudioDeviceInfo> allDevices_;
+diff --git a/interfaces/kits/audio_manager_device_change_callback.h b/interfaces/kits/audio_manager_callback.h
+similarity index 73%
+rename from interfaces/kits/audio_manager_device_change_callback.h
+rename to interfaces/kits/audio_manager_callback.h
+index 3141852..6d4e4f0 100644
+--- a/interfaces/kits/audio_manager_device_change_callback.h
++++ b/interfaces/kits/audio_manager_callback.h
+@@ -20,22 +20,23 @@
+ namespace OHOS {
+     namespace Audio {
+         class AudioManagerDeviceChangeCallback {
+-        public:
++            public:
+             virtual ~AudioManagerDeviceChangeCallback() = default;
+             /**
+-                * Called when an interrupt is received.
+-                *
+-                * @param deviceChangeAction Indicates the DeviceChangeAction information needed by client.
+-                * For details, refer DeviceChangeAction struct
+-                * @since 8
+-                */
++             * Called when an interrupt is received.
++             *
++             * @param deviceChangeAction Indicates the DeviceChangeAction information needed by client.
++             * For details, refer DeviceChangeAction struct
++             * @since 8
++             */
+             virtual void OnDeviceChange(const AudioDeviceInfo &deviceInfo) = 0;
+             virtual void OnReadDataFailed() = 0;
+         };
+-        enum AudioCapturerClientCall {
++
++        typedef enum {
+             ON_DEVICE_CHANGED,
+             ON_READ_DATA_FAILED,
+-        };
++        } AudioCapturerClientCall;
+     }
+ }
+ 
+diff --git a/services/impl/audio_capturer_impl.cpp b/services/impl/audio_capturer_impl.cpp
+index 5c5d688..5c0b461 100644
+--- a/services/impl/audio_capturer_impl.cpp
++++ b/services/impl/audio_capturer_impl.cpp
+@@ -247,7 +247,8 @@ int32_t AudioCapturerImpl::Read(uint8_t *buffer, size_t userSize, bool isBlockin
+         readLen = audioSource->ReadFrame(frame, isBlockingRead);
+         if (readLen == 0) {
+             return ERR_INVALID_READ;
+-        } else if (readLen == ERR_INVALID_READ) {
++        }
++        else if (readLen == ERR_INVALID_READ) {
+             MEDIA_ERR_LOG("audioSource_ ReadFrame fail,ret:0x%x", readLen);
+             return ERR_INVALID_READ;
+         }
+@@ -302,6 +303,7 @@ std::shared_ptr<AudioSource> AudioCapturerImpl::GetAudioSource()
+ {
+     if (info_.deviceType == AUDIO_DEVICE_MIC_LOCAL) {
+         return audioSourceLocal_;
++
+     }
+     if (info_.deviceType == AUDIO_DEVICE_MIC_VIRTUAL) {
+         return audioSourceVirtual_;
+@@ -356,10 +358,8 @@ bool AudioCapturerImpl::Release()
+ }
+ void AudioCapturerImpl::SetDeviceChangeCallback(std::shared_ptr<AudioManagerDeviceChangeCallback> callback)
+ {
+-    std::shared_ptr<AudioManagerDeviceChangeCallbackImpl> callbackImp =
+-        std::make_shared<AudioManagerDeviceChangeCallbackImpl>(callback);
+-    OHOS::HDI::DistributedAudio::Audio::V1_0::AudioManagerInterfaceImpl::GetAudioManager()->
+-        SetDeviceChangeCallback(callbackImp);
++    std::shared_ptr<AudioManagerDeviceChangeCallbackImpl> callbackImp = std::make_shared<AudioManagerDeviceChangeCallbackImpl>(callback);
++    OHOS::HDI::DistributedAudio::Audio::V1_0::AudioManagerInterfaceImpl::GetAudioManager()->SetDeviceChangeCallback(callbackImp);
+     MEDIA_INFO_LOG("set AudioSourceVirtual callback success!");
+ }
+ }  // namespace Audio
+diff --git a/services/impl/audio_capturer_impl.h b/services/impl/audio_capturer_impl.h
+index f1fba0a..dbcccaa 100644
+--- a/services/impl/audio_capturer_impl.h
++++ b/services/impl/audio_capturer_impl.h
+@@ -20,6 +20,7 @@
+ #include <sys/time.h>
+ #include "audio_capturer.h"
+ #include "media_info.h"
++
+ namespace OHOS {
+ namespace Audio {
+ enum AudioChannel {
+diff --git a/services/impl/audio_encoder/audio_encoder.cpp b/services/impl/audio_encoder/audio_encoder.cpp
+index 713808b..2519aab 100644
+--- a/services/impl/audio_encoder/audio_encoder.cpp
++++ b/services/impl/audio_encoder/audio_encoder.cpp
+@@ -119,7 +119,7 @@ static AudioSoundMode ConvertSoundMode(uint32_t channelCount)
+     }
+ }
+ 
+-void AudioEncoder::SetEncAttrValue(const AudioEncodeConfig &config)
++void AudioEncoder::setEncAttrValue(const AudioEncodeConfig &config)
+ {
+     uint32_t paramIndex = 0;
+     domainKind_ = AUDIO_ENCODER;
+@@ -173,7 +173,7 @@ int32_t AudioEncoder::InitAudioEncoderAttr(const AudioEncodeConfig &config)
+         MEDIA_ERR_LOG("audioFormat:%d is not support sampleRate:%d", config.audioFormat, config.sampleRate);
+         return ERR_INVALID_PARAM;
+     }
+-    SetEncAttrValue(config);
++    setEncAttrValue(config);
+ 
+     return SUCCESS;
+ }
+@@ -187,6 +187,14 @@ int32_t AudioEncoder::Initialize(const AudioEncodeConfig &config)
+     }
+     const char *audioEncName = "codec.aac.hardware.encoder";
+     ret = CodecCreate(audioEncName, encAttr_, AUDIO_ENC_PARAM_NUM, &encHandle_);
++    // callstack info start
++    // static td_s32 CreateHandler(const Param *attr, int len, CodecType type, CodecCtx *ctx)
++    // int32_t CodecChannelCreate(void **channelCtx, CodecType type, const Param *attr, int len)
++    // chanCtx->pluginCommon->pfnCreate(&chanCtx->pluginHandle, attr, len);
++    // static td_s32 NATIVE_AENC_Create(void **aencHdl, const Param *attr, int len)
++    // static td_s32 FillAencAttribute(const Param *attrSrc, int lenSrc, AvAenAttr *attrDst)
++    // static td_s32 AencCreateChn(const AvAenAttr *aenAttr, const void *priv, ot_aenc_chn aencChn)
++    // callstack info end
+     if (ret != SUCCESS) {
+         MEDIA_ERR_LOG("CodecCreate failed:0x%x", ret);
+         return ret;
+@@ -203,6 +211,15 @@ int32_t AudioEncoder::BindSource(uint32_t deviceId)
+     params[0].val = reinterpret_cast<void *>(&deviceId);
+     params[0].size = sizeof(uint32_t);
+     int32_t ret = CodecSetParameter(encHandle_, params, sizeof(params) / sizeof(params[0]));
++    // for ai bind to aenc
++    // int32_t SetDevice(CodecBufferChannel *channelCtx, CodecType type, DirectionType dirType,
++    // const Param *params);
++
++    // MEDIA_HAL_UNUSED(dirType);
++    // MEDIA_HAL_UNUSED(type);
++
++    // static td_s32 NATIVE_AENC_SetParameter(void *aencHdl, const Param *param)
++    // callstack info end..
+     if (ret != SUCCESS) {
+         MEDIA_ERR_LOG("CodecSetDevice:0x%x", ret);
+         return ret;
+@@ -269,7 +286,7 @@ int32_t AudioEncoder::ReadStream(AudioStream &stream, bool isBlockingRead)
+         MEDIA_ERR_LOG("memcpy_s failed, timeStamp:%lld, retCopy:0x%x", outInfo.timeStamp, retCopy);
+         return ERR_INVALID_OPERATION;
+     } else {
+-        readLen = int(outInfo.buffers[0].length);
++        readLen = outInfo.buffers[0].length;
+     }
+     stream.timeStamp = outInfo.timeStamp;
+     (void)CodecQueueOutput(encHandle_, &outInfo, timeoutMs, -1);
+diff --git a/services/impl/audio_encoder/include/audio_encoder.h b/services/impl/audio_encoder/include/audio_encoder.h
+index fd4e23a..ea5aa0c 100644
+--- a/services/impl/audio_encoder/include/audio_encoder.h
++++ b/services/impl/audio_encoder/include/audio_encoder.h
+@@ -117,7 +117,7 @@ public:
+ 
+ private:
+     int32_t InitAudioEncoderAttr(const AudioEncodeConfig &config);
+-    void SetEncAttrValue(const AudioEncodeConfig &config);
++    void setEncAttrValue(const AudioEncodeConfig &config);
+ 
+ private:
+     bool initialized_;
+diff --git a/services/impl/audio_source/include/local/audio_source_local.h b/services/impl/audio_source/include/local/audio_source_local.h
+index aa33d27..6376ca6 100644
+--- a/services/impl/audio_source/include/local/audio_source_local.h
++++ b/services/impl/audio_source/include/local/audio_source_local.h
+@@ -97,7 +97,7 @@ public:
+     int32_t Release() override;
+ 
+ private:
+-    int32_t InitCheck() const;
++    int32_t InitCheck();
+ 
+ private:
+     bool initialized_;
+diff --git a/services/impl/audio_source/include/virtual/audio_source_virtual.h b/services/impl/audio_source/include/virtual/audio_source_virtual.h
+index 3483e84..e487bec 100644
+--- a/services/impl/audio_source/include/virtual/audio_source_virtual.h
++++ b/services/impl/audio_source/include/virtual/audio_source_virtual.h
+@@ -16,16 +16,17 @@
+ #ifndef FRAMEWORKS_AUDIO_SOURCE_INCLUDE_AUDIO_VIRTUAL_H_
+ #define FRAMEWORKS_AUDIO_SOURCE_INCLUDE_AUDIO_VIRTUAL_H_
+ 
++#include <cstddef>
+ #include <cstdint>
+ #include <memory>
+-#include <ctime>
++#include <time.h>
+ #include <vector>
+ 
+ #include "audio_source.h"
+ #include "iaudio_capture.h"
+ #include "iaudio_adapter.h"
+ #include "iaudio_manager.h"
+-#include "audio_manager_device_change_callback.h"
++#include "audio_manager_callback.h"
+ #include "iaudio_device_callback.h"
+ 
+ namespace OHOS {
+@@ -33,13 +34,9 @@ namespace Audio {
+ using namespace OHOS::HDI::DistributedAudio::Audio::V1_0;
+ class AudioManagerDeviceChangeCallbackImpl : public IAudioManagerDeviceChangeCallback {
+ public:
+-    explicit AudioManagerDeviceChangeCallbackImpl(std::shared_ptr<AudioManagerDeviceChangeCallback> callback)
+-    {
+-        callback_ = callback;
+-    }
++    AudioManagerDeviceChangeCallbackImpl(std::shared_ptr<AudioManagerDeviceChangeCallback> callback) { callback_ = callback; }
+     ~AudioManagerDeviceChangeCallbackImpl() override {}
+-    void OnDeviceChange(const AudioDeviceInfo &deviceInfo) override
+-    {
++    void OnDeviceChange(const AudioDeviceInfo &deviceInfo) override {
+         if (callback_ != nullptr) {
+             callback_->OnDeviceChange(deviceInfo);
+         }
+@@ -50,8 +47,8 @@ private:
+ 
+ class AudioSourceVirtual : public AudioSource {
+ public:
+-    explicit AudioSourceVirtual(std::string deviceId);
+-    ~AudioSourceVirtual() override;
++    AudioSourceVirtual(std::string deviceId);
++    ~AudioSourceVirtual();
+ 
+     /**
+      * Enumerates currently supported devices by audio source type.
+@@ -60,14 +57,14 @@ public:
+      * @param devices holds an array of satisfied audio device description, including name and identity.
+      * @return Returns SUCCESS if success, other values otherwise.
+      */
+-    int32_t EnumDeviceBySourceType(AudioSourceType inputSource, std::vector<AudioDeviceDesc> &devices) override;
++    int32_t EnumDeviceBySourceType(AudioSourceType inputSource, std::vector<AudioDeviceDesc> &devices);
+ 
+     /**
+      * Obtains the frame count (in BytesPerSample) required in the current conditions.
+      *
+      * @return Returns the frame count (in BytesPerSample); returns {@code -1} if an exception occurs.
+      */
+-    uint64_t GetFrameCount() override;
++    uint64_t GetFrameCount();
+ 
+     /**
+      * Initializes the audio source according to a specific configuration.
+@@ -75,7 +72,7 @@ public:
+      * @param config a configuration of audio source.
+      * @return Returns SUCCESS if success, other values otherwise.
+      */
+-    int32_t Initialize(const AudioSourceConfig &config) override;
++    int32_t Initialize(const AudioSourceConfig &config);
+ 
+     /**
+      * Sets input device's identity when switching device.
+@@ -83,7 +80,7 @@ public:
+      * @param deviceId identity to set.
+      * @return Returns SUCCESS if set successfully, other values otherwise.
+     */
+-    int32_t SetInputDevice(uint32_t deviceId) override;
++    int32_t SetInputDevice(uint32_t deviceId);
+ 
+     /**
+      * Gets current device's identity.
+@@ -91,14 +88,14 @@ public:
+      * @param deviceId holds the identity of current device, if success.
+      * @return Returns SUCCESS if success, other values otherwise.
+      */
+-    int32_t GetCurrentDeviceId(uint32_t &deviceId) override;
++    int32_t GetCurrentDeviceId(uint32_t &deviceId);
+ 
+     /**
+      * Starts audio source.
+      *
+      * @return Returns SUCCESS if success, other values otherwise.
+     */
+-    int32_t Start() override;
++    int32_t Start();
+ 
+     /**
+      *
+@@ -108,24 +105,24 @@ public:
+      * @param isBlockingRead reading mode.
+      * @return Returns size of data actually read.
+     */
+-    int32_t ReadFrame(AudioFrame &frame, bool isBlockingRead) override;
++    int32_t ReadFrame(AudioFrame &frame, bool isBlockingRead);
+ 
+     /**
+      * Stops audio source.
+      *
+      * @return Returns SUCCESS if success, other values otherwise.
+     */
+-    int32_t Stop() override;
++    int32_t Stop();
+ 
+     /**
+     * release.
+     */
+-    int32_t Release() override;
++    int32_t Release();
+ 
+     void SetDeviceChangeCallback(const std::shared_ptr<IAudioManagerDeviceChangeCallback> &callback);
+ 
+ private:
+-    int32_t InitCheck() const;
++    int32_t InitCheck();
+ private:
+     IAudioManager *audioManager_ = nullptr;
+     bool initialized_;
+diff --git a/services/impl/audio_source/src/audio_source.cpp b/services/impl/audio_source/src/audio_source.cpp
+index 835cb15..f372c94 100644
+--- a/services/impl/audio_source/src/audio_source.cpp
++++ b/services/impl/audio_source/src/audio_source.cpp
+@@ -22,6 +22,7 @@ namespace Audio {
+ 
+ AudioSource::AudioSource()
+ {
++   
+ }
+ 
+ AudioSource::~AudioSource()
+diff --git a/services/impl/audio_source/src/local/audio_source_local.cpp b/services/impl/audio_source/src/local/audio_source_local.cpp
+index 00cf93b..ea7f61f 100644
+--- a/services/impl/audio_source/src/local/audio_source_local.cpp
++++ b/services/impl/audio_source/src/local/audio_source_local.cpp
+@@ -34,7 +34,6 @@ static AudioManager *g_audioManager = nullptr;
+ AudioSourceLocal::AudioSourceLocal()
+     : initialized_(false),
+       started_(false),
+-      deviceId_(0),
+       audioAdapter_(nullptr),
+       audioCapture_(nullptr)
+ {
+@@ -49,15 +48,17 @@ AudioSourceLocal::AudioSourceLocal()
+ 
+     for (int index = 0; index < size; index++) {
+         struct AudioAdapterDescriptor *desc = &descs[index];
+-        for (int port = 0; (desc != nullptr && port < static_cast<int>(desc->portNum)); port++) {
+-            if (desc->ports[port].dir == PORT_IN &&
+-                (g_audioManager->LoadAdapter(g_audioManager, desc, &audioAdapter_)) == 0) {
+-                (void)audioAdapter_->InitAllPorts(audioAdapter_);
+-                if (memcpy_s(&capturePort_, sizeof(struct AudioPort),
+-                    &desc->ports[port], sizeof(struct AudioPort)) != 0) {
+-                    MEDIA_WARNING_LOG("memcpy_s capturePort_ failed");
++        if(strcmp(desc->adapterName, "Primary") == 0) {  // USB
++            for (int port = 0; (desc != nullptr && port < static_cast<int>(desc->portNum)); port++) {
++                if (desc->ports[port].dir == PORT_IN &&
++                    !(g_audioManager->LoadAdapter(g_audioManager, desc, &audioAdapter_))) {
++                    (void)audioAdapter_->InitAllPorts(audioAdapter_);
++                    if (memcpy_s(&capturePort_, sizeof(struct AudioPort),
++                        &desc->ports[port], sizeof(struct AudioPort))) {
++                        MEDIA_WARNING_LOG("memcpy_s capturePort_ failed");
++                    }
++                    break;
+                 }
+-                break;
+             }
+         }
+     }
+@@ -66,6 +67,11 @@ AudioSourceLocal::AudioSourceLocal()
+ 
+ AudioSourceLocal::~AudioSourceLocal()
+ {
++    MEDIA_DEBUG_LOG("in");
++    if (initialized_) {
++        Release();
++    }
++
+     if (audioAdapter_ != nullptr) {
+         MEDIA_INFO_LOG("UnloadModule audioAdapter_");
+         if (g_audioManager == nullptr) {
+@@ -78,7 +84,7 @@ AudioSourceLocal::~AudioSourceLocal()
+     }
+ }
+ 
+-int32_t AudioSourceLocal::InitCheck() const
++int32_t AudioSourceLocal::InitCheck()
+ {
+     if (!initialized_) {
+         MEDIA_ERR_LOG("not initialized");
+@@ -170,6 +176,7 @@ int32_t AudioSourceLocal::Initialize(const AudioSourceConfig &config)
+     MEDIA_INFO_LOG("deviceId:0x%x config.sampleRate:%d", config.deviceId, config.sampleRate);
+     AudioDeviceDescriptor desc;
+     desc.pins = PIN_IN_MIC;
++    // desc.pins = PIN_IN_USB_EXT;
+     desc.desc = NULL;
+     AudioSampleAttributes attrs;
+     deviceId_ = config.deviceId;
+@@ -186,6 +193,7 @@ int32_t AudioSourceLocal::Initialize(const AudioSourceConfig &config)
+         MEDIA_ERR_LOG("not support audioFormat:%d", config.audioFormat);
+         return ERR_INVALID_PARAM;
+     }
++    // usb mic sampleRate 48000
+     attrs.sampleRate = config.sampleRate;
+     attrs.channelCount = config.channelCount;
+     attrs.interleaved = config.interleaved;
+diff --git a/services/impl/audio_source/src/virtual/audio_source_virtural.cpp b/services/impl/audio_source/src/virtual/audio_source_virtural.cpp
+index 604b162..455ddca 100644
+--- a/services/impl/audio_source/src/virtual/audio_source_virtural.cpp
++++ b/services/impl/audio_source/src/virtual/audio_source_virtural.cpp
+@@ -55,7 +55,7 @@ AudioSourceVirtual::AudioSourceVirtual(std::string deviceId)
+         OHOS::HDI::DistributedAudio::Audio::V1_0::AudioAdapterDescriptor desc = vecDescs[index];
+         for (uint32_t port = 0; port < desc.ports.size(); port++) {
+             if (desc.ports[port].dir == PORT_OUT_IN &&
+-                (audioManager_->LoadAdapter(desc, audioAdapter_) == SUCCESS)) {
++                !(audioManager_->LoadAdapter(desc, audioAdapter_))) {
+                 (void)audioAdapter_->InitAllPorts();
+                 if (deviceId_ == desc.adapterName || deviceId_ == "") {
+                     adapterName_ = desc.adapterName;
+@@ -75,6 +75,11 @@ AudioSourceVirtual::AudioSourceVirtual(std::string deviceId)
+ 
+ AudioSourceVirtual::~AudioSourceVirtual()
+ {
++    MEDIA_DEBUG_LOG("in");
++    if (initialized_) {
++        Release();
++    }
++    
+     if (audioAdapter_ != nullptr) {
+         MEDIA_INFO_LOG("UnloadModule audioAdapter_");
+         if (audioManager_ == nullptr) {
+@@ -87,7 +92,7 @@ AudioSourceVirtual::~AudioSourceVirtual()
+     }
+ }
+ 
+-int32_t AudioSourceVirtual::InitCheck() const
++int32_t AudioSourceVirtual::InitCheck()
+ {
+     if (!initialized_) {
+         MEDIA_ERR_LOG("not initialized");
+@@ -274,10 +279,7 @@ int32_t AudioSourceVirtual::ReadFrame(AudioFrame &frame, bool isBlockingRead)
+     frame.time.tvNSec = timeStamp.tvNSec;
+     readlen = vecframe.size();
+     if (readlen > 0) {
+-        errno_t err = memcpy_s(frame.buffer, frame.bufferLen, vecframe.data(), readlen);
+-        if (err != EOK) {
+-            MEDIA_ERR_LOG("memcpy_s failed.");
+-        }
++        (void)memcpy_s(frame.buffer, frame.bufferLen, vecframe.data(), readlen);
+     }
+     return readlen;
+ }
+diff --git a/services/server/include/audio_capturer_server.h b/services/server/include/audio_capturer_server.h
+index 777d9f7..c74439d 100644
+--- a/services/server/include/audio_capturer_server.h
++++ b/services/server/include/audio_capturer_server.h
+@@ -59,7 +59,7 @@ public:
+     SvcIdentity GetSvcIdentity();
+     void SetCanCallback(bool isCallback);
+ private:
+-    SvcIdentity sid_ {0, 0, 0};
++    SvcIdentity sid_;
+     std::atomic<bool> isCallback_ {false};
+ };
+ 
+@@ -77,11 +77,10 @@ public:
+     void Dispatch(int32_t funcId, pid_t pid, IpcIo *req, IpcIo *reply);
+     static void *ReadAudioDataProcess(void *serverStr);
+     void OnAllDeviceChange();
+-    void AddDeviceInfo(AudioDeviceInfo deviceInfo);
++    void addDeviceInfo(AudioDeviceInfo deviceInfo);
+     int32_t SendDeviceInfo(const AudioDeviceInfo &deviceInfo);
+     void SendReadDataFailInfo(void);
+ private:
+-    bool HandleTimestamp(SurfaceBuffer *surfaceBuf, int32_t readLen);
+     void GetMinFrameCount(IpcIo *req, IpcIo *reply);
+     int32_t SetSurfaceProcess(Surface *surface);
+     void SetInfo(AudioCapturerImpl *capturer, IpcIo *req, IpcIo *reply);
+@@ -95,9 +94,9 @@ private:
+     SurfaceBuffer *GetCacheBuffer(void);
+     void CancelBuffer(SurfaceBuffer *buffer);
+     void FreeCacheBuffer(void);
+-    void SetAudioCapturerServerCallback(const AudioCapturerImpl *capturer, IpcIo *req);
+-    AudioCapturerInfo DeserializeCaptureInfo(const char *str) const;
+-    std::string SerializeCaptureInfo(const AudioCapturerInfo &info) const;
++    void SetAudioCapturerServerCallback(AudioCapturerImpl *capturer, IpcIo *req);
++    AudioCapturerInfo DeserializeCaptureInfo(const char *str);
++    std::string SerializeCaptureInfo(const AudioCapturerInfo &info);
+     pid_t clientPid_ = -1;
+     AudioCapturerImpl *capturer_ = nullptr;
+     Surface *surface_ = nullptr;
+diff --git a/services/server/src/audio_capturer_samgr.cpp b/services/server/src/audio_capturer_samgr.cpp
+index bcca372..d7183c2 100644
+--- a/services/server/src/audio_capturer_samgr.cpp
++++ b/services/server/src/audio_capturer_samgr.cpp
+@@ -75,6 +75,13 @@ static TaskConfig GetTaskConfig(Service *service)
+ 
+ static int32 Invoke(IServerProxy *iProxy, int funcId, void *origin, IpcIo *req, IpcIo *reply)
+ {
++    // hihopeos add ,if check will crash when origin is nullptr
++#if 0
++    if (origin == nullptr) {
++        MEDIA_ERR_LOG("Invoke: origin is nullptr");
++        return FALSE;
++    }
++#endif
+     pid_t pid = GetCallingPid();
+     AudioCapturerServer *mng = AudioCapturerServer::GetInstance();
+     if (mng == nullptr) {
+diff --git a/services/server/src/audio_capturer_server.cpp b/services/server/src/audio_capturer_server.cpp
+index 7c1785d..f2db039 100644
+--- a/services/server/src/audio_capturer_server.cpp
++++ b/services/server/src/audio_capturer_server.cpp
+@@ -114,9 +114,8 @@ void AudioCapturerServer::FreeCacheBuffer(void)
+     bufCache_ = nullptr;
+ }
+ 
+-void AudioCapturerServer::SetAudioCapturerServerCallback(const AudioCapturerImpl *capturer, IpcIo *req)
++void AudioCapturerServer::SetAudioCapturerServerCallback(AudioCapturerImpl *capturer, IpcIo *req)
+ {
+-    (void)capturer;
+     SvcIdentity sid;
+     if (ReadRemoteObject(req, &sid)) {
+         if (callback_ != nullptr) {
+@@ -145,7 +144,7 @@ SvcIdentity AudioCapturerServerCallback::GetSvcIdentity()
+ void AudioCapturerServerCallback::OnDeviceChange(const AudioDeviceInfo &deviceInfo)
+ {
+     MEDIA_INFO_LOG("revice Device changed,device dhid = %d", deviceInfo.dhId);
+-    AudioCapturerServer::GetInstance()->AddDeviceInfo(deviceInfo);
++    AudioCapturerServer::GetInstance()->addDeviceInfo(deviceInfo);
+     if (isCallback_.load()) {
+         AudioCapturerServer::GetInstance()->SendDeviceInfo(deviceInfo);
+     }
+@@ -164,11 +163,11 @@ int32_t AudioCapturerServer::SendDeviceInfo(const AudioDeviceInfo &deviceInfo)
+     IpcIo io;
+     uint8_t tmpData[DEFAULT_IPC_SIZE];
+     IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 0);
+-    WriteUint32(&io, deviceInfo.dhId);
++    WriteUint32(&io, (int32_t)deviceInfo.dhId);
+     WriteUint32(&io, deviceInfo.deviceName.size());
+     WriteBuffer(&io, deviceInfo.deviceName.c_str(), deviceInfo.deviceName.size());
+-    WriteInt32(&io, deviceInfo.deviceType);
+-    WriteInt32(&io, deviceInfo.connectStatus);
++    WriteInt32(&io, (int32_t)deviceInfo.deviceType);
++    WriteInt32(&io, (int32_t)deviceInfo.connectStatus);
+     MessageOption option;
+     MessageOptionInit(&option);
+     option.flags = TF_OP_ASYNC;
+@@ -188,18 +187,17 @@ void AudioCapturerServer::SendReadDataFailInfo(void)
+     }
+     IpcIo io;
+     uint8_t tmpData[DEFAULT_IPC_SIZE];
+-    IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 0);
++    IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 0);;
+     MessageOption option;
+     MessageOptionInit(&option);
+     option.flags = TF_OP_ASYNC;
+-    int32_t ret = SendRequest(callback_->GetSvcIdentity(), AudioCapturerClientCall::ON_READ_DATA_FAILED,
+-        &io, nullptr, option, nullptr);
++    int32_t ret = SendRequest(callback_->GetSvcIdentity(), ON_READ_DATA_FAILED, &io, nullptr, option, nullptr);
+     if (ret != MEDIA_OK) {
+         MEDIA_ERR_LOG("AudioCapturerServerCallback::ON_READ_DATA_FAILED failed");
+     }
+ }
+ 
+-void AudioCapturerServer::AddDeviceInfo(AudioDeviceInfo deviceInfo)
++void AudioCapturerServer::addDeviceInfo(AudioDeviceInfo deviceInfo)
+ {
+     std::lock_guard<std::mutex> lck(callbackLock_);
+     std::vector<AudioDeviceInfo>::iterator it = deviceInfoList_.begin();
+@@ -229,26 +227,6 @@ void AudioCapturerServer::OnAllDeviceChange()
+     }
+ }
+ 
+-bool AudioCapturerServer::HandleTimestamp(SurfaceBuffer *surfaceBuf, int32_t readLen)
+-{
+-    Timestamp timestamp;
+-    Timestamp::Timebase base = {};
+-    bool ret = capturer_->GetTimestamp(timestamp, base);
+-    if (!ret) {
+-        MEDIA_ERR_LOG("No readtime get.");
+-        return false;
+-    }
+-
+-    errno_t retCopy = memcpy_s((uint8_t *)surfaceBuf->GetVirAddr(), sizeof(Timestamp), &timestamp, sizeof(Timestamp));
+-    if (retCopy != EOK) {
+-        MEDIA_ERR_LOG("retCopy = %x", retCopy);
+-        return false;
+-    }
+-
+-    surfaceBuf->SetSize(sizeof(Timestamp) + readLen);
+-    return true;
+-}
+-
+ void *AudioCapturerServer::ReadAudioDataProcess(void *serverStr)
+ {
+     AudioCapturerServer *serverStore = (AudioCapturerServer *)serverStr;
+@@ -284,14 +262,25 @@ void *AudioCapturerServer::ReadAudioDataProcess(void *serverStr)
+             break;
+         }
+ 
+-        if (!serverStore->HandleTimestamp(surfaceBuf, readLen)) {
++        Timestamp timestamp;
++        Timestamp::Timebase base = {};
++        bool ret =  serverStore->capturer_->GetTimestamp(timestamp, base);
++        if (!ret) {
++            MEDIA_ERR_LOG("No readtime get.");
++            continue;
++        }
++        errno_t retCopy = memcpy_s((uint8_t *)buf, sizeof(Timestamp), &timestamp, sizeof(Timestamp));
++        if (retCopy != EOK) {
++            MEDIA_ERR_LOG("retCopy = %x", retCopy);
+             continue;
+         }
++        surfaceBuf->SetSize(sizeof(Timestamp) + readLen);
+ 
+         // flush buffer
+         if (serverStore->surface_->FlushBuffer(surfaceBuf) != 0) {
+             MEDIA_ERR_LOG("Flush surface buffer failed.");
+             serverStore->CancelBuffer(surfaceBuf);
++            ret = MEDIA_ERR;
+             continue;
+         }
+         serverStore->FreeCacheBuffer();
+@@ -326,7 +315,7 @@ void AudioCapturerServer::GetMinFrameCount(IpcIo *req, IpcIo *reply)
+     WriteUint32(reply, frameCount);
+ }
+ 
+-std::string AudioCapturerServer::SerializeCaptureInfo(const AudioCapturerInfo &info) const
++std::string AudioCapturerServer::SerializeCaptureInfo(const AudioCapturerInfo &info)
+ {
+     std::stringstream ss;
+     ss << static_cast<int32_t>(info.inputSource) << ' '
+@@ -341,7 +330,7 @@ std::string AudioCapturerServer::SerializeCaptureInfo(const AudioCapturerInfo &i
+     return ss.str();
+ }
+ 
+-AudioCapturerInfo AudioCapturerServer::DeserializeCaptureInfo(const char *str) const
++AudioCapturerInfo AudioCapturerServer::DeserializeCaptureInfo(const char *str)
+ {
+     AudioCapturerInfo info = {};
+     std::stringstream ss(str);

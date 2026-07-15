@@ -1,0 +1,6 @@
+[submodule "platform/ss928v100_clang"]
+	path = platform/ss928v100_clang
+	url = https://gitee.com/HiSpark/ss928v100_clang
+[submodule "platform/ss928v100_gcc"]
+	path = platform/ss928v100_gcc
+	url = https://gitee.com/HiSpark/ss928v100_gcc

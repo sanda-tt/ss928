@@ -1,0 +1,35 @@
+diff --git a/ability_lite/ability_posix/src/AbilityMgrTest.cpp b/ability_lite/ability_posix/src/AbilityMgrTest.cpp
+index 42a047929..dfdd06e73 100755
+--- a/ability_lite/ability_posix/src/AbilityMgrTest.cpp
++++ b/ability_lite/ability_posix/src/AbilityMgrTest.cpp
+@@ -656,12 +656,10 @@ HWTEST_F(AbilityMgrTest, testDisConnectAbility, Function | MediumTest | Level1)
+     sem_timedwait(&g_sem, &ts);
+     printf("sem exit \n");
+     printf("ret of connect is %d \n ", result);
+-    if (g_errorCode == 16) {
+-        result = DisconnectAbility(&g_conn);
+-        usleep(900000);
+-        EXPECT_EQ(result, 0);
+-        printf("ret of disconnect is %d \n ", result);
+-    }
++    result = DisconnectAbility(&g_conn);
++    usleep(900000);
++    EXPECT_EQ(result, 0);
++    printf("ret of disconnect is %d \n ", result);
+     ClearElement(&element);
+     ClearWant(&want);
+     printf("------end testDisConnectAbility------\n");
+diff --git a/distributed_schedule_lite/system_ability_manager_posix/src/LiteIPCClientTest.cpp b/distributed_schedule_lite/system_ability_manager_posix/src/LiteIPCClientTest.cpp
+index af7acdf8d..8485d51fc 100755
+--- a/distributed_schedule_lite/system_ability_manager_posix/src/LiteIPCClientTest.cpp
++++ b/distributed_schedule_lite/system_ability_manager_posix/src/LiteIPCClientTest.cpp
+@@ -255,7 +255,8 @@ HWTEST_F(LiteIPCClientTest, testIPCClient0130, Function | MediumTest | Level2)
+ {
+     SvcIdentity svcIdentity = SAMGR_GetRemoteIdentity("noExistService", "noExistFeature");
+     ASSERT_EQ(svcIdentity.handle == 0xffffffff, TRUE);
+-    ASSERT_EQ(svcIdentity.token == 0xffffffff, TRUE);
++    // token type is uintptr_t
++    ASSERT_EQ(svcIdentity.token == INVALID_INDEX, TRUE);
+ };
+ 
+ /**

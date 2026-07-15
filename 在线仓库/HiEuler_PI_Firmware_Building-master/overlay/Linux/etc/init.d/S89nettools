@@ -1,0 +1,35 @@
+#!/bin/sh
+
+export PATH=/usr/local/bin:/usr/local/sbin:$PATH
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+
+/usr/local/bin/haveged -F -d 32 -w 1024 --verbose=1 &
+
+opt/bin/ssh-keycheck.sh /usr/local/bin/ssh-keygen /etc/ssh
+
+/usr/local/bin/sshd -f /etc/sshd_config
+
+telnetd
+
+CONFIG_FILE="/opt/cfg/dev_info.config"
+CONFIG_DONE_FLAG="/etc/.config_fs_type_done"
+
+if [ ! -f "$CONFIG_DONE_FLAG" ]; then
+	if [ -f "$CONFIG_FILE" ]; then
+		if grep -qi "openEuler" /etc/os-release 2>/dev/null; then
+			version=$(grep VERSION_ID /etc/os-release 2>/dev/null | cut -d'=' -f2)
+			fs_type="openEuler$version"
+		elif grep -qi "Ubuntu" /etc/os-release; then
+			version=$(grep VERSION_ID /etc/os-release 2>/dev/null | cut -d'"' -f2)
+			fs_type="Ubuntu$version"
+		elif grep -qi "OpenHarmony" /etc/os-release 2>/dev/null; then
+			fs_type="openHarmony"
+		else
+			fs_type="Linux"
+		fi
+		sed -i "s/\"fs_type\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"fs_type\": \"$fs_type\"/" "$CONFIG_FILE"
+		touch "$CONFIG_DONE_FLAG"
+	fi
+fi
+
+/opt/bin/search_tool /opt/cfg/dev_info.config  > /dev/null 2>&1 &

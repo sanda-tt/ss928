@@ -1,0 +1,32 @@
+rel:
+	@cd ive;         make
+	@cd mau;         make
+	@cd dpu;         make
+	@cd svp_npu;     make
+	@cd npu;         make
+	@cd dsp;         make
+	@cd npu_yolo;    make
+	@cd ovd;         make
+	@cd ovd_sot;     make
+
+clean:
+	@cd ive;         make clean
+	@cd mau;         make clean
+	@cd dpu;         make clean
+	@cd svp_npu;     make clean
+	@cd npu;         make clean
+	@cd dsp;         make clean
+	@cd npu_yolo;    make clean
+	@cd ovd;         make clean
+	@cd ovd_sot;     make clean
+
+cleanall:
+	@cd ive;         make clean;   make cleanstream
+	@cd mau;         make clean;   make cleanstream
+	@cd dpu;         make clean;   make cleanstream
+	@cd svp_npu;     make clean;   make cleanstream
+	@cd npu;         make clean;   make cleanstream
+	@cd dsp;         make clean;   make cleanstream
+	@cd npu_yolo;    make clean;   make cleanstream
+	@cd ovd;         make clean;   make cleanstream
+	@cd ovd_sot;     make clean;   make cleanstream

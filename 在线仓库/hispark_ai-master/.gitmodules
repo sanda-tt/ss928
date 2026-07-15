@@ -1,0 +1,3 @@
+[submodule "src/mindspore-lite"]
+	path = src/mindspore-lite
+	url = https://gitee.com/HiSpark/mindspore-lite.git

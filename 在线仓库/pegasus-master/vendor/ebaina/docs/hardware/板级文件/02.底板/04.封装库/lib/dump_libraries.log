@@ -1,0 +1,357 @@
+(---------------------------------------------------------------------)
+(                                                                     )
+(    Dump Library Log                                                 )
+(                                                                     )
+(    Software Version : 17.2S071                                      )
+(    Date/Time        : Tue Mar 19 14:03:24 2024                      )
+(                                                                     )
+(---------------------------------------------------------------------)
+
+
+*** file: D:/板卡资料/资料-重新整理/欧拉/新建文件夹/01.板级文件/02.底板/05.底板源文件/EulerPi_v0.3_smt.brd ***
+
+
+
+  *** Creating all device files (see create_devices.log) ***
+
+
+  *** Creating padstacks. ***
+
+  SMD30S being dumped.
+
+  C40D40N being dumped.
+
+  R100X60 being dumped.
+
+  C43D43N being dumped.
+
+  R43X102 being dumped.
+
+  R43X114 being dumped.
+
+  C63D63N being dumped.
+
+  FIX-SMTWEM2XXSTR being dumped.
+
+  P_D07_C1D2MM being dumped.
+
+  R47X108 being dumped.
+
+  R155_60 being dumped.
+
+  C108D244 being dumped.
+
+  REC0_5X1_2MM being dumped.
+
+  REC1_2X1_7MM being dumped.
+
+  14X70OV being dumped.
+
+  SMD8_28S11_31 being dumped.
+
+  VIA10-20 being dumped.
+
+  R220_105 being dumped.
+
+  3_0X2_1 being dumped.
+
+  R138X138 being dumped.
+
+  1_3X0_8 being dumped.
+
+  R169X169 being dumped.
+
+  S_S0R55 being dumped.
+
+  DIP55C35 being dumped.
+
+  REC0_25X1_2MM being dumped.
+
+  P_D2D3_C3D5MM being dumped.
+
+  REC0_6X0_85MM being dumped.
+
+  REC0_4X1_95MM being dumped.
+
+  DIP55S35 being dumped.
+
+  RECTX0_32Y1_3 being dumped.
+
+  R43X114-1 being dumped.
+
+  SMD20S26PSH_L being dumped.
+
+  36X48REC being dumped.
+
+  SMD30_32 being dumped.
+
+  C128D128N being dumped.
+
+  SMD20S26PSH_R being dumped.
+
+  SMD40_50 being dumped.
+
+  REC_36X50_SMD being dumped.
+
+  SMD51_63 being dumped.
+
+  SMD42_38 being dumped.
+
+  REC_51X39_SMD being dumped.
+
+  O2R5X1R6 being dumped.
+
+  SMD_R98X236S10 being dumped.
+
+  O32X8_S4 being dumped.
+
+  OB60_107X28_67D being dumped.
+
+  REC2X3MM being dumped.
+
+  RECTX1_10Y1_30 being dumped.
+
+  SMD_R433X102S10 being dumped.
+
+  CHAM_REC_1_1X0_85MM being dumped.
+
+  SMD_SQ30 being dumped.
+
+  SMD_R433X295S10 being dumped.
+
+  SMD30_32A being dumped.
+
+  RECT43X50 being dumped.
+
+  DF40C_B_HC_HB_GB_DS_MAIN being dumped.
+
+  OB60_130X28_107D being dumped.
+
+  TP1R6D1R4 being dumped.
+
+  R105_0P635 being dumped.
+
+  OB0_6X1_4 being dumped.
+
+  OB0_6X1_8 being dumped.
+
+  OB0_3X1MM being dumped.
+
+  NTP0_65MM being dumped.
+
+  CIR3_7X5_6_TOP being dumped.
+
+  SMD65REC13 being dumped.
+
+  VIA8-16-BGA being dumped.
+
+  SMD20SQU-H being dumped.
+
+  REC0_6X1_8 being dumped.
+
+  SMD10_105OB being dumped.
+
+  PAD48CIR48U being dumped.
+
+  C51D35 being dumped.
+
+  C56D40 being dumped.
+
+  C80D55 being dumped.
+
+  C95D65 being dumped.
+
+  S51D35 being dumped.
+
+  SMD10_21S16_24DY15 being dumped.
+
+  REC0_85X2MM being dumped.
+
+  R32X11 being dumped.
+
+  S_RCT_2-05_X_2-00 being dumped.
+
+  D95_20 being dumped.
+
+  R12X61 being dumped.
+
+  R61X15 being dumped.
+
+  SMD10_21S16_24UY15 being dumped.
+
+  R35X53 being dumped.
+
+  R45X25 being dumped.
+
+  R63X55 being dumped.
+
+  R28X63 being dumped.
+
+  R48X26 being dumped.
+
+  R47X55 being dumped.
+
+  R29X48 being dumped.
+
+  R62X87 being dumped.
+
+  R47X87 being dumped.
+
+  S240NP being dumped.
+
+
+  *** Creating shape symbols (.dra and .ssm) ***
+
+  sh20q_lno_t being dumped.
+
+  sh20q_rno_t being dumped.
+
+  shape20 being dumped.
+
+  shape26 being dumped.
+
+  cmplxrr0-2x1a0-19 being dumped.
+
+  cmplxrr0-2x1a0-19-solder being dumped.
+
+
+  *** Creating package symbols (.dra and .psm) ***
+
+  esd0402 being dumped.
+
+  mlf10-050-0301l being dumped.
+
+  xtal_3225_4p being dumped.
+
+  microsim_7p being dumped.
+
+  c108d244 being dumped.
+
+  sot23-5 being dumped.
+
+  sy8368a being dumped.
+
+  msop-10 being dumped.
+
+  ts-1145a being dumped.
+
+  tssop8_65p300x300mm being dumped.
+
+  df40c-100ds-0_4 being dumped.
+
+  sot_323 being dumped.
+
+  qfn40_0r4_5x5 being dumped.
+
+  qfn48_0r4_6x6 being dumped.
+
+  smtso20xxctj being dumped.
+
+  tssop14 being dumped.
+
+  sot23-6c being dumped.
+
+  sed90-f-a being dumped.
+
+  usb_typec_304 being dumped.
+
+  pj-316a-6a being dumped.
+
+  sd_13n2_16r1x15 being dumped.
+
+  tssop_20 being dumped.
+
+  hsx4-0302b being dumped.
+
+  sot23-gsd being dumped.
+
+  smb being dumped.
+
+  rj45_hrk1 being dumped.
+
+  ngff_m2_bkey_67ps_qea-m3s being dumped.
+
+  vssop8_0r5_dcu being dumped.
+
+  lsm2_5r5x5r2_h3 being dumped.
+
+  c0402 being dumped.
+
+  c0603 being dumped.
+
+  qfn76_0r4_9x9_e being dumped.
+
+  kf128-254-2p being dumped.
+
+  sma_diode being dumped.
+
+  l2520 being dumped.
+
+  hsd0603-led being dumped.
+
+  r1206 being dumped.
+
+  r0603 being dumped.
+
+  ssop20_ss being dumped.
+
+  sop8 being dumped.
+
+  kf128l-35-2p being dumped.
+
+  con2x20_254 being dumped.
+
+  ms412 being dumped.
+
+  conn-smd-2p-p1_25 being dumped.
+
+  usb30_dual being dumped.
+
+  sop10 being dumped.
+
+  molex_47151 being dumped.
+
+  sc0402 being dumped.
+
+  sc0603 being dumped.
+
+  emerson_128-0711-201_new being dumped.
+
+  sc0805 being dumped.
+
+  nl-h873-usa1 being dumped.
+
+  sr0402 being dumped.
+
+  sr0603 being dumped.
+
+  sod123 being dumped.
+
+  sur08_4p_90 being dumped.
+
+  sot-23 being dumped.
+
+
+  *** Creating mechanical symbols (.dra and .bsm) ***
+
+  weee_symbol being dumped.
+
+
+  *** Creating format symbols (.dra and .osm) ***
+
+  pb-0707 being dumped.
+
+
+
+*********************** Summary *********************
+ERRORs reported:                           0
+
+Number of padstacks dumped:               91
+Number of package symbols dumped:         57
+Number of mechanical symbols dumped:       1
+Number of format symbols dumped:           1
+Number of shape symbols dumped:            6
+
+Total number of symbols dumped:           65
+*****************************************************
+

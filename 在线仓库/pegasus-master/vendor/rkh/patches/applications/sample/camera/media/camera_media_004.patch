@@ -1,0 +1,90 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index c46cb2d..935d974 100755
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -27,7 +27,7 @@ executable("camera_sample") {
+     "//foundation/multimedia/camera_lite/frameworks:camera_lite",
+     "//foundation/multimedia/media_lite/frameworks/recorder_lite:recorder_lite",
+   ]
+-  output_dir = "$root_out_dir/dev_tools"
++  output_dir = "$root_out_dir/usr"
+ }
+ 
+ executable("audio_capture_sample") {
+@@ -45,7 +45,7 @@ executable("audio_capture_sample") {
+     "//foundation/multimedia/audio_lite/frameworks:audio_capturer_lite",
+     "//third_party/bounds_checking_function:libsec_shared",
+   ]
+-  output_dir = "$root_out_dir/dev_tools"
++  output_dir = "$root_out_dir/usr"
+ }
+ 
+ executable("player_sample") {
+@@ -63,7 +63,7 @@ executable("player_sample") {
+     "//foundation/multimedia/media_lite/frameworks/player_lite:player_lite",
+     "//third_party/bounds_checking_function:libsec_shared",
+   ]
+-  output_dir = "$root_out_dir/dev_tools"
++  output_dir = "$root_out_dir/usr"
+ }
+ 
+ lite_component("media_sample") {
+diff --git a/audio_capture_sample.cpp b/audio_capture_sample.cpp
+index d9e4894..5a8a1d3 100644
+--- a/audio_capture_sample.cpp
++++ b/audio_capture_sample.cpp
+@@ -282,9 +282,13 @@ int main(int argc, char *argv[])
+     AudioCapturer audioCap;
+ 
+     AudioCapturerInfo info;
+-    info.deviceId = "0";
+     info.inputSource = AUDIO_MIC;
+     info.bitWidth = BIT_WIDTH_16;
++    // hihopeos add, deviceId = "0", fix ipc deserialization parsing on the audio caputure server side
++    info.deviceId = "0";
++    info.streamType = TYPE_MEDIA;
++    info.deviceType = AUDIO_DEVICE_MIC_LOCAL;
++
+     AudioCodecFormat audioFormat = GetAudioFormat();
+     if (audioFormat == FORMAT_BUTT) {
+         return -1;
+@@ -306,7 +310,8 @@ int main(int argc, char *argv[])
+     }
+     frameCount = audioCap.GetFrameCount();
+     std::cout << "GetFrameCount  " << frameCount << std::endl;
+-    g_audioSourceProcessInput.framesize = frameCount * 0x400;
++    // hihopeos add, framesize * 2 = 8192
++    g_audioSourceProcessInput.framesize = 8192;
+     g_audioSourceProcessInput.buffer = new uint8_t[g_audioSourceProcessInput.framesize];
+ 
+     RumCmd(audioCap);
+diff --git a/player_sample.cpp b/player_sample.cpp
+index 982996d..e36028c 100755
+--- a/player_sample.cpp
++++ b/player_sample.cpp
+@@ -360,8 +360,8 @@ static int SetSurface(TestSample &sample)
+     }
+     sample.surface->SetUserData("region_position_x", "0");
+     sample.surface->SetUserData("region_position_y", "0");
+-    sample.surface->SetUserData("region_width", "480");
+-    sample.surface->SetUserData("region_height", "480");
++    sample.surface->SetUserData("region_width", "1920");
++    sample.surface->SetUserData("region_height", "1080");
+     int32_t ret = sample.adapter->SetVideoSurface(sample.surface);
+     sample.setSurfaceCost = GetCurTimeMs() - begin;
+     if (ret != 0) {
+@@ -891,9 +891,14 @@ int main(int argc, char **argv)
+     PlayProcess(sample);
+ 
+     sleep(1);
++    Format formatSetLayerPriority;
++    formatSetLayerPriority.PutIntValue(LAYER_PRIORITY, 3);
++    sample.adapter->SetParameter(formatSetLayerPriority);
+ 
+     SampleCmd(sample);
+     EndStreamSourceThread(sample);
++    formatSetLayerPriority.PutIntValue(LAYER_PRIORITY, 0);
++    sample.adapter->SetParameter(formatSetLayerPriority);
+     int32_t ret = sample.adapter->Stop();
+     printf("Stop, ret:%d\n", ret);
+ 

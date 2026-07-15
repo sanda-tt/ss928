@@ -1,0 +1,2388 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index 23a8e72..6b835fc 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -11,8 +11,13 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-import("//build/ohos.gni")
+-
++if (defined(ohos_lite)) {
++  import("//build/lite/config/component/lite_component.gni")
++  import("//build/lite/ndk/ndk.gni")
++} else {
++  import("//build/ohos.gni")
++}
++import("libasound_src.gni")
+ config("alsa_lib_header") {
+   include_dirs = [
+     "//third_party/alsa-lib/include",
+@@ -59,138 +64,62 @@ config("alsa_lib_config") {
+     "-DHAVE_CONFIG_H",
+   ]
+ 
++  cflags += [
++  "-Wno-error",
++  "-Wno-unknown-pragmas",
++  "-fgnu-inline-asm"
++]
++
+   if (use_musl) {
+     cflags += [ "-Wno-bool-operation" ]
+   }
+ }
+ 
+-ohos_shared_library("libasound") {
+-  sources = [
+-    "//third_party/alsa-lib/src/async.c",
+-    "//third_party/alsa-lib/src/conf.c",
+-    "//third_party/alsa-lib/src/confeval.c",
+-    "//third_party/alsa-lib/src/confmisc.c",
+-    "//third_party/alsa-lib/src/control/cards.c",
+-    "//third_party/alsa-lib/src/control/control.c",
+-    "//third_party/alsa-lib/src/control/control_empty.c",
+-    "//third_party/alsa-lib/src/control/control_ext.c",
+-    "//third_party/alsa-lib/src/control/control_hw.c",
+-    "//third_party/alsa-lib/src/control/control_plugin.c",
+-    "//third_party/alsa-lib/src/control/control_remap.c",
+-    "//third_party/alsa-lib/src/control/control_shm.c",
+-    "//third_party/alsa-lib/src/control/control_symbols.c",
+-    "//third_party/alsa-lib/src/control/ctlparse.c",
+-    "//third_party/alsa-lib/src/control/eld.c",
+-    "//third_party/alsa-lib/src/control/hcontrol.c",
+-    "//third_party/alsa-lib/src/control/namehint.c",
+-    "//third_party/alsa-lib/src/control/setup.c",
+-    "//third_party/alsa-lib/src/control/tlv.c",
+-    "//third_party/alsa-lib/src/dlmisc.c",
+-    "//third_party/alsa-lib/src/error.c",
+-    "//third_party/alsa-lib/src/hwdep/hwdep.c",
+-    "//third_party/alsa-lib/src/hwdep/hwdep_hw.c",
+-    "//third_party/alsa-lib/src/hwdep/hwdep_symbols.c",
+-    "//third_party/alsa-lib/src/input.c",
+-    "//third_party/alsa-lib/src/mixer/bag.c",
+-    "//third_party/alsa-lib/src/mixer/mixer.c",
+-    "//third_party/alsa-lib/src/mixer/simple.c",
+-    "//third_party/alsa-lib/src/mixer/simple_abst.c",
+-    "//third_party/alsa-lib/src/mixer/simple_none.c",
+-    "//third_party/alsa-lib/src/names.c",
+-    "//third_party/alsa-lib/src/output.c",
+-    "//third_party/alsa-lib/src/pcm/interval.c",
+-    "//third_party/alsa-lib/src/pcm/mask.c",
+-    "//third_party/alsa-lib/src/pcm/pcm.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_adpcm.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_alaw.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_asym.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_copy.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_direct.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_dmix.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_dshare.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_dsnoop.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_empty.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_extplug.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_file.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_generic.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_hooks.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_hw.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_iec958.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_ioplug.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_ladspa.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_lfloat.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_linear.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_meter.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_misc.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_mmap.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_mmap_emul.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_mulaw.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_multi.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_null.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_params.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_plug.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_plugin.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_rate.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_rate_linear.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_route.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_share.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_shm.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_simple.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_softvol.c",
+-    "//third_party/alsa-lib/src/pcm/pcm_symbols.c",
+-    "//third_party/alsa-lib/src/rawmidi/rawmidi.c",
+-    "//third_party/alsa-lib/src/rawmidi/rawmidi_hw.c",
+-    "//third_party/alsa-lib/src/rawmidi/rawmidi_symbols.c",
+-    "//third_party/alsa-lib/src/rawmidi/rawmidi_virt.c",
+-    "//third_party/alsa-lib/src/seq/seq.c",
+-    "//third_party/alsa-lib/src/seq/seq_event.c",
+-    "//third_party/alsa-lib/src/seq/seq_hw.c",
+-    "//third_party/alsa-lib/src/seq/seq_midi_event.c",
+-    "//third_party/alsa-lib/src/seq/seq_old.c",
+-    "//third_party/alsa-lib/src/seq/seq_symbols.c",
+-    "//third_party/alsa-lib/src/seq/seqmid.c",
+-    "//third_party/alsa-lib/src/shmarea.c",
+-    "//third_party/alsa-lib/src/socket.c",
+-    "//third_party/alsa-lib/src/timer/timer.c",
+-    "//third_party/alsa-lib/src/timer/timer_hw.c",
+-    "//third_party/alsa-lib/src/timer/timer_query.c",
+-    "//third_party/alsa-lib/src/timer/timer_query_hw.c",
+-    "//third_party/alsa-lib/src/timer/timer_symbols.c",
+-    "//third_party/alsa-lib/src/ucm/main.c",
+-    "//third_party/alsa-lib/src/ucm/parser.c",
+-    "//third_party/alsa-lib/src/ucm/ucm_cond.c",
+-    "//third_party/alsa-lib/src/ucm/ucm_exec.c",
+-    "//third_party/alsa-lib/src/ucm/ucm_include.c",
+-    "//third_party/alsa-lib/src/ucm/ucm_regex.c",
+-    "//third_party/alsa-lib/src/ucm/ucm_subs.c",
+-    "//third_party/alsa-lib/src/ucm/utils.c",
+-    "//third_party/alsa-lib/src/userfile.c",
+-  ]
+-
+-  include_dirs = [
+-    "//third_party/alsa-lib/include",
+-    "//third_party/alsa-lib/include/sound",
+-    "//third_party/alsa-lib/include/uapi",
+-    "//third_party/alsa-lib/src/pcm",
+-    "//third_party/alsa-lib/src/ucm",
+-    "//third_party/alsa-lib/src/mixer",
+-    "//third_party/alsa-lib/src/seq",
+-    "//third_party/alsa-lib/src/hwdep",
+-    "//third_party/alsa-lib/src/rawmidi",
+-    "//third_party/alsa-lib/src/control",
+-    "//third_party/alsa-lib/src/timer",
+-    "{target_gen_dir}/include/",
+-  ]
++if (defined(ohos_lite)) {
++  shared_library("libasound") {
++    sources = libasound_sources
++    public_configs = [ ":alsa_lib_header" ]
++    cflags = libasound_cflags
++    deps = [
++      # conf files
++      "src/conf:alsa-lib-prebuilt-all",
++    ]
++    outdir = rebase_path("$root_out_dir")
++    ldflags = [
++      "-L$outdir",
++    ]
++  }
++  group("asound_shared") {
++    deps = [ ":libasound" ]
++  }
++} else {
++  ohos_shared_library("libasound") {
++    sources = libasound_sources
++    include_dirs = [
++      "//third_party/alsa-lib/include",
++      "//third_party/alsa-lib/include/sound",
++      "//third_party/alsa-lib/include/uapi",
++      "//third_party/alsa-lib/src/pcm",
++      "//third_party/alsa-lib/src/ucm",
++      "//third_party/alsa-lib/src/mixer",
++      "//third_party/alsa-lib/src/seq",
++      "//third_party/alsa-lib/src/hwdep",
++      "//third_party/alsa-lib/src/rawmidi",
++      "//third_party/alsa-lib/src/control",
++      "//third_party/alsa-lib/src/timer",
++      "{target_gen_dir}/include/",
++    ]
+ 
+-  configs = [ ":alsa_lib_config" ]
+-  deps = [
+-    # conf files
+-    "src/conf:alsa-lib-prebuilt-all",
+-  ]
+-  public_configs = [ ":alsa_lib_header" ]
+-  output_extension = "so"
+-  install_images = [ chipset_base_dir ]
+-  install_enable = true
+-  part_name = "alsa-lib"
+-  subsystem_name = "thirdparty"
++    configs = [ ":alsa_lib_config" ]
++    deps = [
++      # conf files
++      "src/conf:alsa-lib-prebuilt-all",
++    ]
++    public_configs = [ ":alsa_lib_header" ]
++    output_extension = "so"
++    install_images = [ chipset_base_dir ]
++    install_enable = true
++    part_name = "alsa-lib"
++    subsystem_name = "thirdparty"
++  }
+ }
+diff --git a/include/local.h b/include/local.h
+index 512e445..247af1c 100644
+--- a/include/local.h
++++ b/include/local.h
+@@ -295,8 +295,12 @@ extern snd_lib_error_handler_t snd_err_msg;
+ 
+ /* We want the .gnu.warning.SYMBOL section to be unallocated.  */
+ #  ifdef HAVE_ASM_PREVIOUS_DIRECTIVE
+-#   define __make_section_unallocated(section_string)	\
+-  asm (".section " section_string "\n\t.previous");
++	#ifdef ALSALIB_LITE
++	#define __make_section_unallocated(section_string)
++	#else
++	#define __make_section_unallocated(section_string) \
++		asm (".section " section_string "\n\t.previous");
++	#endif
+ #  elif defined HAVE_ASM_POPSECTION_DIRECTIVE
+ #   define __make_section_unallocated(section_string)	\
+   asm (".pushsection " section_string "\n\t.popsection");
+diff --git a/libasound_src.gni b/libasound_src.gni
+new file mode 100644
+index 0000000..0f395e4
+--- /dev/null
++++ b/libasound_src.gni
+@@ -0,0 +1,150 @@
++#
++# Copyright (c) 2021 Huawei Device Co., Ltd.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++#
++
++libsec_include_dirs = [ "//third_party/bounds_checking_function/include" ]
++
++libasound_sources = [
++    "//third_party/alsa-lib/src/async.c",
++    "//third_party/alsa-lib/src/conf.c",
++    "//third_party/alsa-lib/src/confeval.c",
++    "//third_party/alsa-lib/src/confmisc.c",
++    "//third_party/alsa-lib/src/control/cards.c",
++    "//third_party/alsa-lib/src/control/control.c",
++    "//third_party/alsa-lib/src/control/control_empty.c",
++    "//third_party/alsa-lib/src/control/control_ext.c",
++    "//third_party/alsa-lib/src/control/control_hw.c",
++    "//third_party/alsa-lib/src/control/control_plugin.c",
++    "//third_party/alsa-lib/src/control/control_remap.c",
++    "//third_party/alsa-lib/src/control/control_shm.c",
++    "//third_party/alsa-lib/src/control/control_symbols.c",
++    "//third_party/alsa-lib/src/control/ctlparse.c",
++    "//third_party/alsa-lib/src/control/eld.c",
++    "//third_party/alsa-lib/src/control/hcontrol.c",
++    "//third_party/alsa-lib/src/control/namehint.c",
++    "//third_party/alsa-lib/src/control/setup.c",
++    "//third_party/alsa-lib/src/control/tlv.c",
++    "//third_party/alsa-lib/src/dlmisc.c",
++    "//third_party/alsa-lib/src/error.c",
++    "//third_party/alsa-lib/src/hwdep/hwdep.c",
++    "//third_party/alsa-lib/src/hwdep/hwdep_hw.c",
++    "//third_party/alsa-lib/src/hwdep/hwdep_symbols.c",
++    "//third_party/alsa-lib/src/input.c",
++    "//third_party/alsa-lib/src/mixer/bag.c",
++    "//third_party/alsa-lib/src/mixer/mixer.c",
++    "//third_party/alsa-lib/src/mixer/simple.c",
++    "//third_party/alsa-lib/src/mixer/simple_abst.c",
++    "//third_party/alsa-lib/src/mixer/simple_none.c",
++    "//third_party/alsa-lib/src/names.c",
++    "//third_party/alsa-lib/src/output.c",
++    "//third_party/alsa-lib/src/pcm/interval.c",
++    "//third_party/alsa-lib/src/pcm/mask.c",
++    "//third_party/alsa-lib/src/pcm/pcm.c",
++    "//third_party/alsa-lib/src/pcm/pcm_adpcm.c",
++    "//third_party/alsa-lib/src/pcm/pcm_alaw.c",
++    "//third_party/alsa-lib/src/pcm/pcm_asym.c",
++    "//third_party/alsa-lib/src/pcm/pcm_copy.c",
++    "//third_party/alsa-lib/src/pcm/pcm_direct.c",
++    "//third_party/alsa-lib/src/pcm/pcm_dmix.c",
++    "//third_party/alsa-lib/src/pcm/pcm_dshare.c",
++    "//third_party/alsa-lib/src/pcm/pcm_dsnoop.c",
++    "//third_party/alsa-lib/src/pcm/pcm_empty.c",
++    "//third_party/alsa-lib/src/pcm/pcm_extplug.c",
++    "//third_party/alsa-lib/src/pcm/pcm_file.c",
++    "//third_party/alsa-lib/src/pcm/pcm_generic.c",
++    "//third_party/alsa-lib/src/pcm/pcm_hooks.c",
++    "//third_party/alsa-lib/src/pcm/pcm_hw.c",
++    "//third_party/alsa-lib/src/pcm/pcm_iec958.c",
++    "//third_party/alsa-lib/src/pcm/pcm_ioplug.c",
++    "//third_party/alsa-lib/src/pcm/pcm_ladspa.c",
++    "//third_party/alsa-lib/src/pcm/pcm_lfloat.c",
++    "//third_party/alsa-lib/src/pcm/pcm_linear.c",
++    "//third_party/alsa-lib/src/pcm/pcm_meter.c",
++    "//third_party/alsa-lib/src/pcm/pcm_misc.c",
++    "//third_party/alsa-lib/src/pcm/pcm_mmap.c",
++    "//third_party/alsa-lib/src/pcm/pcm_mmap_emul.c",
++    "//third_party/alsa-lib/src/pcm/pcm_mulaw.c",
++    "//third_party/alsa-lib/src/pcm/pcm_multi.c",
++    "//third_party/alsa-lib/src/pcm/pcm_null.c",
++    "//third_party/alsa-lib/src/pcm/pcm_params.c",
++    "//third_party/alsa-lib/src/pcm/pcm_plug.c",
++    "//third_party/alsa-lib/src/pcm/pcm_plugin.c",
++    "//third_party/alsa-lib/src/pcm/pcm_rate.c",
++    "//third_party/alsa-lib/src/pcm/pcm_rate_linear.c",
++    "//third_party/alsa-lib/src/pcm/pcm_route.c",
++    "//third_party/alsa-lib/src/pcm/pcm_share.c",
++    "//third_party/alsa-lib/src/pcm/pcm_shm.c",
++    "//third_party/alsa-lib/src/pcm/pcm_simple.c",
++    "//third_party/alsa-lib/src/pcm/pcm_softvol.c",
++    "//third_party/alsa-lib/src/pcm/pcm_symbols.c",
++    "//third_party/alsa-lib/src/rawmidi/rawmidi.c",
++    "//third_party/alsa-lib/src/rawmidi/rawmidi_hw.c",
++    "//third_party/alsa-lib/src/rawmidi/rawmidi_symbols.c",
++    "//third_party/alsa-lib/src/rawmidi/rawmidi_virt.c",
++    "//third_party/alsa-lib/src/seq/seq.c",
++    "//third_party/alsa-lib/src/seq/seq_event.c",
++    "//third_party/alsa-lib/src/seq/seq_hw.c",
++    "//third_party/alsa-lib/src/seq/seq_midi_event.c",
++    "//third_party/alsa-lib/src/seq/seq_old.c",
++    "//third_party/alsa-lib/src/seq/seq_symbols.c",
++    "//third_party/alsa-lib/src/seq/seqmid.c",
++    "//third_party/alsa-lib/src/shmarea.c",
++    "//third_party/alsa-lib/src/socket.c",
++    "//third_party/alsa-lib/src/timer/timer.c",
++    "//third_party/alsa-lib/src/timer/timer_hw.c",
++    "//third_party/alsa-lib/src/timer/timer_query.c",
++    "//third_party/alsa-lib/src/timer/timer_query_hw.c",
++    "//third_party/alsa-lib/src/timer/timer_symbols.c",
++    "//third_party/alsa-lib/src/ucm/main.c",
++    "//third_party/alsa-lib/src/ucm/parser.c",
++    "//third_party/alsa-lib/src/ucm/ucm_cond.c",
++    "//third_party/alsa-lib/src/ucm/ucm_exec.c",
++    "//third_party/alsa-lib/src/ucm/ucm_include.c",
++    "//third_party/alsa-lib/src/ucm/ucm_regex.c",
++    "//third_party/alsa-lib/src/ucm/ucm_subs.c",
++    "//third_party/alsa-lib/src/ucm/utils.c",
++    "//third_party/alsa-lib/src/userfile.c",
++]
++
++
++libasound_cflags = [
++    "-Wno-sign-compare",
++    "-Wno-implicit-function-declaration",
++    "-Wno-parentheses",
++    "-Wno-string-conversion",
++    "-Wno-string-plus-int",
++    "-Wno-asm-operand-widths",
++    "-Wno-pointer-sign",
++    "-Wno-deprecated-declarations",
++    "-Wno-implicit-int",
++    "-Wno-switch",
++    "-Wno-incompatible-pointer-types-discards-qualifiers",
++    "-Wno-int-conversion",
++    "-Wno-absolute-value",
++    "-Wno-unused-function",
++    "-Wno-unused-label",
++    "-Wno-unused-const-variable",
++    "-Wno-visibility",
++    "-Wno-incompatible-pointer-types",
++    "-Wno-sometimes-uninitialized",
++    "-Wno-format",
++    "-Wno-tautological-constant-out-of-range-compare",
++    "-Wno-implicit-fallthrough",
++    "-Wno-error",
++    "-D_GNU_SOURCE",
++    "-DHAVE_CONFIG_H",
++    "-DALSALIB_LITE",
++    "-Wno-unknown-pragmas",
++    "-fgnu-inline-asm"
++  ]
+diff --git a/src/conf/BUILD.gn b/src/conf/BUILD.gn
+index 1eca8a9..bc434df 100644
+--- a/src/conf/BUILD.gn
++++ b/src/conf/BUILD.gn
+@@ -1,721 +1,1283 @@
+ # DO NOT EDIT IT
+ # Author: Allen.Riemann
+ 
+-import("//build/ohos.gni")
++if (defined(ohos_lite)) {
++  import("//build/lite/config/component/lite_component.gni")
++  import("//build/lite/ndk/ndk.gni")
++} else {
++  import("//build/ohos.gni")
++}
+ 
+-alsa_lib_prebuilt_all = []
+ 
+-ohos_prebuilt_etc("alsa-lib-prebuilt-smixer.conf") {
+-  source = "smixer.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-smixer.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-alsa.conf") {
+-  source = "alsa.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-alsa.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/modem.conf") {
+-  source = "pcm/modem.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/modem.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/dmix.conf") {
+-  source = "pcm/dmix.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/dmix.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround21.conf") {
+-  source = "pcm/surround21.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround21.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/dsnoop.conf") {
+-  source = "pcm/dsnoop.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/dsnoop.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/side.conf") {
+-  source = "pcm/side.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/side.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/dpl.conf") {
+-  source = "pcm/dpl.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/dpl.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround71.conf") {
+-  source = "pcm/surround71.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround71.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround40.conf") {
+-  source = "pcm/surround40.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround40.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/rear.conf") {
+-  source = "pcm/rear.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/rear.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround50.conf") {
+-  source = "pcm/surround50.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround50.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/hdmi.conf") {
+-  source = "pcm/hdmi.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/hdmi.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround51.conf") {
+-  source = "pcm/surround51.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround51.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/front.conf") {
+-  source = "pcm/front.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/front.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/iec958.conf") {
+-  source = "pcm/iec958.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/iec958.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround41.conf") {
+-  source = "pcm/surround41.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround41.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/center_lfe.conf") {
+-  source = "pcm/center_lfe.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/center_lfe.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/default.conf") {
+-  source = "pcm/default.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/pcm"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/default.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-ctl/default.conf") {
+-  source = "ctl/default.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/ctl"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-ctl/default.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/AU8820.conf") {
+-  source = "cards/AU8820.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AU8820.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/FireWave.conf") {
+-  source = "cards/FireWave.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/FireWave.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ENS1371.conf") {
+-  source = "cards/ENS1371.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ENS1371.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VX222.conf") {
+-  source = "cards/VX222.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VX222.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8788.conf") {
+-  source = "cards/CMI8788.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8788.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/pistachio-card.conf") {
+-  source = "cards/pistachio-card.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/pistachio-card.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8338-SWIEC.conf") {
+-  source = "cards/CMI8338-SWIEC.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8338-SWIEC.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8338.conf") {
+-  source = "cards/CMI8338.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8338.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ATIIXP-MODEM.conf") {
+-  source = "cards/ATIIXP-MODEM.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ATIIXP-MODEM.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/AU8830.conf") {
+-  source = "cards/AU8830.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AU8830.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ATIIXP.conf") {
+-  source = "cards/ATIIXP.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ATIIXP.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/TRID4DWAVENX.conf") {
+-  source = "cards/TRID4DWAVENX.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/TRID4DWAVENX.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/GUS.conf") {
+-  source = "cards/GUS.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/GUS.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ATIIXP-SPDMA.conf") {
+-  source = "cards/ATIIXP-SPDMA.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ATIIXP-SPDMA.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/AU8810.conf") {
+-  source = "cards/AU8810.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AU8810.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/aliases.conf") {
+-  source = "cards/aliases.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/aliases.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VIA686A.conf") {
+-  source = "cards/VIA686A.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA686A.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8738-MC8.conf") {
+-  source = "cards/CMI8738-MC8.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8738-MC8.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Aureon51.conf") {
+-  source = "cards/Aureon51.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Aureon51.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ENS1370.conf") {
+-  source = "cards/ENS1370.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ENS1370.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Loopback.conf") {
+-  source = "cards/Loopback.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Loopback.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Maestro3.conf") {
+-  source = "cards/Maestro3.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Maestro3.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/FWSpeakers.conf") {
+-  source = "cards/FWSpeakers.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/FWSpeakers.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VIA8233A.conf") {
+-  source = "cards/VIA8233A.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA8233A.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Audigy.conf") {
+-  source = "cards/Audigy.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Audigy.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Echo_Echo3G.conf") {
+-  source = "cards/Echo_Echo3G.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Echo_Echo3G.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICH.conf") {
+-  source = "cards/ICH.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICH.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VIA8237.conf") {
+-  source = "cards/VIA8237.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA8237.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ES1968.conf") {
+-  source = "cards/ES1968.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ES1968.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/EMU10K1.conf") {
+-  source = "cards/EMU10K1.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/EMU10K1.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICH4.conf") {
+-  source = "cards/ICH4.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICH4.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICE1712.conf") {
+-  source = "cards/ICE1712.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICE1712.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/PC-Speaker.conf") {
+-  source = "cards/PC-Speaker.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PC-Speaker.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/EMU10K1X.conf") {
+-  source = "cards/EMU10K1X.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/EMU10K1X.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/RME9652.conf") {
+-  source = "cards/RME9652.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/RME9652.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/YMF744.conf") {
+-  source = "cards/YMF744.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/YMF744.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CA0106.conf") {
+-  source = "cards/CA0106.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CA0106.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICH-MODEM.conf") {
+-  source = "cards/ICH-MODEM.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICH-MODEM.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VXPocket440.conf") {
+-  source = "cards/VXPocket440.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VXPocket440.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/PMacToonie.conf") {
+-  source = "cards/PMacToonie.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PMacToonie.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/PMac.conf") {
+-  source = "cards/PMac.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PMac.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/vc4-hdmi.conf") {
+-  source = "cards/vc4-hdmi.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/vc4-hdmi.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Audigy2.conf") {
+-  source = "cards/Audigy2.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Audigy2.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CS46xx.conf") {
+-  source = "cards/CS46xx.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CS46xx.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/RME9636.conf") {
+-  source = "cards/RME9636.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/RME9636.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/NFORCE.conf") {
+-  source = "cards/NFORCE.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/NFORCE.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/PS3.conf") {
+-  source = "cards/PS3.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PS3.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/FM801.conf") {
+-  source = "cards/FM801.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/FM801.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/SI7018.conf") {
+-  source = "cards/SI7018.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/SI7018.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/SB-XFi.conf") {
+-  source = "cards/SB-XFi.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/SB-XFi.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VXPocket.conf") {
+-  source = "cards/VXPocket.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VXPocket.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICE1724.conf") {
+-  source = "cards/ICE1724.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICE1724.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/AACI.conf") {
+-  source = "cards/AACI.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AACI.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/USB-Audio.conf") {
+-  source = "cards/USB-Audio.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/USB-Audio.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8738-MC6.conf") {
+-  source = "cards/CMI8738-MC6.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8738-MC6.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/HDA-Intel.conf") {
+-  source = "cards/HDA-Intel.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/HDA-Intel.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/HdmiLpeAudio.conf") {
+-  source = "cards/HdmiLpeAudio.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/HdmiLpeAudio.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Aureon71.conf") {
+-  source = "cards/Aureon71.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Aureon71.conf" ]
+-
+-ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VIA8233.conf") {
+-  source = "cards/VIA8233.conf"
+-  install_enable = true
+-  relative_install_dir = "audio/alsa/share/cards"
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-lib"
+-}
+-alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA8233.conf" ]
++if (defined(ohos_lite)) {
++    alsa_lib_prebuilt_all = []
++
++    copy("alsa-lib-prebuilt-smixer.conf") {
++      sources = ["smixer.conf"]
++      outputs = [ "$root_out_dir/etc/smixer.conf" ]
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-smixer.conf" ]
++
++    copy("alsa-lib-prebuilt-alsa.conf") {
++      sources = ["alsa.conf" ]
++      outputs = [ "$root_out_dir/etc/alsa.conf" ]
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-alsa.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/modem.conf") {
++      sources = ["pcm/modem.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/modem.conf" ]
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/modem.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/dmix.conf") {
++      sources = [ "pcm/dmix.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/dmix.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/dmix.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/surround21.conf") {
++      sources = [ "pcm/surround21.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/surround21.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround21.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/dsnoop.conf") {
++      sources = [ "pcm/dsnoop.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/dsnoop.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/dsnoop.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/side.conf") {
++      sources = [ "pcm/side.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/side.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/side.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/dpl.conf") {
++      sources = [ "pcm/dpl.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/dpl.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/dpl.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/surround71.conf") {
++      sources = [ "pcm/surround71.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/surround71.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround71.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/surround40.conf") {
++      sources = [ "pcm/surround40.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/surround40.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround40.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/rear.conf") {
++      sources = [ "pcm/rear.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/rear.conf" ]
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/rear.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/surround50.conf") {
++      sources = [ "pcm/surround50.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/surround50.conf" ]
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround50.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/hdmi.conf") {
++      sources = [ "pcm/hdmi.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/hdmi.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/hdmi.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/surround51.conf") {
++      sources = [ "pcm/surround51.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/surround51.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround51.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/front.conf") {
++      sources = [ "pcm/front.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/front.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/front.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/iec958.conf") {
++      sources = [ "pcm/iec958.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/iec958.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/iec958.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/surround41.conf") {
++      sources = [ "pcm/surround41.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/surround41.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround41.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/center_lfe.conf") {
++      sources = [ "pcm/center_lfe.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/center_lfe.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/center_lfe.conf" ]
++
++    copy("alsa-lib-prebuilt-pcm/default.conf") {
++      sources = [ "pcm/default.conf" ]
++      outputs = [ "$root_out_dir/etc/pcm/default.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/default.conf" ]
++
++    copy("alsa-lib-prebuilt-ctl/default.conf") {
++      sources = [ "ctl/default.conf" ]
++      outputs = [ "$root_out_dir/etc/ctl/default.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-ctl/default.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/AU8820.conf") {
++      sources = [ "cards/AU8820.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/AU8820.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AU8820.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/FireWave.conf") {
++      sources = [ "cards/FireWave.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/FireWave.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/FireWave.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ENS1371.conf") {
++      sources = [ "cards/ENS1371.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ENS1371.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ENS1371.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/VX222.conf") {
++      sources = [ "cards/VX222.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/VX222.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VX222.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/CMI8788.conf") {
++      sources = [ "cards/CMI8788.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/CMI8788.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8788.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/pistachio-card.conf") {
++      sources = [ "cards/pistachio-card.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/pistachio-card.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/pistachio-card.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/CMI8338-SWIEC.conf") {
++      sources = [ "cards/CMI8338-SWIEC.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/CMI8338-SWIEC.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8338-SWIEC.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/CMI8338.conf") {
++      sources = [ "cards/CMI8338.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/CMI8338.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8338.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ATIIXP-MODEM.conf") {
++      sources = [ "cards/ATIIXP-MODEM.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ATIIXP-MODEM.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ATIIXP-MODEM.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/AU8830.conf") {
++      sources = [ "cards/AU8830.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/AU8830.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AU8830.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ATIIXP.conf") {
++      sources = [ "cards/ATIIXP.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ATIIXP.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ATIIXP.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/TRID4DWAVENX.conf") {
++      sources = [ "cards/TRID4DWAVENX.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/TRID4DWAVENX.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/TRID4DWAVENX.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/GUS.conf") {
++      sources = [ "cards/GUS.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/GUS.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/GUS.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ATIIXP-SPDMA.conf") {
++      sources = [ "cards/ATIIXP-SPDMA.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ATIIXP-SPDMA.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ATIIXP-SPDMA.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/AU8810.conf") {
++      sources = [ "cards/AU8810.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/AU8810.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AU8810.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/aliases.conf") {
++      sources = [ "cards/aliases.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/aliases.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/aliases.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/VIA686A.conf") {
++      sources = [ "cards/VIA686A.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/VIA686A.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA686A.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/CMI8738-MC8.conf") {
++      sources = [ "cards/CMI8738-MC8.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/CMI8738-MC8.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8738-MC8.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/Aureon51.conf") {
++      sources = [ "cards/Aureon51.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/Aureon51.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Aureon51.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ENS1370.conf") {
++      sources = [ "cards/ENS1370.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ENS1370.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ENS1370.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/Loopback.conf") {
++      sources = [ "cards/Loopback.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/Loopback.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Loopback.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/Maestro3.conf") {
++      sources = [ "cards/Maestro3.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/Maestro3.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Maestro3.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/FWSpeakers.conf") {
++      sources = [ "cards/FWSpeakers.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/FWSpeakers.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/FWSpeakers.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/VIA8233A.conf") {
++      sources = [ "cards/VIA8233A.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/VIA8233A.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA8233A.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/Audigy.conf") {
++      sources = [ "cards/Audigy.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/Audigy.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Audigy.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/Echo_Echo3G.conf") {
++      sources = [ "cards/Echo_Echo3G.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/Echo_Echo3G.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Echo_Echo3G.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ICH.conf") {
++      sources = [ "cards/ICH.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ICH.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICH.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/VIA8237.conf") {
++      sources = [ "cards/VIA8237.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/VIA8237.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA8237.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ES1968.conf") {
++      sources = [ "cards/ES1968.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ES1968.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ES1968.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/EMU10K1.conf") {
++      sources = [ "cards/EMU10K1.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/EMU10K1.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/EMU10K1.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ICH4.conf") {
++      sources = [ "cards/ICH4.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ICH4.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICH4.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ICE1712.conf") {
++      sources = [ "cards/ICE1712.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ICE1712.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICE1712.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/PC-Speaker.conf") {
++      sources = [ "cards/PC-Speaker.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/PC-Speaker.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PC-Speaker.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/EMU10K1X.conf") {
++      sources = [ "cards/EMU10K1X.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/EMU10K1X.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/EMU10K1X.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/RME9652.conf") {
++      sources = [ "cards/RME9652.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/RME9652.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/RME9652.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/YMF744.conf") {
++      sources = [ "cards/YMF744.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/YMF744.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/YMF744.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/CA0106.conf") {
++      sources = [ "cards/CA0106.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/CA0106.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CA0106.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/ICH-MODEM.conf") {
++      sources = [ "cards/ICH-MODEM.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ICH-MODEM.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICH-MODEM.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/VXPocket440.conf") {
++      sources = [ "cards/VXPocket440.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/VXPocket440.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VXPocket440.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/PMacToonie.conf") {
++      sources = [ "cards/PMacToonie.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/PMacToonie.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PMacToonie.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/PMac.conf") {
++      sources = [ "cards/PMac.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/PMac.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PMac.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/vc4-hdmi.conf") {
++      sources = [ "cards/vc4-hdmi.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/vc4-hdmi.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/vc4-hdmi.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/Audigy2.conf") {
++      sources = [ "cards/Audigy2.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/Audigy2.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Audigy2.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/CS46xx.conf") {
++      sources = [ "cards/CS46xx.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/CS46xx.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CS46xx.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/RME9636.conf") {
++      sources = [ "cards/RME9636.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/RME9636.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/RME9636.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/NFORCE.conf") {
++      sources = [ "cards/NFORCE.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/NFORCE.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/NFORCE.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/PS3.conf") {
++      sources = [ "cards/PS3.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/PS3.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PS3.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/FM801.conf") {
++      sources = [ "cards/FM801.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/FM801.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/FM801.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/SI7018.conf") {
++      sources = [ "cards/SI7018.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/SI7018.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/SI7018.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/SB-XFi.conf") {
++      sources = [ "cards/SB-XFi.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/SB-XFi.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/SB-XFi.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/VXPocket.conf") {
++      sources = [ "cards/VXPocket.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/VXPocket.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VXPocket.conf" ]
+ 
+-group("alsa-lib-prebuilt-all") {
+-  deps = alsa_lib_prebuilt_all
++    copy("alsa-lib-prebuilt-cards/ICE1724.conf") {
++      sources = [ "cards/ICE1724.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/ICE1724.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICE1724.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/AACI.conf") {
++      sources = [ "cards/AACI.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/AACI.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AACI.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/USB-Audio.conf") {
++      sources = [ "cards/USB-Audio.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/USB-Audio.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/USB-Audio.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/CMI8738-MC6.conf") {
++      sources = [ "cards/CMI8738-MC6.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/CMI8738-MC6.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8738-MC6.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/HDA-Intel.conf") {
++      sources = [ "cards/HDA-Intel.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/HDA-Intel.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/HDA-Intel.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/HdmiLpeAudio.conf") {
++      sources = [ "cards/HdmiLpeAudio.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/HdmiLpeAudio.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/HdmiLpeAudio.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/Aureon71.conf") {
++      sources = [ "cards/Aureon71.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/Aureon71.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Aureon71.conf" ]
++
++    copy("alsa-lib-prebuilt-cards/VIA8233.conf") {
++      sources = [ "cards/VIA8233.conf" ]
++      outputs = [ "$root_out_dir/etc/cards/VIA8233.conf" ]
++
++    }
++    alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA8233.conf" ]
++
++    group("alsa-lib-prebuilt-all") {
++      deps = alsa_lib_prebuilt_all
++    }
++  } else {
++  alsa_lib_prebuilt_all = []
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-smixer.conf") {
++    source = "smixer.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-smixer.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-alsa.conf") {
++    source = "alsa.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-alsa.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/modem.conf") {
++    source = "pcm/modem.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/modem.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/dmix.conf") {
++    source = "pcm/dmix.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/dmix.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround21.conf") {
++    source = "pcm/surround21.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround21.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/dsnoop.conf") {
++    source = "pcm/dsnoop.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/dsnoop.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/side.conf") {
++    source = "pcm/side.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/side.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/dpl.conf") {
++    source = "pcm/dpl.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/dpl.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround71.conf") {
++    source = "pcm/surround71.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround71.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround40.conf") {
++    source = "pcm/surround40.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround40.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/rear.conf") {
++    source = "pcm/rear.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/rear.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround50.conf") {
++    source = "pcm/surround50.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround50.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/hdmi.conf") {
++    source = "pcm/hdmi.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/hdmi.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround51.conf") {
++    source = "pcm/surround51.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround51.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/front.conf") {
++    source = "pcm/front.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/front.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/iec958.conf") {
++    source = "pcm/iec958.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/iec958.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/surround41.conf") {
++    source = "pcm/surround41.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/surround41.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/center_lfe.conf") {
++    source = "pcm/center_lfe.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/center_lfe.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-pcm/default.conf") {
++    source = "pcm/default.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/pcm"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-pcm/default.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-ctl/default.conf") {
++    source = "ctl/default.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/ctl"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-ctl/default.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/AU8820.conf") {
++    source = "cards/AU8820.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AU8820.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/FireWave.conf") {
++    source = "cards/FireWave.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/FireWave.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ENS1371.conf") {
++    source = "cards/ENS1371.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ENS1371.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VX222.conf") {
++    source = "cards/VX222.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VX222.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8788.conf") {
++    source = "cards/CMI8788.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8788.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/pistachio-card.conf") {
++    source = "cards/pistachio-card.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/pistachio-card.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8338-SWIEC.conf") {
++    source = "cards/CMI8338-SWIEC.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8338-SWIEC.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8338.conf") {
++    source = "cards/CMI8338.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8338.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ATIIXP-MODEM.conf") {
++    source = "cards/ATIIXP-MODEM.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ATIIXP-MODEM.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/AU8830.conf") {
++    source = "cards/AU8830.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AU8830.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ATIIXP.conf") {
++    source = "cards/ATIIXP.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ATIIXP.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/TRID4DWAVENX.conf") {
++    source = "cards/TRID4DWAVENX.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/TRID4DWAVENX.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/GUS.conf") {
++    source = "cards/GUS.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/GUS.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ATIIXP-SPDMA.conf") {
++    source = "cards/ATIIXP-SPDMA.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ATIIXP-SPDMA.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/AU8810.conf") {
++    source = "cards/AU8810.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AU8810.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/aliases.conf") {
++    source = "cards/aliases.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/aliases.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VIA686A.conf") {
++    source = "cards/VIA686A.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA686A.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8738-MC8.conf") {
++    source = "cards/CMI8738-MC8.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8738-MC8.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Aureon51.conf") {
++    source = "cards/Aureon51.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Aureon51.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ENS1370.conf") {
++    source = "cards/ENS1370.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ENS1370.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Loopback.conf") {
++    source = "cards/Loopback.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Loopback.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Maestro3.conf") {
++    source = "cards/Maestro3.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Maestro3.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/FWSpeakers.conf") {
++    source = "cards/FWSpeakers.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/FWSpeakers.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VIA8233A.conf") {
++    source = "cards/VIA8233A.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA8233A.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Audigy.conf") {
++    source = "cards/Audigy.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Audigy.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Echo_Echo3G.conf") {
++    source = "cards/Echo_Echo3G.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Echo_Echo3G.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICH.conf") {
++    source = "cards/ICH.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICH.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VIA8237.conf") {
++    source = "cards/VIA8237.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA8237.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ES1968.conf") {
++    source = "cards/ES1968.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ES1968.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/EMU10K1.conf") {
++    source = "cards/EMU10K1.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/EMU10K1.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICH4.conf") {
++    source = "cards/ICH4.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICH4.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICE1712.conf") {
++    source = "cards/ICE1712.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICE1712.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/PC-Speaker.conf") {
++    source = "cards/PC-Speaker.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PC-Speaker.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/EMU10K1X.conf") {
++    source = "cards/EMU10K1X.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/EMU10K1X.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/RME9652.conf") {
++    source = "cards/RME9652.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/RME9652.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/YMF744.conf") {
++    source = "cards/YMF744.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/YMF744.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CA0106.conf") {
++    source = "cards/CA0106.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CA0106.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICH-MODEM.conf") {
++    source = "cards/ICH-MODEM.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICH-MODEM.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VXPocket440.conf") {
++    source = "cards/VXPocket440.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VXPocket440.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/PMacToonie.conf") {
++    source = "cards/PMacToonie.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PMacToonie.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/PMac.conf") {
++    source = "cards/PMac.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PMac.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/vc4-hdmi.conf") {
++    source = "cards/vc4-hdmi.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/vc4-hdmi.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Audigy2.conf") {
++    source = "cards/Audigy2.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Audigy2.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CS46xx.conf") {
++    source = "cards/CS46xx.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CS46xx.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/RME9636.conf") {
++    source = "cards/RME9636.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/RME9636.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/NFORCE.conf") {
++    source = "cards/NFORCE.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/NFORCE.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/PS3.conf") {
++    source = "cards/PS3.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/PS3.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/FM801.conf") {
++    source = "cards/FM801.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/FM801.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/SI7018.conf") {
++    source = "cards/SI7018.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/SI7018.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/SB-XFi.conf") {
++    source = "cards/SB-XFi.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/SB-XFi.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VXPocket.conf") {
++    source = "cards/VXPocket.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VXPocket.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/ICE1724.conf") {
++    source = "cards/ICE1724.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/ICE1724.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/AACI.conf") {
++    source = "cards/AACI.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/AACI.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/USB-Audio.conf") {
++    source = "cards/USB-Audio.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/USB-Audio.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/CMI8738-MC6.conf") {
++    source = "cards/CMI8738-MC6.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/CMI8738-MC6.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/HDA-Intel.conf") {
++    source = "cards/HDA-Intel.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/HDA-Intel.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/HdmiLpeAudio.conf") {
++    source = "cards/HdmiLpeAudio.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/HdmiLpeAudio.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/Aureon71.conf") {
++    source = "cards/Aureon71.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/Aureon71.conf" ]
++
++  ohos_prebuilt_etc("alsa-lib-prebuilt-cards/VIA8233.conf") {
++    source = "cards/VIA8233.conf"
++    install_enable = true
++    relative_install_dir = "audio/alsa/share/cards"
++    subsystem_name = "thirdparty"
++    part_name = "alsa-lib"
++  }
++  alsa_lib_prebuilt_all += [ ":alsa-lib-prebuilt-cards/VIA8233.conf" ]
++
++  group("alsa-lib-prebuilt-all") {
++    deps = alsa_lib_prebuilt_all
++  }
+ }

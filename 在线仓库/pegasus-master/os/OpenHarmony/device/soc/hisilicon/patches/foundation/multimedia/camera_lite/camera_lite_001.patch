@@ -1,0 +1,2905 @@
+diff --git a/bundle.json b/bundle.json
+index 3ce8665..4c96acb 100755
+--- a/bundle.json
++++ b/bundle.json
+@@ -32,7 +32,8 @@
+         },
+         "build": {
+             "sub_component": [
+-                "//foundation/multimedia/camera_lite/frameworks:camera_lite"
++                "//foundation/multimedia/camera_lite/frameworks:camera_lite",
++		        "//applications/sample/camera/media:media_sample"
+             ],
+             "inner_kits": [],
+             "test": []
+diff --git a/frameworks/BUILD.gn b/frameworks/BUILD.gn
+index 5cc004b..1d4fce2 100644
+--- a/frameworks/BUILD.gn
++++ b/frameworks/BUILD.gn
+@@ -23,7 +23,7 @@ shared_library("camera_lite") {
+     "event_handler.cpp",
+     "frame_config.cpp",
+   ]
+-
++  deps = []
+   if (enable_media_passthrough_mode == true) {
+     sources += [
+       "../services/impl/src/camera_device.cpp",
+@@ -38,8 +38,19 @@ shared_library("camera_lite") {
+       "//foundation/multimedia/media_utils_lite/hals",
+       "//drivers/peripheral/base",
+     ]
+-
+-    ldflags = [ "-lhdi_camera" ]
++    deps += [
++      "//device/soc/hisilicon/common/hal/media/camera/source:hdi_camera",
++      "//device/soc/hisilicon/common/hal/media/camera/source/src/distributed_camera:hdi_virtual_camera",
++    ]
++    ldflags = []
++    if (board_name == "hispark_taurus" || board_name == "hispark_aries" ||
++      board_name == "hispark_aiflylite" || board_name == "hispark_aifly") {
++        ldflags += [
++          "-lcodec",
++          "-lhdi_camera",
++          "-ldisplay_layer",
++        ]
++    }
+     defines = [ "ENABLE_PASSTHROUGH_MODE" ]
+   } else {
+     sources += [
+@@ -73,32 +84,27 @@ shared_library("camera_lite") {
+     "-lpthread",
+     "-L$ohos_root_path/$root_out_dir",
+   ]
+-  if (board_name == "hispark_taurus" || board_name == "hispark_aries") {
+-    ldflags += [
+-      "-lcodec",
+-      "-lhdi_videodisplayer",
+-    ]
+-  }
+-
+-  cflags = [ "-fPIC" ]
+-  cflags += [ "-Wall" ]
+-  cflags_cc = cflags
+-  deps = [
++  deps += [
+     "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared",
+     "//base/security/permission_lite/services/pms_client:pms_client",
+     "//foundation/communication/ipc/interfaces/innerkits/c/ipc:ipc_single",
+     "//foundation/systemabilitymgr/samgr_lite/samgr:samgr",
+     "//third_party/bounds_checking_function:libsec_shared",
+   ]
+-  if (board_name == "hispark_taurus" || board_name == "hispark_aries") {
+-    deps += [
+-      "//device/soc/hisilicon/common/hal/media:hardware_media_sdk",
+-      "//device/soc/hisilicon/common/hal/middleware:middleware_source_sdk",
+-    ]
++
++  cflags = [ "-fPIC" ]
++  cflags += [ "-Wall" ]
++  cflags_cc = cflags
++  if (board_name == "hispark_taurus" || board_name == "hispark_aries" ||
++      board_name == "hispark_aiflylite" || board_name == "hispark_aifly") {
++    if (enable_media_passthrough_mode == true) {
++      deps += [
++        "//device/soc/hisilicon/common/hal/media:hardware_media_sdk",
++      ]
++    }
+   }
+   public_deps = [
+     "//foundation/graphic/surface_lite:surface_lite",
+-    "//foundation/multimedia/media_lite/frameworks/recorder_lite:recorder_lite",
+     "//foundation/multimedia/media_utils_lite:media_common",
+   ]
+ }
+diff --git a/frameworks/binder/include/camera_device_client.h b/frameworks/binder/include/camera_device_client.h
+index 919c076..83c33a0 100644
+--- a/frameworks/binder/include/camera_device_client.h
++++ b/frameworks/binder/include/camera_device_client.h
+@@ -30,11 +30,11 @@ namespace Media {
+ class CameraImpl;
+ class CameraDeviceClient {
+ public:
+-    static CameraDeviceClient *GetInstance();
+-    static int Callback(void* owner, int code, IpcIo *reply);
+-
++    CameraDeviceClient();
+     ~CameraDeviceClient();
+ 
++    static int Callback(void* owner, int code, IpcIo *reply);
++
+     int32_t SetCameraConfig(CameraConfig &cc);
+     int32_t TriggerLoopingCapture(FrameConfig &fc);
+     void StopLoopingCapture(int32_t type);
+@@ -47,13 +47,13 @@ public:
+     static int32_t SurfaceRequestHandler(uint32_t code, IpcIo *data, IpcIo *reply, MessageOption option);
+     static int32_t DeviceClientCallback(uint32_t code, IpcIo *data, IpcIo *reply, MessageOption option);
+ private:
+-    CameraDeviceClient();
+     CameraClient *cameraClient_ = nullptr;
+     IClientProxy *proxy_ = nullptr;
+     std::string cameraId_;
+     CameraImpl *cameraImpl_ = nullptr;
+     CallBackPara *para_ = nullptr;
+-    SvcIdentity sid_;
++    SvcIdentity sid_ {0, 0, 0};
++    IpcObjectStub objectStub_ {nullptr, nullptr, false};
+     int32_t ret_ = 0;
+ };
+ } // namespace Media
+diff --git a/frameworks/binder/include/camera_service_client.h b/frameworks/binder/include/camera_service_client.h
+index dbf7ce5..cad1965 100644
+--- a/frameworks/binder/include/camera_service_client.h
++++ b/frameworks/binder/include/camera_service_client.h
+@@ -38,6 +38,7 @@ public:
+     static int32_t ServiceClientCallback(uint32_t code, IpcIo *data, IpcIo *reply, MessageOption option);
+     uint8_t GetCameraModeNum();
+     int32_t SetCameraMode(uint8_t modeIndex);
++    void RegisterCameraDeviceCallback();
+ 
+ private:
+     CameraServiceClient();
+@@ -50,6 +51,7 @@ private:
+     std::map<std::string, CameraInfo*> deviceInfoMap_;
+     CameraServiceCallback *cameraServiceCb_ = nullptr;
+     SvcIdentity sid_;
++    IpcObjectStub objectStub_;
+     CallBackPara *para_ = nullptr;
+     uint8_t cameraModeNum = 0;
+     int32_t ret_ = 0;
+diff --git a/frameworks/binder/src/camera_device_client.cpp b/frameworks/binder/src/camera_device_client.cpp
+index 34e6108..148c6ed 100644
+--- a/frameworks/binder/src/camera_device_client.cpp
++++ b/frameworks/binder/src/camera_device_client.cpp
+@@ -28,13 +28,6 @@
+ using namespace std;
+ namespace OHOS {
+ namespace Media {
+-static IpcObjectStub objectStub_;
+-
+-CameraDeviceClient *CameraDeviceClient::GetInstance()
+-{
+-    static CameraDeviceClient client;
+-    return &client;
+-}
+ 
+ CameraDeviceClient::CameraDeviceClient()
+ {
+@@ -42,6 +35,10 @@ CameraDeviceClient::CameraDeviceClient()
+     if (cameraClient_->InitCameraClient()) {
+         proxy_ = cameraClient_->GetIClientProxy();
+     }
++    para_ = new (nothrow) CallBackPara;
++    if (para_ == nullptr) {
++        MEDIA_ERR_LOG("para_ is null.");
++    }
+ }
+ 
+ CameraDeviceClient::~CameraDeviceClient()
+@@ -94,6 +91,11 @@ int32_t CameraDeviceClient::SetCameraConfig(CameraConfig &cc)
+     WriteString(&io, cameraId_.c_str());
+     para_->data = this;
+     para_->cameraConfig = &cc;
++    uint32_t len = cc.GetCameraSettings().size();
++    WriteUint32(&io, len);
++    if (len > 0) {
++        WriteBuffer(&io, cc.GetCameraSettings().c_str(), len);
++    }
+     CallBackPara para = {};
+     para.funcId = CAMERA_SERVER_SET_CAMERA_CONFIG;
+     para.data = this;
+@@ -130,6 +132,14 @@ int32_t SerilizeFrameConfig(IpcIo &io, FrameConfig &fc, uint32_t maxSurfaceNum)
+     fc.GetParameter(CAM_IMAGE_INVERT_MODE, invertMode);
+     WriteInt32(&io, invertMode);
+ 
++    int32_t width = 0;
++    fc.GetParameter(CAM_IMAGE_WIDTH, width);
++    WriteInt32(&io, width);
++
++    int32_t height = 0;
++    fc.GetParameter(CAM_IMAGE_HEIGHT, height);
++    WriteInt32(&io, height);
++
+     CameraRect streamCrop;
+     fc.GetParameter(CAM_IMAGE_CROP_RECT, streamCrop);
+     WriteInt32(&io, streamCrop.x);
+@@ -276,7 +286,10 @@ void CameraDeviceClient::SetCameraCallback()
+     if (!writeRemote) {
+         return;
+     }
+-
++    if (proxy_ == nullptr) {
++        MEDIA_ERR_LOG("proxy_ is null.");
++        return;
++    }
+     CallBackPara para = {};
+     para.funcId = CAMERA_SERVER_SET_CAMERA_CALLBACK;
+     uint32_t ans = proxy_->Invoke(proxy_, CAMERA_SERVER_SET_CAMERA_CALLBACK, &io, &para, Callback);
+diff --git a/frameworks/binder/src/camera_service_client.cpp b/frameworks/binder/src/camera_service_client.cpp
+index c9b34fe..c0dccca 100644
+--- a/frameworks/binder/src/camera_service_client.cpp
++++ b/frameworks/binder/src/camera_service_client.cpp
+@@ -12,7 +12,11 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
++
+ #include "camera_service_client.h"
++#include <unistd.h>
++#include <string>
++#include <cstdio>
+ #include "media_log.h"
+ #include "samgr_lite.h"
+ #include "camera_type.h"
+@@ -20,13 +24,9 @@
+ #include "meta_data.h"
+ #include "camera_client.h"
+ 
+-#include <string>
+-#include <cstdio>
+-
+ using namespace std;
+ namespace OHOS {
+ namespace Media {
+-static IpcObjectStub objectStub_;
+ 
+ CameraServiceClient *CameraServiceClient::GetInstance()
+ {
+@@ -47,6 +47,37 @@ CameraServiceClient::~CameraServiceClient()
+     }
+ }
+ 
++void CameraServiceClient::RegisterCameraDeviceCallback()
++{
++    if (para_ == nullptr) {
++        para_ = new (nothrow) CallBackPara;
++        if (para_ == nullptr) {
++            MEDIA_ERR_LOG("para_ is null.");
++            return;
++        }
++        para_->data = this;
++    }
++    objectStub_.func = CameraServiceClient::ServiceClientCallback;
++    objectStub_.args = para_;
++    objectStub_.isRemote = false;
++    sid_.handle = IPC_INVALID_HANDLE;
++    sid_.token = SERVICE_TYPE_ANONYMOUS;
++    sid_.cookie = reinterpret_cast<uintptr_t>(&objectStub_);
++    IpcIo io;
++    uint8_t tmpData[DEFAULT_IPC_SIZE];
++    IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 1);
++    bool writeRemote = WriteRemoteObject(&io, &sid_);
++    if (!writeRemote) {
++        return;
++    }
++    CallBackPara para = {};
++    para.funcId = CAMERA_SERVER_SET_CAMERA_CALLBACK;
++    int32_t ans = proxy_->Invoke(proxy_, CAMERA_SERVER_SET_CAMERA_CALLBACK, &io, &para, Callback);
++    if (ans != 0) {
++        MEDIA_ERR_LOG("Stop Looping capture ipc  transmission failed. (ret=%d)", ans);
++    }
++}
++
+ void CameraServiceClient::InitCameraServiceClient(CameraServiceCallback *callback)
+ {
+     if (callback == nullptr) {
+@@ -141,7 +172,7 @@ int CameraServiceClient::Callback(void* owner, int code, IpcIo *reply)
+             ReadUint32(reply, &listSize);
+             for (uint32_t i = 0; i < listSize; i++) {
+                 size_t sz;
+-                string cameraId((const char*)(ReadString(reply, &sz)));
++                string cameraId(reinterpret_cast<const char *>(ReadString(reply, &sz)));
+                 client->list_.emplace_back(cameraId);
+                 MEDIA_INFO_LOG("Callback : cameraId %s", cameraId.c_str());
+             }
+@@ -166,17 +197,17 @@ int CameraServiceClient::Callback(void* owner, int code, IpcIo *reply)
+ 
+ list<string> CameraServiceClient::GetCameraIdList()
+ {
+-    if (list_.empty()) {
+-        IpcIo io;
+-        uint8_t tmpData[DEFAULT_IPC_SIZE];
+-        IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 0);
+-        CallBackPara para = {};
+-        para.funcId = CAMERA_SERVER_GET_CAMERAIDLIST;
+-        para.data = this;
+-        uint32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_GET_CAMERAIDLIST, &io, &para, Callback);
+-        if (ret != 0) {
+-            MEDIA_ERR_LOG("Get cameraId list ipc  transmission failed. (ret=%d)", ret);
+-        }
++    MEDIA_INFO_LOG("CameraServiceClient::GetCameraIdList");
++    IpcIo io;
++    uint8_t tmpData[DEFAULT_IPC_SIZE];
++    IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 0);
++
++    CallBackPara para = {};
++    para.funcId = CAMERA_SERVER_GET_CAMERAIDLIST;
++    para.data = this;
++    int32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_GET_CAMERAIDLIST, &io, &para, Callback);
++    if (ret != 0) {
++        MEDIA_ERR_LOG("Get cameraId list ipc  transmission failed. (ret=%d)", ret);
+     }
+     return list_;
+ }
+@@ -189,7 +220,7 @@ uint8_t CameraServiceClient::GetCameraModeNum()
+     CallBackPara para = {};
+     para.funcId = CAMERA_SERVER_GET_CAMERA_MODE_NUM;
+     para.data = this;
+-    uint32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_GET_CAMERA_MODE_NUM, &io, &para, Callback);
++    int32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_GET_CAMERA_MODE_NUM, &io, &para, Callback);
+     if (ret != 0) {
+         MEDIA_ERR_LOG("Get camera mode num failed. (ret=%d)", ret);
+     }
+@@ -198,7 +229,7 @@ uint8_t CameraServiceClient::GetCameraModeNum()
+ 
+ CameraAbility *CameraServiceClient::GetCameraAbility(string &cameraId)
+ {
+-    std::map<string, CameraAbility*>::iterator iter = deviceAbilityMap_.find(cameraId);
++    std::map<string, CameraAbility*>::const_iterator iter = deviceAbilityMap_.find(cameraId);
+     if (iter != deviceAbilityMap_.end()) {
+         return iter->second;
+     }
+@@ -212,7 +243,7 @@ CameraAbility *CameraServiceClient::GetCameraAbility(string &cameraId)
+     para.data = this;
+ 
+     // wait for callback.
+-    uint32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_GET_CAMERA_ABILITY, &io, &para, Callback);
++    int32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_GET_CAMERA_ABILITY, &io, &para, Callback);
+     if (ret != 0) {
+         MEDIA_ERR_LOG("Get camera ability ipc transmission failed. (ret=%d)", ret);
+     }
+@@ -227,7 +258,7 @@ CameraAbility *CameraServiceClient::GetCameraAbility(string &cameraId)
+ 
+ CameraInfo *CameraServiceClient::GetCameraInfo(string &cameraId)
+ {
+-    std::map<string, CameraInfo*>::iterator iter = deviceInfoMap_.find(cameraId);
++    std::map<string, CameraInfo*>::const_iterator iter = deviceInfoMap_.find(cameraId);
+     if (iter != deviceInfoMap_.end()) {
+         return iter->second;
+     }
+@@ -240,7 +271,7 @@ CameraInfo *CameraServiceClient::GetCameraInfo(string &cameraId)
+     para.funcId = CAMERA_SERVER_GET_CAMERA_INFO;
+     para.data = this;
+     // wait for callback.
+-    uint32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_GET_CAMERA_INFO, &io, &para, Callback);
++    int32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_GET_CAMERA_INFO, &io, &para, Callback);
+     if (ret != 0) {
+         MEDIA_ERR_LOG("Get camera info ipc transmission failed. (ret=%d)", ret);
+     }
+@@ -266,9 +297,10 @@ int32_t CameraServiceClient::ServiceClientCallback(uint32_t code, IpcIo *data, I
+         case ON_CAMERA_STATUS_CHANGE: {
+             int status;
+             ReadInt32(data, &status);
++            size_t sz;
++            std::string cameraId(reinterpret_cast<const char *>(ReadString(data, &sz)));
+             CameraServiceCallback::CameraStatus cameraStatus =
+                 static_cast<CameraServiceCallback::CameraStatus>(status);
+-            string cameraId = para->cameraId;
+             client->cameraServiceCb_->OnCameraStatusChange(cameraId, cameraStatus);
+             break;
+         }
+@@ -289,7 +321,7 @@ int32_t CameraServiceClient::SetCameraMode(uint8_t modeIndex)
+     CallBackPara para = {};
+     para.funcId = CAMERA_SERVER_SET_CAMERA_MODE_NUM;
+     para.data = this;
+-    uint32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_SET_CAMERA_MODE_NUM, &io, &para, Callback);
++    int32_t ret = proxy_->Invoke(proxy_, CAMERA_SERVER_SET_CAMERA_MODE_NUM, &io, &para, Callback);
+     if (ret != 0) {
+         MEDIA_ERR_LOG("Set camera mode failed.(ret=%d)", ret);
+         return ret;
+@@ -299,10 +331,12 @@ int32_t CameraServiceClient::SetCameraMode(uint8_t modeIndex)
+ 
+ void CameraServiceClient::CreateCamera(string cameraId)
+ {
+-    para_ = new (nothrow) CallBackPara;
+-    if (para_ == nullptr) {
+-        MEDIA_ERR_LOG("para_ is null, failed.");
+-        return;
++   if (para_ == nullptr) {
++        para_ = new (nothrow) CallBackPara;
++        if (para_ == nullptr) {
++            MEDIA_ERR_LOG("para_ is null.");
++            return;
++        }
+     }
+     para_->cameraId = cameraId;
+     para_->data = this;
+@@ -323,7 +357,7 @@ void CameraServiceClient::CreateCamera(string cameraId)
+     if (!writeRemote) {
+         return;
+     }
+-    uint32_t ans = proxy_->Invoke(proxy_, CAMERA_SERVER_CREATE_CAMERA, &io, para_, Callback);
++    int32_t ans = proxy_->Invoke(proxy_, CAMERA_SERVER_CREATE_CAMERA, &io, para_, Callback);
+     if (ans != 0) {
+         MEDIA_ERR_LOG("Create camera ipc  transmission failed. (ret=%d)", ans);
+     }
+diff --git a/frameworks/camera_client.cpp b/frameworks/camera_client.cpp
+index f6c9e89..bea71c7 100644
+--- a/frameworks/camera_client.cpp
++++ b/frameworks/camera_client.cpp
+@@ -37,8 +37,9 @@ CameraClient *CameraClient::GetInstance()
+ 
+ bool CameraClient::InitCameraClient()
+ {
+-    HOS_SystemInit();
++
+     if (proxy_ == nullptr) {
++        HOS_SystemInit();
+         IUnknown *iUnknown = SAMGR_GetInstance()->GetDefaultFeatureApi(SERVICE_NAME);
+         if (iUnknown == nullptr) {
+             MEDIA_ERR_LOG("Camera server connecting failed.");
+diff --git a/frameworks/camera_impl.cpp b/frameworks/camera_impl.cpp
+index 76b85d8..83d6f0f 100644
+--- a/frameworks/camera_impl.cpp
++++ b/frameworks/camera_impl.cpp
+@@ -21,8 +21,9 @@
+ using namespace std;
+ namespace OHOS {
+ namespace Media {
+-CameraImpl::CameraImpl(const std::string &id, const CameraAbility *ability, const CameraInfo *info):id_(id)
++CameraImpl::CameraImpl(std::string &id, const CameraAbility *ability, const CameraInfo *info)
+ {
++    id_ = id;
+     ability_ = ability;
+     info_ = info;
+ }
+@@ -49,10 +50,6 @@ FrameConfig *CameraImpl::GetFrameConfig(int32_t type)
+ 
+ void CameraImpl::Configure(CameraConfig &config)
+ {
+-    if (config_ != nullptr) {
+-        return;
+-    }
+-
+     if (config.GetFrameStateCb() == nullptr || config.GetEventHandler() == nullptr) {
+         return;
+     }
+@@ -77,9 +74,30 @@ void CameraImpl::OnConfigured(int32_t ret, CameraConfig &config)
+     handler_->Post([this] { this->stateCb_->OnConfigured(*this); });
+ }
+ 
++void CameraImpl::ClearFrameConfigs()
++{
++    FrameStateCallback *fsc = config_->GetFrameStateCb();
++    if (fsc == nullptr) {
++        return;
++    }
++    EventHandler *eventhdl = config_->GetEventHandler();
++    if (eventhdl == nullptr) {
++        return;
++    }
++
++    for (auto i : frameConfigs_) {
++        eventhdl->Post([fsc, this, i] {
++            FrameResult frameResult;
++            fsc->OnFrameFinished(*this, *i, frameResult);
++        });
++    }
++    frameConfigs_.clear();
++}
++
+ void CameraImpl::Release()
+ {
+     if (config_ != nullptr) {
++        ClearFrameConfigs();
+         delete config_;
+         config_ = nullptr;
+     }
+@@ -87,6 +105,8 @@ void CameraImpl::Release()
+         return;
+     }
+     deviceClient_->Release();
++    delete deviceClient_;
++    deviceClient_ = nullptr;
+     if (handler_ == nullptr) {
+         return;
+     }
+@@ -105,7 +125,7 @@ int32_t CameraImpl::TriggerLoopingCapture(FrameConfig &fc)
+         return MEDIA_ERR;
+     }
+     FrameConfig *curFc = GetFrameConfig(type);
+-    if (curFc != nullptr) {
++    if (curFc != nullptr && type != FRAME_CONFIG_PREVIEW) {
+         MEDIA_ERR_LOG("Frame config of the input type is already existed.");
+         return MEDIA_ERR;
+     }
+@@ -130,27 +150,7 @@ void CameraImpl::StopLoopingCapture(int32_t type = -1)
+     if (config_ == nullptr) {
+         return;
+     }
+-    FrameStateCallback *fsc = config_->GetFrameStateCb();
+-    if (fsc == nullptr) {
+-        return;
+-    }
+-    EventHandler *eventhdl = config_->GetEventHandler();
+-    if (eventhdl == nullptr) {
+-        return;
+-    }
+-
+-    for (auto i : frameConfigs_) {
+-        if (i->GetFrameConfigType() == type || type == -1) {
+-            eventhdl->Post([fsc, this, i] {
+-                FrameResult frameResult;
+-                fsc->OnFrameFinished(*this, *i, frameResult);
+-            });
+-        }
+-    }
+-    /* clear all configs, if type == -1 */
+-    if (type == -1) {
+-        frameConfigs_.clear();
+-    }
++    ClearFrameConfigs();
+ }
+ 
+ int32_t CameraImpl::TriggerSingleCapture(FrameConfig &fc)
+@@ -186,9 +186,11 @@ const CameraInfo *CameraImpl::GetInfo()
+ 
+ void CameraImpl::OnCreate(string cameraId)
+ {
+-    deviceClient_ = CameraDeviceClient::GetInstance();
+     if (deviceClient_ == nullptr) {
+-        return;
++        deviceClient_ = new (std::nothrow) CameraDeviceClient();
++        if (deviceClient_ == nullptr) {
++            return;
++        }
+     }
+     deviceClient_->SetCameraId(cameraId);
+     deviceClient_->SetCameraImpl(this);
+@@ -197,6 +199,15 @@ void CameraImpl::OnCreate(string cameraId)
+         return;
+     }
+     handler_->Post([this] { this->stateCb_->OnCreated(*this); });
++    MEDIA_INFO_LOG("CameraImpl:OnCreate success");
++}
++
++void CameraImpl::OnRelease(std::string cameraId)
++{
++    if (stateCb_ == nullptr || handler_ == nullptr) {
++        return;
++    }
++    handler_->Post([this] { this->stateCb_->OnReleased(*this); });
+ }
+ 
+ void CameraImpl::OnFrameFinished(int32_t ret, FrameConfig &fc)
+diff --git a/frameworks/camera_impl.h b/frameworks/camera_impl.h
+index 15aed0b..50cd73c 100644
+--- a/frameworks/camera_impl.h
++++ b/frameworks/camera_impl.h
+@@ -26,8 +26,8 @@ namespace Media {
+ class CameraImpl : public Camera {
+ public:
+     CameraImpl() = delete;
+-    CameraImpl(const std::string &id, const CameraAbility *ability, const CameraInfo *info);
+-    ~CameraImpl() = default;
++    CameraImpl(std::string &id, const CameraAbility *ability, const CameraInfo *info);
++    ~CameraImpl() override {};
+ 
+     std::string GetCameraId() override;
+     const CameraConfig *GetCameraConfig() const override;
+@@ -43,12 +43,14 @@ public:
+     const CameraAbility *GetAbility();
+     const CameraInfo *GetInfo();
+     void OnCreate(std::string cameraId);
++    void OnRelease(std::string cameraId);
+     void OnCreateFailed();
+     void OnFrameFinished(int32_t ret, FrameConfig &fc);
+     void OnConfigured(int32_t ret, CameraConfig &config);
+     void RegistCb(CameraStateCallback &callback, EventHandler &handler);
+ 
+ private:
++    void ClearFrameConfigs();
+     std::string id_;
+     std::list<FrameConfig *> frameConfigs_;
+     CameraConfig *config_ = nullptr;
+diff --git a/frameworks/camera_kit.cpp b/frameworks/camera_kit.cpp
+index 0e878bf..abdee93 100644
+--- a/frameworks/camera_kit.cpp
++++ b/frameworks/camera_kit.cpp
+@@ -67,6 +67,11 @@ void CameraKit::CreateCamera(const string &cameraId, CameraStateCallback &callba
+     cameraManager_->CreateCamera(cameraId, callback, handler);
+ }
+ 
++void CameraKit::DeleteCamera(const string &cameraId) const
++{
++    cameraManager_->DeleteCamera(cameraId);
++}
++
+ uint8_t CameraKit::GetCameraModeNum()
+ {
+     return cameraManager_->GetCameraModeNum();
+diff --git a/frameworks/camera_manager.cpp b/frameworks/camera_manager.cpp
+index c61afae..7a7d656 100644
+--- a/frameworks/camera_manager.cpp
++++ b/frameworks/camera_manager.cpp
+@@ -34,7 +34,9 @@ public:
+     ~CameraManagerImpl()
+     {
+         for (const auto &i : cameraMapCache_) {
+-            delete i.second;
++            if (i.second != nullptr) {
++                delete i.second;
++            }
+         }
+     }
+ 
+@@ -56,9 +58,6 @@ public:
+                         i.second->Post(
+                             [i, cameraId]() { i.first->OnCameraStatus(cameraId, CAMERA_DEVICE_STATE_UNAVAILABLE); });
+                     }
+-                    // User may still using icamera now
+-                    delete p->second;
+-                    cameraMapCache_.erase(p);
+                 }
+                 break;
+             case CAMERA_STATUS_AVAIL:
+@@ -75,6 +74,12 @@ public:
+                     p->second->OnCreate(cameraId);
+                 }
+                 break;
++            case CAMERA_STATUS_CLOSE:
++                if (p != cameraMapCache_.end()) {
++                    MEDIA_INFO_LOG("CAMERA_STATUS_CLOSE:%s ", cameraId.c_str());
++                    p->second->OnRelease(cameraId);
++                }
++                break;
+             case CAMERA_STATUS_CREATE_FAILED:
+                 if (p != cameraMapCache_.end()) {
+                     p->second->OnCreateFailed();
+@@ -92,6 +97,7 @@ public:
+             string cameraId = i.first;
+             handler.Post([&callback, cameraId]() { callback.OnCameraStatus(cameraId, CAMERA_DEVICE_STATE_AVAILABLE); });
+         }
++        cameraServiceClient_->RegisterCameraDeviceCallback();
+     }
+ 
+     void UnregisterCameraDeviceCallback(CameraDeviceCallback &callback) override
+@@ -153,6 +159,19 @@ public:
+         p->second->RegistCb(callback, handler);
+         cameraServiceClient_->CreateCamera(cameraId);
+     }
++
++    void DeleteCamera(const string &cameraId) override
++    {
++        auto p = cameraMapCache_.find(cameraId);
++        if (p == cameraMapCache_.end()) {
++            MEDIA_ERR_LOG("The cameraId %s is not available", cameraId.c_str());
++            return;
++        }
++        delete cameraMapCache_[cameraId];
++        cameraMapCache_[cameraId] = nullptr;
++        cameraMapCache_.erase(cameraId);
++        MEDIA_INFO_LOG("The cameraId %s has been deleted", cameraId.c_str());
++    }
+ private:
+     CameraServiceClient *cameraServiceClient_;
+     map<string, CameraImpl *> cameraMapCache_;
+@@ -167,6 +186,11 @@ private:
+             MEDIA_FATAL_LOG("New object failed.");
+             return;
+         }
++        auto p = cameraMapCache_.find(cameraId);
++        if (p != cameraMapCache_.end()) {
++            delete cameraMapCache_[cameraId];
++            cameraMapCache_[cameraId] = nullptr;
++        }
+         cameraMapCache_[cameraId] = cam;
+     }
+ };
+diff --git a/frameworks/camera_manager.h b/frameworks/camera_manager.h
+index 6bbcf5a..2321dbf 100644
+--- a/frameworks/camera_manager.h
++++ b/frameworks/camera_manager.h
+@@ -58,6 +58,7 @@ public:
+ 
+     virtual void UnregisterCameraDeviceCallback(CameraDeviceCallback &callback) {}
+     virtual void CreateCamera(const std::string &cameraId, CameraStateCallback &callback, EventHandler &handler) {}
++    virtual void DeleteCamera(const std::string &cameraId) {}
+ protected:
+     CameraManager() {}
+ };
+diff --git a/frameworks/frame_config.cpp b/frameworks/frame_config.cpp
+index 9d7e1ae..9751686 100644
+--- a/frameworks/frame_config.cpp
++++ b/frameworks/frame_config.cpp
+@@ -20,7 +20,9 @@ using namespace std;
+ 
+ namespace OHOS {
+ namespace Media {
+-const int32_t DEFAULT_FPS = 30;
++const int32_t DEFAULT_FPS = 60;
++const int32_t DEFAULT_WIDTH = 1920;
++const int32_t DEFAULT_HEIGHT = 1080;
+ int32_t FrameConfig::GetFrameConfigType()
+ {
+     return type_;
+@@ -92,6 +94,8 @@ void FrameConfig::SetValue(uint32_t key, const void *value)
+         case CAM_FRAME_FPS:
+         case CAM_IMAGE_INVERT_MODE:
+         case CAM_IMAGE_FORMAT:
++        case CAM_IMAGE_WIDTH:
++        case CAM_IMAGE_HEIGHT:
+             keyMap_[key] = *(static_cast<const int32_t *>(value));
+             break;
+         case CAM_IMAGE_CROP_RECT:
+@@ -114,12 +118,21 @@ FrameConfig::FrameConfig(int32_t type) : type_(type)
+     SetParameter(CAM_IMAGE_CROP_RECT, crop);
+     SetParameter(CAM_IMAGE_INVERT_MODE, CAM_CENTER_MIRROR);
+     SetParameter(CAM_FRAME_FPS, DEFAULT_FPS);
+-    if (type == FRAME_CONFIG_RECORD) {
+-        SetParameter(CAM_IMAGE_FORMAT, CAM_FORMAT_H265);
+-    } else if (type == FRAME_CONFIG_CAPTURE) {
+-        SetParameter(CAM_IMAGE_FORMAT, CAM_FORMAT_JPEG);
+-    } else {
+-        SetParameter(CAM_IMAGE_FORMAT, CAM_FORMAT_YVU420);
++    SetParameter(CAM_IMAGE_WIDTH, DEFAULT_WIDTH);
++    SetParameter(CAM_IMAGE_HEIGHT, DEFAULT_HEIGHT);
++    switch (type) {
++        case FRAME_CONFIG_RECORD:
++            SetParameter(CAM_IMAGE_FORMAT, CAM_FORMAT_H265);
++            break;
++        case FRAME_CONFIG_CAPTURE:
++            SetParameter(CAM_IMAGE_FORMAT, CAM_FORMAT_JPEG);
++            break;
++        case FRAME_CONFIG_CALLBACK_H264:
++            SetParameter(CAM_IMAGE_FORMAT, CAM_FORMAT_H264);
++            break;
++        default:
++            SetParameter(CAM_IMAGE_FORMAT, CAM_FORMAT_YVU420);
++            break;
+     }
+ }
+ } // namespace Media
+diff --git a/interfaces/kits/camera_config.h b/interfaces/kits/camera_config.h
+index f34f0e8..9b7bce1 100644
+--- a/interfaces/kits/camera_config.h
++++ b/interfaces/kits/camera_config.h
+@@ -93,12 +93,23 @@ public:
+         return nullptr;
+     }
+ 
++    void SetCameraSettings(std::string strValue)
++    {
++        value_ = strValue;
++    }
++
++    std::string GetCameraSettings()
++    {
++        return value_;
++    }
++    
+ protected:
+     /**
+      * @brief A constructor used to create a <b>CameraConfig</b> instance.
+      *
+      */
+     CameraConfig() {}
++    std::string value_ = "";
+ };
+ } // namespace Media
+ } // namespace OHOS
+diff --git a/interfaces/kits/camera_info.h b/interfaces/kits/camera_info.h
+index 1903e92..862d84e 100644
+--- a/interfaces/kits/camera_info.h
++++ b/interfaces/kits/camera_info.h
+@@ -61,6 +61,16 @@ typedef enum {
+     CAMERA_FACING_OTHERS
+ } FacingType;
+ 
++typedef enum {
++    FORMAT_YVU420 = 0,
++    FORMAT_JPEG,
++    FORMAT_AVC,
++    FORMAT_HEVC,
++    FORMAT_RGB_BAYER_12BPP,
++    FORMAT_PRIVATE,
++    FORMAT_IMAGE_BUTT
++} ImageFormat;
++
+ class CameraInfo {
+ public:
+     /**
+diff --git a/interfaces/kits/camera_kit.h b/interfaces/kits/camera_kit.h
+index ad215f3..d8f8948 100644
+--- a/interfaces/kits/camera_kit.h
++++ b/interfaces/kits/camera_kit.h
+@@ -128,6 +128,13 @@ public:
+      * @param handler Indicates the event callback to register.
+      */
+     void CreateCamera(const std::string &cameraId, CameraStateCallback &callback, EventHandler &handler);
++ 
++    /**
++     * @brief Delete a camera object.
++     *
++     * @param cameraId Indicates the camera ID.
++     */
++    void DeleteCamera(const std::string &cameraId) const;
+ 
+ private:
+     /**
+diff --git a/interfaces/kits/frame_config.h b/interfaces/kits/frame_config.h
+index e429aa0..e403aa0 100644
+--- a/interfaces/kits/frame_config.h
++++ b/interfaces/kits/frame_config.h
+@@ -48,6 +48,7 @@ constexpr int32_t FRAME_CONFIG_PREVIEW = 0;
+ constexpr int32_t FRAME_CONFIG_RECORD = 1;
+ constexpr int32_t FRAME_CONFIG_CAPTURE = 2;
+ constexpr int32_t FRAME_CONFIG_CALLBACK = 3;
++constexpr int32_t FRAME_CONFIG_CALLBACK_H264 = 4;
+ constexpr int32_t PRIVATE_TAG_LEN = 32;
+ 
+ /**
+diff --git a/interfaces/kits/meta_data.h b/interfaces/kits/meta_data.h
+index 848e52e..ef49172 100644
+--- a/interfaces/kits/meta_data.h
++++ b/interfaces/kits/meta_data.h
+@@ -82,7 +82,10 @@ typedef enum {
+     CAM_AF_MODE,
+     /* Image denoising level */
+     PARAM_KEY_SIZE,
+-    PARAM_KEY_IMAGE_ENCODE_QFACTOR
++    PARAM_KEY_IMAGE_ENCODE_QFACTOR,
++    PARAM_KEY_DEBREATHE_EFFECT,
++    CAM_IMAGE_WIDTH,
++    CAM_IMAGE_HEIGHT,
+ } CameraFuncKey;
+ 
+ /**
+diff --git a/services/BUILD.gn b/services/BUILD.gn
+index ca5c2da..d696058 100644
+--- a/services/BUILD.gn
++++ b/services/BUILD.gn
+@@ -10,6 +10,7 @@
+ # limitations under the License.
+ 
+ import("//build/lite/config/component/lite_component.gni")
++import("//foundation/multimedia/media_utils_lite/config.gni")
+ 
+ shared_library("camera_server") {
+   sources = [
+@@ -29,7 +30,6 @@ shared_library("camera_server") {
+     "-lstdc++",
+     "-lcodec",
+     "-lhdi_camera",
+-    "-lhdi_videodisplayer",
+     "-lpthread",
+     "-Wl,-rpath-link=$ohos_root_path/$root_out_dir",
+   ]
+@@ -40,7 +40,7 @@ shared_library("camera_server") {
+     "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared",
+     "//base/security/permission_lite/services/pms_client:pms_client",
+     "//device/soc/hisilicon/common/hal/media:hardware_media_sdk",
+-    "//device/soc/hisilicon/common/hal/middleware:middleware_source_sdk",
++    "//device/soc/hisilicon/common/hal/media/camera/source:hdi_camera",
+     "//foundation/systemabilitymgr/samgr_lite/samgr:samgr",
+     "//third_party/bounds_checking_function:libsec_shared",
+   ]
+@@ -53,13 +53,13 @@ shared_library("camera_server") {
+ 
+ config("external_camera_server_library") {
+   include_dirs = [
+-    "//kernel/liteos_a/kernel/include",
+-    "//kernel/liteos_a/kernel/common",
+     "//commonlibrary/utils_lite/include",
+     "//foundation/multimedia/media_utils_lite/interfaces/kits",
+     "//drivers/peripheral/format/interfaces/include",
+     "//foundation/multimedia/media_utils_lite/hals",
+     "//base/security/permission_lite/interfaces/kits",
++    "//foundation/multimedia/camera_lite/interfaces/kits",
++    "//foundation/multimedia/camera_lite/services/impl/include", #for camera impl
+     "//foundation/multimedia/services/camera_lite/include",
+     "//foundation/systemabilitymgr/samgr_lite/interfaces/kits/registry",
+     "//foundation/systemabilitymgr/samgr_lite/interfaces/kits/samgr",
+@@ -71,4 +71,4 @@ config("external_camera_server_library") {
+     "//drivers/peripheral/base",
+     "//foundation/communication/ipc/interfaces/innerkits/c/ipc/include/",
+   ]
+-}
++}
+\ No newline at end of file
+diff --git a/services/impl/include/camera_device.h b/services/impl/include/camera_device.h
+index af0f0e7..250583c 100644
+--- a/services/impl/include/camera_device.h
++++ b/services/impl/include/camera_device.h
+@@ -1,132 +1,148 @@
+-/*
+- * Copyright (c) 2020 Huawei Device Co., Ltd.
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *     http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#ifndef OHOS_CAMERA_DEVICE_H
+-#define OHOS_CAMERA_DEVICE_H
+-
+-#include <cstdbool>
+-#include <thread>
+-#include <vector>
+-
+-#include "camera_ability.h"
+-#include "camera_config.h"
+-#include "codec_type.h"
+-#include "frame_config.h"
+-#include "surface.h"
+-using namespace std;
+-namespace OHOS {
+-namespace Media {
+-enum LoopState {
+-    LOOP_IDLE,
+-    LOOP_READY,
+-    LOOP_LOOPING,
+-    LOOP_STOP,
+-    LOOP_ERROR,
+-};
+-const int32_t RECORDER_MAX_NUM = 2;
+-class DeviceAssistant {
+-public:
+-    std::thread *thrd_ = nullptr;
+-    LoopState state_ = LOOP_IDLE;
+-    FrameConfig *fc_ = nullptr;
+-    uint32_t cameraId_;
+-    uint32_t streamId_;
+-
+-    virtual int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
+-    {
+-        return -1;
+-    }
+-    virtual int32_t Start(uint32_t streamId)
+-    {
+-        return -1;
+-    }
+-    virtual int32_t Stop()
+-    {
+-        return -1;
+-    }
+-};
+-
+-struct CodecDesc {
+-    CODEC_HANDLETYPE vencHdl_;
+-    list<Surface *> vencSurfaces_;
+-};
+-
+-class RecordAssistant : public DeviceAssistant {
+-public:
+-    int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId) override;
+-    int32_t Start(uint32_t streamId) override;
+-    int32_t Stop() override;
+-    void ClearFrameConfig();
+-    static int OnVencBufferAvailble(UINTPTR userDate, CodecBuffer *outBuf, int32_t *acquireFd);
+-    static CodecCallback recordCodecCb_;
+-private:
+-    int32_t SetFrameConfigEnd(int32_t result);
+-    vector<CodecDesc> codecInfo_;
+-    int32_t streamIdNum_[RECORDER_MAX_NUM] = {-1, -1};
+-};
+-
+-class PreviewAssistant : public DeviceAssistant {
+-public:
+-    int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId) override;
+-    int32_t Start(uint32_t streamId) override;
+-    int32_t Stop() override;
+-    Surface *capSurface_ = nullptr;
+-private:
+-    pthread_t threadId;
+-    static void *YuvCopyProcess(void *arg);
+-};
+-
+-class CaptureAssistant : public DeviceAssistant {
+-    int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId) override;
+-    int32_t Start(uint32_t streamId) override;
+-    int32_t Stop() override;
+-    CODEC_HANDLETYPE vencHdl_ = nullptr;
+-    Surface *capSurface_ = nullptr;
+-};
+-
+-class CallbackAssistant : public DeviceAssistant {
+-public:
+-    int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId) override;
+-    int32_t Start(uint32_t streamId) override;
+-    int32_t Stop() override;
+-    Surface *capSurface_ = nullptr;
+-private:
+-    pthread_t threadId;
+-    static void *StreamCopyProcess(void *arg);
+-};
+-
+-class CameraDevice {
+-public:
+-    CameraDevice();
+-    explicit CameraDevice(uint32_t cameraId);
+-    virtual ~CameraDevice();
+-
+-    int32_t Initialize();
+-    int32_t UnInitialize();
+-    int32_t SetCameraConfig();
+-    int32_t TriggerLoopingCapture(FrameConfig &fc, uint32_t *streamId);
+-    void StopLoopingCapture(int32_t type);
+-    int32_t TriggerSingleCapture(FrameConfig &fc, uint32_t *streamId);
+-    uint32_t GetCameraId();
+-private:
+-    uint32_t cameraId;
+-    RecordAssistant recordAssistant_;
+-    PreviewAssistant previewAssistant_;
+-    CaptureAssistant captureAssistant_;
+-    CallbackAssistant callbackAssistant_;
+-};
+-} // namespace Media
+-} // namespace OHOS
++/*
++ * Copyright (c) 2024 Huawei Device Co., Ltd.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef OHOS_CAMERA_DEVICE_H
++#define OHOS_CAMERA_DEVICE_H
++
++#include <cstdbool>
++#include <thread>
++#include <vector>
++
++#include "camera_ability.h"
++#include "camera_config.h"
++#include "codec_type.h"
++#include "frame_config.h"
++#include "surface.h"
++#include "hal_camera.h"
++
++using namespace std;
++namespace OHOS {
++namespace Media {
++enum LoopState {
++    LOOP_IDLE,
++    LOOP_READY,
++    LOOP_LOOPING,
++    LOOP_STOP,
++    LOOP_ERROR,
++};
++const int32_t MAX_STREAM_NUM = 5;
++class DeviceAssistant {
++public:
++    std::thread *thrd_ = nullptr;
++    LoopState state_ = LOOP_IDLE;
++    FrameConfig *fc_ = nullptr;
++    string cameraId_;
++    static HalCameraManager *halCameraDev_;
++    uint32_t streamId_;
++
++    virtual int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
++    {
++        return -1;
++    }
++    virtual int32_t Start(uint32_t streamId)
++    {
++        return -1;
++    }
++    virtual int32_t Stop()
++    {
++        return -1;
++    }
++};
++
++class RecordAssistant : public DeviceAssistant {
++public:
++    int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId) override;
++    int32_t Start(uint32_t streamId) override;
++    int32_t Stop() override;
++    void ClearFrameConfig();
++
++    vector<CODEC_HANDLETYPE> vencHdls_;
++    vector<list<Surface *>> vencSurfaces_;
++    static int OnVencBufferAvailble(UINTPTR hComponent, UINTPTR dataIn, OutputInfo *buffer);
++    static CodecCallback recordCodecCb_;
++    int32_t streamIdNum_[MAX_STREAM_NUM] = {-1, -1, -1, -1, -1};
++};
++
++class PreviewAssistant : public DeviceAssistant {
++public:
++    int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId) override;
++    int32_t Start(uint32_t streamId) override;
++    virtual int32_t Stop() override;
++    Surface *capSurface_ = nullptr;
++private:
++    uint32_t GetFreeStreamIndex();
++    int32_t sourceIdx = 0;
++    int32_t streamIdNum_[MAX_STREAM_NUM] = {-1, -1, -1, -1, -1};
++};
++
++class CaptureAssistant : public DeviceAssistant {
++    int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId) override;
++    int32_t Start(uint32_t streamId) override;
++    virtual int32_t Stop() override;
++    CODEC_HANDLETYPE vencHdl_ = nullptr;
++    Surface *capSurface_ = nullptr;
++};
++
++class CallbackAssistant : public DeviceAssistant {
++public:
++    int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId) override;
++    int32_t Start(uint32_t streamId) override;
++    virtual int32_t Stop() override;
++    Surface *capSurface_ = nullptr;
++private:
++    pthread_t threadId;
++    static void *StreamCopyProcess(void *arg);
++};
++
++class CallbackH264Assistant : public DeviceAssistant {
++public:
++    int32_t SetFrameConfig(FrameConfig &fc, uint32_t *streamId) override;
++    int32_t Start(uint32_t streamId) override;
++    virtual int32_t Stop() override;
++    void ClearFrameConfig();
++
++    vector<CODEC_HANDLETYPE> vencHdls_;
++    vector<list<Surface *>> vencSurfaces_;
++    static int OnVencBufferAvailble(UINTPTR hComponent, UINTPTR dataIn, OutputInfo *buffer);
++    static CodecCallback callbackH264CodecCb_;
++    int32_t streamIdNum_[MAX_STREAM_NUM] = {-1, -1, -1, -1, -1};
++};
++
++class CameraDevice {
++public:
++    CameraDevice();
++    CameraDevice(string cameraId, HalCameraManager *halCameraDev);
++    virtual ~CameraDevice();
++
++    int32_t Initialize();
++    int32_t UnInitialize();
++    int32_t SetCameraConfig(const char *dataBuff, uint32_t len);
++    int32_t TriggerLoopingCapture(FrameConfig &fc, uint32_t *streamId);
++    void StopLoopingCapture(int32_t type);
++    int32_t TriggerSingleCapture(FrameConfig &fc, uint32_t *streamId);
++    uint32_t GetCameraId();
++    int32_t UpdataCameraSetting(const char *dataBuff, uint32_t len);
++private:
++    string cameraId_;
++    RecordAssistant recordAssistant_;
++    PreviewAssistant previewAssistant_;
++    CaptureAssistant captureAssistant_;
++    CallbackAssistant callbackAssistant_;
++    CallbackH264Assistant callbackH264Assistant_;
++    HalCameraManager *halCameraDev_ = nullptr;
++};
++} // namespace Media
++} // namespace OHOS
+ #endif // OHOS_CAMERA_DEVICE_H
+\ No newline at end of file
+diff --git a/services/impl/include/camera_service.h b/services/impl/include/camera_service.h
+index 33c6401..6d82b02 100644
+--- a/services/impl/include/camera_service.h
++++ b/services/impl/include/camera_service.h
+@@ -19,6 +19,7 @@
+ #include "camera_service_callback.h"
+ #include "camera_ability.h"
+ #include "camera_info_impl.h"
++#include "hal_camera.h"
+ 
+ namespace OHOS {
+ namespace Media {
+@@ -31,18 +32,23 @@ public:
+     CameraAbility *GetCameraAbility(std::string &cameraId);
+     CameraInfo *GetCameraInfo(std::string &cameraId);
+     CameraDevice *GetCameraDevice(std::string &cameraId);
+-    int32_t CreateCamera(std::string cameraId);
+-    int32_t CloseCamera(string cameraId);
+-    list<string> GetCameraIdList();
++    int32_t CreateCamera(std::string &cameraId);
++    int32_t CloseCamera(std::string &cameraId);
++    list<std::string> GetCameraIdList();
+     uint8_t GetCameraModeNum();
+     int32_t SetCameraMode(uint8_t modeIndex);
++    void RegCameraServiceCallback(CameraServiceCallback *callback);
++    void CameraStatusChange(std::string &cameraId, CameraStatus status);
+ private:
+     CameraService();
+-    int32_t InitCameraDevices();
+-    std::map<string, CameraDevice*> deviceMap_;
+-    std::map<string, CameraAbility*> deviceAbilityMap_;
+-    std::map<string, CameraInfo*> deviceInfoMap_;
++    std::pair<CameraDevice*, HalCameraManager*> GetCameraDeviceInfo(std::string &cameraId);
++    HalCameraManager *GetHalCameraDevice(const std::string &cameraId);
++    std::map<std::string, std::pair<CameraDevice*, HalCameraManager*>> deviceMap_;
++    std::map<std::string, CameraAbility*> deviceAbilityMap_;
++    std::map<std::string, CameraInfo*> deviceInfoMap_;
+     CameraServiceCallback *cameraServiceCb_ = nullptr;
++    HalCameraManager *localHalCameraDev_ = nullptr;
++    bool inited_ = false;
+ };
+ } // namespace Media
+ } // namespace OHOS
+diff --git a/services/impl/src/camera_device.cpp b/services/impl/src/camera_device.cpp
+index 1118273..f4f43d4 100644
+--- a/services/impl/src/camera_device.cpp
++++ b/services/impl/src/camera_device.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2020-2022 Huawei Device Co., Ltd.
++ * Copyright (c) 2020 Huawei Device Co., Ltd.
+  * Licensed under the Apache License, Version 2.0 (the "License");
+  * you may not use this file except in compliance with the License.
+  * You may obtain a copy of the License at
+@@ -25,12 +25,13 @@
+ #include <unistd.h>
+ #include "codec_interface.h"
+ #include "display_layer.h"
+-#include "hal_camera.h"
+ #include "media_log.h"
+ #include "meta_data.h"
+ #include "securec.h"
+ 
+ #include <iostream>
++#include <string>
++#include <thread>
+ 
+ using namespace OHOS;
+ using namespace OHOS::Media;
+@@ -45,12 +46,37 @@ const int32_t IMAGE_WIDTH = 3;       // "DATA_PIX_FORMAT"
+ const int32_t IMAGE_HEIGHT = 4;       // "DATA_PIX_FORMAT"
+ const int32_t IMAGE_SIZE = 5;       // "DATA_PIX_FORMAT"
+ const int32_t DELAY_TIME_ONE_FRAME = 30000;
+-const int32_t VIDEO_MAX_NUM = 2;        // "video max num"
++const int32_t VIDEO_MAX_NUM = 2;       // "video max num"
+ const int32_t INVALID_STREAM_ID = -1;
+ 
++const std::string CAMERA_ID_PREFIX = "Camera_";
++
+ namespace OHOS {
+ namespace Media {
+ extern Surface *g_surface;
++inline PicSize Convert2CodecSize(int32_t width, int32_t height)
++{
++    struct SizeMap {
++        PicSize res_;
++        int32_t width_;
++        int32_t height_;
++    };
++    static SizeMap sizeMap[] = {
++        {RESOLUTION_CIF, 352, 288},         {RESOLUTION_360P, 640, 360},        {RESOLUTION_D1_PAL, 720, 576},
++        {RESOLUTION_D1_NTSC, 720, 480},     {RESOLUTION_720P, 1280, 720},       {RESOLUTION_1080P, 1920, 1080},
++        {RESOLUTION_2560X1440, 2560, 1440}, {RESOLUTION_2592X1520, 2592, 1520}, {RESOLUTION_2592X1536, 2592, 1536},
++        {RESOLUTION_2592X1944, 2592, 1944}, {RESOLUTION_2688X1536, 2688, 1536}, {RESOLUTION_2716X1524, 2716, 1524},
++        {RESOLUTION_3840X2160, 3840, 2160}, {RESOLUTION_4096X2160, 4096, 2160}, {RESOLUTION_3000X3000, 3000, 3000},
++        {RESOLUTION_4000X3000, 4000, 3000}, {RESOLUTION_7680X4320, 7680, 4320}, {RESOLUTION_3840X8640, 3840, 8640}
++    };
++
++    for (uint32_t i = 0; i < sizeof(sizeMap) / sizeof(SizeMap); i++) {
++        if (sizeMap[i].width_ == width && sizeMap[i].height_ == height) {
++            return sizeMap[i].res_;
++        }
++    }
++    return RESOLUTION_INVALID;
++}
+ 
+ AvCodecMime ConverFormat(ImageFormat format)
+ {
+@@ -76,19 +102,39 @@ static int32_t SetVencSource(CODEC_HANDLETYPE codecHdl, uint32_t deviceId)
+     return MEDIA_OK;
+ }
+ 
+-static uint32_t GetDefaultBitrate(uint32_t width, uint32_t height)
++static int32_t SetVencDeBreatheEffect(FrameConfig &fc, CODEC_HANDLETYPE codecHdl)
++{
++    int32_t deBreatheEffect = -1;
++    fc.GetParameter(PARAM_KEY_DEBREATHE_EFFECT, deBreatheEffect);
++    MEDIA_DEBUG_LOG("deBreatheEffect = %d\n", deBreatheEffect);
++    if (deBreatheEffect == 1) {
++        Param deBreatheParam = {
++            .key = KEY_DEBREATHE_EFFECT,
++            .val = &deBreatheEffect,
++            .size = sizeof(deBreatheEffect)
++        };
++        int32_t ret = CodecSetParameter(codecHdl, &deBreatheParam, 1);
++        if (ret != 0) {
++            MEDIA_ERR_LOG("set DeBreatheEffect is faild, (ret=%d)", ret);
++            return ret;
++        }
++    }
++	return MEDIA_OK;
++}
++
++static uint32_t GetDefaultBitrate(PicSize size)
+ {
+     uint32_t rate; /* auto calc bitrate if set 0 */
+-    if (width * height == 640 * 360) { /* 640,width  360,height */
+-        rate = 0x800; /* 2048kbps */
+-    } else if (width * height == 1280 * 720) { /* 1280,width  720,height */
+-        rate = 0x400; /* 1024kbps */
+-    } else if (width * height >= 2560 * 1440 && width * height <= 2716 * 1524) { /* 2560,2716 width  1440,1524,height */
+-        rate = 0x1800; /* 6144kbps */
+-    } else if (width * height == 3840 * 2160 || width * height == 4096 * 2160) { /* 3840,4096 width  2160,height */
+-        rate = 0xa000; /* 40960kbps */
++    if (size == RESOLUTION_360P) {
++        rate = 2048; /* kbps */
++    } else if (size == RESOLUTION_720P) {
++        rate = 1024; /* kbps */
++    } else if (size >= RESOLUTION_2560X1440 && size <= RESOLUTION_2716X1524) {
++        rate = 6144; /* kbps */
++    } else if (size == RESOLUTION_3840X2160 || size == RESOLUTION_4096X2160) {
++        rate = 40960; /* kbps */
+     } else {
+-        rate = 0x0;
++        rate = 0;
+     }
+     return rate;
+ }
+@@ -98,6 +144,7 @@ static int32_t CameraCreateVideoEnc(FrameConfig &fc,
+                                     uint32_t srcDev,
+                                     CODEC_HANDLETYPE *codecHdl)
+ {
++    const char *name = "codec.video.hardware.encoder";
+     const uint32_t maxParamNum = 10;
+     uint32_t paramIndex = 0;
+     Param param[maxParamNum];
+@@ -114,16 +161,16 @@ static int32_t CameraCreateVideoEnc(FrameConfig &fc,
+     param[paramIndex].size = sizeof(AvCodecMime);
+     paramIndex++;
+ 
+-    VideoCodecRcMode rcMode = VID_CODEC_RC_CBR;
++    VenCodeRcMode rcMode = VENCOD_RC_CBR;
+     param[paramIndex].key = KEY_VIDEO_RC_MODE;
+     param[paramIndex].val = &rcMode;
+-    param[paramIndex].size = sizeof(VideoCodecRcMode);
++    param[paramIndex].size = sizeof(VenCodeRcMode);
+     paramIndex++;
+ 
+-    VideoCodecGopMode gopMode = VID_CODEC_GOPMODE_NORMALP;
++    VenCodeGopMode gopMode = VENCOD_GOPMODE_NORMALP;
+     param[paramIndex].key = KEY_VIDEO_GOP_MODE;
+     param[paramIndex].val = &gopMode;
+-    param[paramIndex].size = sizeof(VideoCodecGopMode);
++    param[paramIndex].size = sizeof(VenCodeGopMode);
+     paramIndex++;
+ 
+     Profile profile = HEVC_MAIN_PROFILE;
+@@ -132,24 +179,12 @@ static int32_t CameraCreateVideoEnc(FrameConfig &fc,
+     param[paramIndex].size = sizeof(Profile);
+     paramIndex++;
+ 
+-#if (!defined(__LINUX__)) || (defined(ENABLE_PASSTHROUGH_MODE))
+-    uint32_t width = stream.width;
+-    uint32_t height = stream.height;
+-#else
+-    uint32_t width = g_surface->GetWidth();
+-    uint32_t height = g_surface->GetHeight();
+-#endif
+-
+-    MEDIA_DEBUG_LOG("width=%d", width);
+-    param[paramIndex].key = KEY_VIDEO_WIDTH;
+-    param[paramIndex].val = &width;
+-    param[paramIndex].size = sizeof(uint32_t);
+-    paramIndex++;
++    PicSize picSize = Convert2CodecSize(stream.width, stream.height);
+ 
+-    MEDIA_DEBUG_LOG("height=%d", height);
+-    param[paramIndex].key = KEY_VIDEO_HEIGHT;
+-    param[paramIndex].val = &height;
+-    param[paramIndex].size = sizeof(uint32_t);
++    MEDIA_DEBUG_LOG("picSize=%d", picSize);
++    param[paramIndex].key = KEY_VIDEO_PIC_SIZE;
++    param[paramIndex].val = &picSize;
++    param[paramIndex].size = sizeof(PicSize);
+     paramIndex++;
+ 
+     uint32_t frameRate = stream.fps;
+@@ -159,56 +194,89 @@ static int32_t CameraCreateVideoEnc(FrameConfig &fc,
+     param[paramIndex].size = sizeof(uint32_t);
+     paramIndex++;
+ 
+-    uint32_t bitRate = GetDefaultBitrate(width, height);
++    uint32_t bitRate = GetDefaultBitrate(picSize);
+     MEDIA_DEBUG_LOG("bitRate=%u kbps", bitRate);
+     param[paramIndex].key = KEY_BITRATE;
+     param[paramIndex].val = &bitRate;
+     param[paramIndex].size = sizeof(uint32_t);
+     paramIndex++;
+ 
+-    int32_t ret = CodecCreateByType(domainKind, codecMime, codecHdl);
++    int32_t ret = CodecCreate(name, param, paramIndex, codecHdl);
+     if (ret != 0) {
+         MEDIA_ERR_LOG("Create video encoder failed.");
+         return MEDIA_ERR;
+     }
+ 
+-    ret = CodecSetParameter(*codecHdl, param, paramIndex);
++    ret = SetVencSource(*codecHdl, srcDev);
+     if (ret != 0) {
+-        CodecDestroy(*codecHdl);
+-        MEDIA_ERR_LOG("video CodecSetParameter failed.");
++        CodecDestroy(codecHdl);
+         return MEDIA_ERR;
+     }
+-
+-    ret = SetVencSource(*codecHdl, srcDev);
++    ret = SetVencDeBreatheEffect(fc, *codecHdl);
+     if (ret != 0) {
+-        CodecDestroy(*codecHdl);
++        CodecDestroy(codecHdl);
+         return MEDIA_ERR;
+     }
+ 
+     return MEDIA_OK;
+ }
+ 
+-static void FillParam(Param &param, ParamKey key, uint8_t *data, uint32_t size)
++static int32_t CameraCreatePicEnc(FrameConfig &fc, StreamAttr stream, uint32_t srcDev, CODEC_HANDLETYPE *codecHdl)
+ {
+-    param.key = key;
+-    param.val = data;
+-    param.size = size;
+-}
++    const char *videoEncName = "codec.jpeg.hardware.encoder";
++    const uint32_t maxParamNum = 10;
++    Param param[maxParamNum];
++    uint32_t paramIndex = 0;
+ 
+-static CODEC_HANDLETYPE CameraCreateJpegEncProc(FrameConfig &fc, uint32_t srcDev, AvCodecMime codecMime,
+-    const Param* param, uint32_t paramNum)
+-{
+-    CODEC_HANDLETYPE codecHdl = nullptr;
+-    if (CodecCreateByType(VIDEO_ENCODER, codecMime, &codecHdl) != 0) {
+-        return nullptr;
++    CodecType domainKind = VIDEO_ENCODER;
++    param[paramIndex].key = KEY_CODEC_TYPE;
++    param[paramIndex].val = &domainKind;
++    param[paramIndex].size = sizeof(CodecType);
++    paramIndex++;
++
++    AvCodecMime codecMime = ConverFormat(stream.format);
++    param[paramIndex].key = KEY_MIMETYPE;
++    param[paramIndex].val = &codecMime;
++    param[paramIndex].size = sizeof(AvCodecMime);
++    paramIndex++;
++
++    auto surfaceList = fc.GetSurfaces();
++    Surface *surface = surfaceList.front();
++
++    PicSize picSize = Convert2CodecSize(surface->GetWidth(), surface->GetHeight());
++    param[paramIndex].key = KEY_VIDEO_PIC_SIZE;
++    param[paramIndex].val = &picSize;
++    param[paramIndex].size = sizeof(PicSize);
++    paramIndex++;
++
++    if (codecMime == MEDIA_MIMETYPE_VIDEO_HEVC) {
++        MEDIA_DEBUG_LOG("CameraCreatePicEnc set fixQp");
++        VenCodeRcMode rcMode = VENCOD_RC_FIXQP;
++        param[paramIndex].key = KEY_VIDEO_RC_MODE;
++        param[paramIndex].val = &rcMode;
++        param[paramIndex].size = sizeof(VenCodeRcMode);
++        MEDIA_DEBUG_LOG("CameraCreatePicEnc val:%p, mode:%d", param[paramIndex].val, *((VenCodeRcMode *)param[paramIndex].val));
++        paramIndex++;
++
++        Profile profile = HEVC_MAIN_PROFILE;
++        param[paramIndex].key = KEY_VIDEO_PROFILE;
++        param[paramIndex].val = &profile;
++        param[paramIndex].size = sizeof(Profile);
++        MEDIA_DEBUG_LOG("CameraCreatePicEnc val:%p, profile:0x%x", param[paramIndex].val, *((Profile *)param[paramIndex].val));
++        paramIndex++;
++
++        uint32_t frameRate = stream.fps;
++        MEDIA_DEBUG_LOG("frameRate=%u", frameRate);
++        param[paramIndex].key = KEY_VIDEO_FRAME_RATE;
++        param[paramIndex].val = &frameRate;
++        param[paramIndex].size = sizeof(uint32_t);
++        paramIndex++;
+     }
+ 
+-    int32_t ret = CodecSetParameter(codecHdl, param, paramNum);
++    int32_t ret = CodecCreate(videoEncName, param, paramIndex, codecHdl);
+     if (ret != 0) {
+-        CodecDestroy(codecHdl);
+-        return nullptr;
++        return MEDIA_ERR;
+     }
+-
+     int32_t qfactor = -1;
+     fc.GetParameter(PARAM_KEY_IMAGE_ENCODE_QFACTOR, qfactor);
+     if (qfactor != -1) {
+@@ -217,72 +285,34 @@ static CODEC_HANDLETYPE CameraCreateJpegEncProc(FrameConfig &fc, uint32_t srcDev
+             .val = &qfactor,
+             .size = sizeof(qfactor)
+         };
+-        ret = CodecSetParameter(codecHdl, &jpegParam, 1);
++        ret = CodecSetParameter(*codecHdl, &jpegParam, 1);
+         if (ret != 0) {
+             MEDIA_ERR_LOG("CodecSetParameter set jpeg qfactor failed.(ret=%u)", ret);
+         }
+     }
+ 
+-    ret = SetVencSource(codecHdl, srcDev);
++    ret = SetVencSource(*codecHdl, srcDev);
+     if (ret != 0) {
+         MEDIA_ERR_LOG("Set video encoder source failed.");
+-        CodecDestroy(codecHdl);
+-        return nullptr;
++        CodecDestroy(*codecHdl);
++        return MEDIA_ERR;
+     }
+-    return codecHdl;
+-}
+-
+-static int32_t CameraCreateJpegEnc(FrameConfig &fc, StreamAttr stream, uint32_t srcDev, CODEC_HANDLETYPE *codecHdl)
+-{
+-    uint32_t maxParamNum = 10; /* 10 maxParamNum */
+-    Param param[maxParamNum];
+-    uint32_t paramIndex = 0;
+-
+-    CodecType domainKind = VIDEO_ENCODER;
+-    FillParam(param[paramIndex], KEY_CODEC_TYPE, reinterpret_cast<uint8_t *>(&domainKind), sizeof(CodecType));
+-    paramIndex++;
+-
+-    AvCodecMime codecMime = ConverFormat(stream.format);
+-    FillParam(param[paramIndex], KEY_MIMETYPE, reinterpret_cast<uint8_t *>(&codecMime), sizeof(AvCodecMime));
+-    paramIndex++;
+-
+-    auto surfaceList = fc.GetSurfaces();
+-    Surface *surface = surfaceList.front();
+-    uint32_t width = surface->GetWidth();
+-    MEDIA_DEBUG_LOG("width=%d", width);
+-    FillParam(param[paramIndex], KEY_VIDEO_WIDTH, reinterpret_cast<uint8_t *>(&width), sizeof(uint32_t));
+-    paramIndex++;
+-
+-    uint32_t height = surface->GetHeight();
+-    MEDIA_DEBUG_LOG("height=%d", height);
+-    FillParam(param[paramIndex], KEY_VIDEO_HEIGHT, reinterpret_cast<uint8_t *>(&height), sizeof(uint32_t));
+-    paramIndex++;
+-    if (codecMime == MEDIA_MIMETYPE_VIDEO_HEVC) {
+-        VideoCodecRcMode rcMode = VID_CODEC_RC_FIXQP;
+-        FillParam(param[paramIndex], KEY_VIDEO_RC_MODE, reinterpret_cast<uint8_t *>(&rcMode), sizeof(VideoCodecRcMode));
+-        paramIndex++;
+ 
+-        Profile profile = HEVC_MAIN_PROFILE;
+-        FillParam(param[paramIndex], KEY_VIDEO_PROFILE, reinterpret_cast<uint8_t *>(&profile), sizeof(Profile));
+-        paramIndex++;
+-
+-        uint32_t frameRate = stream.fps;
+-        FillParam(param[paramIndex], KEY_VIDEO_FRAME_RATE, reinterpret_cast<uint8_t *>(&frameRate), sizeof(uint32_t));
+-        paramIndex++;
++    ret = SetVencDeBreatheEffect(fc, *codecHdl);
++    if (ret != 0) {
++        CodecDestroy(codecHdl);
++        return MEDIA_ERR;
+     }
+-    *codecHdl = CameraCreateJpegEncProc(fc, srcDev, codecMime, param, paramIndex);
+-    return (*codecHdl != nullptr) ? MEDIA_OK : MEDIA_ERR;
++
++    return MEDIA_OK;
+ }
+ 
+-static int32_t CopyCodecOutput(uint8_t *dst, uint32_t *size, CodecBuffer *buffer)
++static int32_t CopyCodecOutput(void *dst, uint32_t *size, OutputInfo *buffer)
+ {
+-    if (dst == nullptr || size == nullptr || buffer == nullptr) {
+-        return MEDIA_ERR;
+-    }
+     char *dstBuf = reinterpret_cast<char *>(dst);
+     for (uint32_t i = 0; i < buffer->bufferCnt; i++) {
+-        uint32_t packSize = buffer->buffer[i].length - buffer->buffer[i].offset;
+-        errno_t ret = memcpy_s(dstBuf, *size, (void *)(buffer->buffer[i].buf + buffer->buffer[i].offset), packSize);
++        uint32_t packSize = buffer->buffers[i].length - buffer->buffers[i].offset;
++        errno_t ret = memcpy_s(dstBuf, *size, buffer->buffers[i].addr + buffer->buffers[i].offset, packSize);
+         if (ret != EOK) {
+             return MEDIA_ERR;
+         }
+@@ -296,13 +326,16 @@ static void StreamAttrInitialize(StreamAttr *streamAttr, Surface *surface,
+                                  StreamType streamType, FrameConfig &fc)
+ {
+     if (streamAttr == nullptr || surface == nullptr) {
++        MEDIA_ERR_LOG("streamAttr surface is illegal.");
+         return;
+     }
+-    (void)memset_s(streamAttr, sizeof(StreamAttr), 0, sizeof(StreamAttr));
++    memset_s(streamAttr, sizeof(StreamAttr), 0, sizeof(StreamAttr));
+     streamAttr->type = streamType;
+     fc.GetParameter(CAM_IMAGE_FORMAT, streamAttr->format);
+-    streamAttr->width = surface->GetWidth();
+-    streamAttr->height = surface->GetHeight();
++    streamAttr->displayWidth = surface->GetWidth();
++    streamAttr->displayHeight = surface->GetHeight();
++    fc.GetParameter(CAM_IMAGE_WIDTH, streamAttr->width);
++    fc.GetParameter(CAM_IMAGE_HEIGHT, streamAttr->height);
+     fc.GetParameter(CAM_FRAME_FPS, streamAttr->fps);
+     fc.GetParameter(CAM_IMAGE_INVERT_MODE, streamAttr->invertMode);
+     fc.GetParameter(CAM_IMAGE_CROP_RECT, streamAttr->crop);
+@@ -316,31 +349,17 @@ static ImageFormat Convert2HalImageFormat(uint32_t format)
+     return FORMAT_YVU420;
+ }
+ 
+-static int32_t SurfaceSetSize(SurfaceBuffer* surfaceBuf, Surface* surface, uint32_t size)
++int32_t RecordAssistant::OnVencBufferAvailble(UINTPTR hComponent, UINTPTR dataIn, OutputInfo *buffer)
+ {
+-#if (!defined(__LINUX__)) || (defined(ENABLE_PASSTHROUGH_MODE))
+-    surfaceBuf->SetSize(surface->GetSize() - size);
+-    if (surface->FlushBuffer(surfaceBuf) != 0) {
+-        MEDIA_ERR_LOG("Flush g_surface failed.");
+-        surface->CancelBuffer(surfaceBuf);
+-        return -1;
+-    }
+-#else
+-    surfaceBuf->SetSize(g_surface->GetSize() - size);
+-    if (g_surface->FlushBuffer(surfaceBuf) != 0) {
+-        MEDIA_ERR_LOG("Flush surface failed.");
+-        g_surface->CancelBuffer(surfaceBuf);
+-        return -1;
++    CODEC_HANDLETYPE hdl = reinterpret_cast<CODEC_HANDLETYPE>(hComponent);
++    RecordAssistant *assistant = reinterpret_cast<RecordAssistant *>(dataIn);
++    list<Surface *> *surfaceList = nullptr;
++    for (uint32_t idx = 0; idx < assistant->vencHdls_.size(); idx++) {
++        if (assistant->vencHdls_[idx] == hdl) {
++            surfaceList = &(assistant->vencSurfaces_[idx]);
++            break;
++        }
+     }
+-#endif
+-    return 0;
+-}
+-
+-int32_t RecordAssistant::OnVencBufferAvailble(UINTPTR userData, CodecBuffer* outBuf, int32_t *acquireFd)
+-{
+-    (void)acquireFd;
+-    CodecDesc* codecInfo = reinterpret_cast<CodecDesc* >(userData);
+-    list<Surface*> *surfaceList = &codecInfo->vencSurfaces_;
+     if (surfaceList == nullptr || surfaceList->empty()) {
+         MEDIA_ERR_LOG("Encoder handle is illegal.");
+         return MEDIA_ERR;
+@@ -366,9 +385,9 @@ int32_t RecordAssistant::OnVencBufferAvailble(UINTPTR userData, CodecBuffer* out
+             MEDIA_ERR_LOG("Invalid buffer address.");
+             break;
+         }
+-        ret = CopyCodecOutput((uint8_t*)buf, &size, outBuf);
++        ret = CopyCodecOutput(buf, &size, buffer);
+         if (ret != MEDIA_OK) {
+-            MEDIA_ERR_LOG("No available outBuf in surface.");
++            MEDIA_ERR_LOG("No available buffer in surface.");
+ #if (!defined(__LINUX__)) || (defined(ENABLE_PASSTHROUGH_MODE))
+             surface->CancelBuffer(surfaceBuf);
+ #else
+@@ -376,57 +395,44 @@ int32_t RecordAssistant::OnVencBufferAvailble(UINTPTR userData, CodecBuffer* out
+ #endif
+             break;
+         }
+-        surfaceBuf->SetInt32(KEY_IS_SYNC_FRAME, (((outBuf->flag & STREAM_FLAG_KEYFRAME) == 0) ? 0 : 1));
+-        surfaceBuf->SetInt64(KEY_TIME_US, outBuf->timeStamp);
+-        ret = SurfaceSetSize(surfaceBuf, surface, size);
+-        if (ret != 0) {
++        surfaceBuf->SetInt32(KEY_IS_SYNC_FRAME, (((buffer->flag & STREAM_FLAG_KEYFRAME) == 0) ? 0 : 1));
++        surfaceBuf->SetInt64(KEY_TIME_US, buffer->timeStamp);
++#if (!defined(__LINUX__)) || (defined(ENABLE_PASSTHROUGH_MODE))
++        surfaceBuf->SetSize(surface->GetSize() - size);
++        if (surface->FlushBuffer(surfaceBuf) != 0) {
++            MEDIA_ERR_LOG("Flush surface failed.");
++            surface->CancelBuffer(surfaceBuf);
++            ret = -1;
+             break;
+         }
++#else
++        surfaceBuf->SetSize(g_surface->GetSize() - size);
++        if (g_surface->FlushBuffer(surfaceBuf) != 0) {
++            MEDIA_ERR_LOG("Flush surface failed.");
++            g_surface->CancelBuffer(surfaceBuf);
++            ret = -1;
++            break;
++        }
++#endif
+     }
+-    if (CodecQueueOutput(codecInfo->vencHdl_, outBuf, 0, -1) != 0) {
++    if (CodecQueueOutput(hdl, buffer, 0, -1) != 0) {
+         MEDIA_ERR_LOG("Codec queue output failed.");
+     }
+     return ret;
+ }
+ 
++HalCameraManager *DeviceAssistant::halCameraDev_ = nullptr;
++
+ CodecCallback RecordAssistant::recordCodecCb_ = {nullptr, nullptr, RecordAssistant::OnVencBufferAvailble};
+ 
+ void RecordAssistant::ClearFrameConfig()
+ {
+-    for (uint32_t i = 0; i < codecInfo_.size(); i++) {
+-        CodecStop(codecInfo_[i].vencHdl_);
+-        CodecDestroy(codecInfo_[i].vencHdl_);
++    for (uint32_t i = 0; i < vencHdls_.size(); i++) {
++        CodecStop(vencHdls_[i]);
++        CodecDestroy(vencHdls_[i]);
+     }
+-    codecInfo_.clear();
+-}
+-
+-int32_t RecordAssistant::SetFrameConfigEnd(int32_t result)
+-{
+-    if (result != MEDIA_OK) {
+-        for (uint32_t i = 0; i < codecInfo_.size(); i++) {
+-            CodecDestroy(codecInfo_[i].vencHdl_);
+-        }
+-        codecInfo_.clear();
+-        return result;
+-    }
+-    for (uint32_t i = 0; i < codecInfo_.size(); i++) {
+-        result = CodecSetCallback(codecInfo_[i].vencHdl_, &recordCodecCb_, reinterpret_cast<UINTPTR>(&codecInfo_[i]));
+-        if (result != 0) {
+-            MEDIA_ERR_LOG("set CodecSetCallback failed ret:%d", result);
+-            CodecDestroy(codecInfo_[i].vencHdl_);
+-            break;
+-        }
+-    }
+-
+-    if (result == MEDIA_OK) {
+-        state_ = LOOP_READY;
+-    } else {
+-        for (uint32_t i = 0; i < codecInfo_.size(); i++) {
+-            CodecDestroy(codecInfo_[i].vencHdl_);
+-        }
+-        codecInfo_.clear();
+-    }
+-    return result;
++    vencHdls_.clear();
++    vencSurfaces_.clear();
+ }
+ 
+ int32_t RecordAssistant::SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
+@@ -447,40 +453,46 @@ int32_t RecordAssistant::SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
+ #else
+         StreamAttrInitialize(&stream, g_surface, STREAM_VIDEO, fc);
+ #endif
+-        ret = HalCameraStreamCreate(cameraId_, &stream, streamId);
++        ret = halCameraDev_->HalCameraStreamCreate(cameraId_.c_str(), &stream, streamId);
+         if (ret != MEDIA_OK) {
+             MEDIA_ERR_LOG(" creat recorder stream failed.");
+             ClearFrameConfig();
+-            break;
++            return MEDIA_ERR;
+         }
+         streamId_ = *streamId;
+         streamIdNum_[num] = *streamId;
+         num++;
+-
+         StreamInfo streamInfo;
+         streamInfo.type = STERAM_INFO_PRIVATE;
+         fc.GetVendorParameter(streamInfo.u.data, PRIVATE_TAG_LEN);
+-        HalCameraStreamSetInfo(cameraId_, *streamId, &streamInfo);
++        halCameraDev_->HalCameraStreamSetInfo(cameraId_.c_str(), *streamId, &streamInfo);
+ 
+         uint32_t deviceId = 0;
+-        HalCameraGetDeviceId(cameraId_, *streamId, &deviceId);
++        halCameraDev_->HalCameraGetDeviceId(cameraId_.c_str(), *streamId, &deviceId);
+         ret = CameraCreateVideoEnc(fc, stream, deviceId, &codecHdl);
+         if (ret != MEDIA_OK) {
+             MEDIA_ERR_LOG("Cannot create suitble video encoder.");
+             ClearFrameConfig();
+-            break;
++            return MEDIA_ERR;
++        }
++
++        ret = CodecSetCallback(codecHdl, &recordCodecCb_, reinterpret_cast<UINTPTR>(this));
++        if (ret != 0) {
++            MEDIA_ERR_LOG("Set codec callback failed.(ret=%d)", ret);
++            CodecDestroy(codecHdl);
++            ClearFrameConfig();
++            return MEDIA_ERR;
+         }
++        vencHdls_.emplace_back(codecHdl);
+ #if (!defined(__LINUX__)) || (defined(ENABLE_PASSTHROUGH_MODE))
+         list<Surface*> conList({surface});
+ #else
+         list<Surface*> conList({g_surface});
+ #endif
+-        CodecDesc info;
+-        info.vencHdl_ = codecHdl;
+-        info.vencSurfaces_ = conList;
+-        codecInfo_.emplace_back(info);
++        vencSurfaces_.emplace_back(conList);
+     }
+-    return SetFrameConfigEnd(ret);
++    state_ = LOOP_READY;
++    return MEDIA_OK;
+ }
+ 
+ int32_t RecordAssistant::Start(uint32_t streamId)
+@@ -488,11 +500,11 @@ int32_t RecordAssistant::Start(uint32_t streamId)
+     if (state_ != LOOP_READY) {
+         return MEDIA_ERR;
+     }
+-    HalCameraStreamOn(cameraId_, streamId);
++    halCameraDev_->HalCameraStreamOn(cameraId_.c_str(), streamId);
+     int32_t ret = MEDIA_OK;
+     int32_t i;
+-    for (i = 0; static_cast<uint32_t>(i) < codecInfo_.size(); i++) {
+-        ret = CodecStart(codecInfo_[i].vencHdl_);
++    for (i = 0; static_cast<uint32_t>(i) < vencHdls_.size(); i++) {
++        ret = CodecStart(vencHdls_[i]);
+         if (ret != MEDIA_OK) {
+             MEDIA_ERR_LOG("Video encoder start failed.");
+             ret = MEDIA_ERR;
+@@ -502,7 +514,7 @@ int32_t RecordAssistant::Start(uint32_t streamId)
+     if (ret == MEDIA_ERR) {
+         /* rollback */
+         for (; i >= 0; i--) {
+-            CodecStop(codecInfo_[i].vencHdl_);
++            CodecStop(vencHdls_[i]);
+         }
+         return MEDIA_ERR;
+     }
+@@ -517,10 +529,10 @@ int32_t RecordAssistant::Stop()
+         return MEDIA_ERR;
+     }
+     ClearFrameConfig();
+-    for (uint32_t i = 0; i < VIDEO_MAX_NUM; i++) {
++    for(uint32_t i = 0; i < VIDEO_MAX_NUM; i++) {
+         if (streamIdNum_[i] != INVALID_STREAM_ID) {
+-            HalCameraStreamOff(cameraId_, streamIdNum_[i]);
+-            HalCameraStreamDestroy(cameraId_, streamIdNum_[i]);
++            halCameraDev_->HalCameraStreamOff(cameraId_.c_str(), streamIdNum_[i]);
++            halCameraDev_->HalCameraStreamDestroy(cameraId_.c_str(), streamIdNum_[i]);
+         }
+         streamIdNum_[i] = INVALID_STREAM_ID;
+     }
+@@ -528,21 +540,31 @@ int32_t RecordAssistant::Stop()
+     return MEDIA_OK;
+ }
+ 
+-void* PreviewAssistant::YuvCopyProcess(void *arg)
+-{
+-    return nullptr;
+-}
+-
+ static void GetSurfaceRect(Surface *surface, IRect *attr)
+ {
+     attr->x = std::stoi(surface->GetUserData(string("region_position_x")));
+     attr->y = std::stoi(surface->GetUserData(string("region_position_y")));
+     attr->w = std::stoi(surface->GetUserData(string("region_width")));
+-    attr->h = std::stoi(surface->GetUserData(string("region_hegiht")));
++    attr->h = std::stoi(surface->GetUserData(string("region_height")));
++}
++
++uint32_t PreviewAssistant::GetFreeStreamIndex()
++{
++    for(uint32_t i = 0; i < MAX_STREAM_NUM; i++) {
++        if (streamIdNum_[i] == INVALID_STREAM_ID) {
++            return i;
++        }
++    }
++    return MAX_STREAM_NUM;
+ }
+ 
+ int32_t PreviewAssistant::SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
+ {
++    uint32_t streamIndex = GetFreeStreamIndex();
++    if (streamIndex >= MAX_STREAM_NUM) {
++        MEDIA_ERR_LOG("Only support stream :%d.", MAX_STREAM_NUM);
++        return MEDIA_ERR;
++    }
+     fc_ = &fc;
+     auto surfaceList = fc.GetSurfaces();
+     if (surfaceList.size() != 1) {
+@@ -552,7 +574,7 @@ int32_t PreviewAssistant::SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
+     Surface *surface = surfaceList.front();
+     StreamAttr stream = {};
+     StreamAttrInitialize(&stream, surface, STREAM_PREVIEW, fc);
+-    int32_t ret = HalCameraStreamCreate(cameraId_, &stream, streamId);
++    int32_t ret = halCameraDev_->HalCameraStreamCreate(cameraId_.c_str(), &stream, streamId);
+     if (ret != MEDIA_OK) {
+         MEDIA_ERR_LOG(" creat preview stream failed.");
+         return MEDIA_ERR;
+@@ -561,30 +583,29 @@ int32_t PreviewAssistant::SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
+     streamInfo.type = STREAM_INFO_POS;
+     streamInfo.u.pos.x = std::stoi(surface->GetUserData(string("region_position_x")));
+     streamInfo.u.pos.y = std::stoi(surface->GetUserData(string("region_position_y")));
++    streamInfo.u.pos.w = std::stoi(surface->GetUserData(string("region_width")));
++    streamInfo.u.pos.h = std::stoi(surface->GetUserData(string("region_height")));
+ 
+-    HalCameraStreamSetInfo(cameraId_, *streamId, &streamInfo);
++    halCameraDev_->HalCameraStreamSetInfo(cameraId_.c_str(), *streamId, &streamInfo);
+     streamId_ = *streamId;
++    streamIdNum_[streamIndex] = *streamId;
++    state_ = LOOP_READY;
+     return MEDIA_OK;
+ }
+ 
+ int32_t PreviewAssistant::Start(uint32_t streamId)
+ {
+-    if (state_ == LOOP_LOOPING) {
++    if (state_ != LOOP_READY) {
+         return MEDIA_ERR;
+     }
+-    state_ = LOOP_LOOPING;
+-
+-    int32_t retCode = pthread_create(&threadId, nullptr, YuvCopyProcess, this);
+-    if (retCode != 0) {
+-        MEDIA_ERR_LOG("fork thread YuvCopyProcess failed: %d.", retCode);
+-    }
+ 
+-    int32_t ret = HalCameraStreamOn(cameraId_, streamId);
+-    if (ret != MEDIA_OK) {
++    int32_t ret = halCameraDev_->HalCameraStreamOn(cameraId_.c_str(), streamId);
++    if (ret != 0) {
+         MEDIA_ERR_LOG("Preview start failed of HalCameraStreamOn.(ret=%d)", ret);
+         Stop();
+         return MEDIA_ERR;
+     }
++    state_ = LOOP_LOOPING;
+     return MEDIA_OK;
+ }
+ 
+@@ -594,9 +615,14 @@ int32_t PreviewAssistant::Stop()
+         return MEDIA_ERR;
+     }
+     state_ = LOOP_STOP;
+-    pthread_join(threadId, NULL);
+-    HalCameraStreamOff(cameraId_, streamId_);
+-    HalCameraStreamDestroy(cameraId_, streamId_);
++    for(uint32_t i = 0; i < MAX_STREAM_NUM; i++) {
++        if (streamIdNum_[i] == INVALID_STREAM_ID) {
++            continue;
++        }
++        halCameraDev_->HalCameraStreamOff(cameraId_.c_str(), streamIdNum_[i]);
++        halCameraDev_->HalCameraStreamDestroy(cameraId_.c_str(), streamIdNum_[i]);
++        streamIdNum_[i] = INVALID_STREAM_ID;
++    }
+     return MEDIA_OK;
+ }
+ 
+@@ -620,15 +646,16 @@ int32_t CaptureAssistant::SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
+     StreamAttrInitialize(&stream, surface, STREAM_CAPTURE, fc);
+ 
+     uint32_t deviceId = 0;
+-    int32_t ret = HalCameraStreamCreate(cameraId_, &stream, streamId);
++    int32_t ret = halCameraDev_->HalCameraStreamCreate(cameraId_.c_str(), &stream, streamId);
+     if (ret != MEDIA_OK) {
+         MEDIA_ERR_LOG(" creat capture stream failed.");
+         return MEDIA_ERR;
+     }
+     streamId_ = *streamId;
+-    HalCameraGetDeviceId(cameraId_, *streamId, &deviceId);
+-    ret = CameraCreateJpegEnc(fc, stream, deviceId, &vencHdl_);
++    halCameraDev_->HalCameraGetDeviceId(cameraId_.c_str(), *streamId, &deviceId);
++    ret = CameraCreatePicEnc(fc, stream, deviceId, &vencHdl_);
+     if (ret != MEDIA_OK) {
++        halCameraDev_->HalCameraStreamDestroy(cameraId_.c_str(), *streamId);
+         MEDIA_ERR_LOG("Create capture venc failed.");
+         return MEDIA_ERR;
+     }
+@@ -642,36 +669,26 @@ int32_t CaptureAssistant::SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
+ int32_t CaptureAssistant::Start(uint32_t streamId)
+ {
+     state_ = LOOP_LOOPING;
+-    HalCameraStreamOn(cameraId_, streamId);
++    halCameraDev_->HalCameraStreamOn(cameraId_.c_str(), streamId);
+     int32_t ret = CodecStart(vencHdl_);
+     if (ret != 0) {
+         MEDIA_ERR_LOG("Start capture encoder failed.(ret=%d)", ret);
+         state_ = LOOP_STOP;
+         return MEDIA_ERR;
+     }
+-
+-    CodecBuffer* outInfo = (CodecBuffer*)new char[sizeof(CodecBuffer) + sizeof(CodecBufferInfo) * 3]; /* 3 buffCnt */
+-    if (outInfo == NULL) {
+-        MEDIA_ERR_LOG("malloc Dequeue buffer failed!");
+-        return MEDIA_ERR;
+-    }
+-    SurfaceBuffer *surfaceBuf = NULL;
+     do {
+-        if (memset_s(outInfo, sizeof(CodecBuffer) + sizeof(CodecBufferInfo) * 0x3, 0,
+-            sizeof(CodecBuffer) + sizeof(CodecBufferInfo) * 3) != MEDIA_OK) { /* 3 buffCnt */
+-            MEDIA_ERR_LOG("memset_s failed!");
+-            delete(outInfo);
+-            return MEDIA_ERR;
+-        }
+-        outInfo->bufferCnt = 3; /* 3 buffCnt */
+-        ret = CodecDequeueOutput(vencHdl_, 0, nullptr, outInfo);
+-        if (ret != 0) {
+-            MEDIA_ERR_LOG("Dequeue capture frame failed.(ret=%d)", ret);
++        SurfaceBuffer *surfaceBuf = capSurface_->RequestBuffer();
++        if (surfaceBuf == nullptr) {
++            MEDIA_ERR_LOG("No available buffer in surface.");
+             break;
+         }
+ 
+-        surfaceBuf = capSurface_->RequestBuffer();
+-        if (surfaceBuf == NULL) {
++        OutputInfo outInfo;
++        ret = CodecDequeueOutput(vencHdl_, 0, nullptr, &outInfo);
++        if (ret != 0) {
++            capSurface_->CancelBuffer(surfaceBuf);
++            MEDIA_ERR_LOG("Dequeue capture frame failed.(ret=%d)", ret);
++            ret = MEDIA_ERR;
+             break;
+         }
+ 
+@@ -679,25 +696,33 @@ int32_t CaptureAssistant::Start(uint32_t streamId)
+         void *buf = surfaceBuf->GetVirAddr();
+         if (buf == nullptr) {
+             MEDIA_ERR_LOG("Invalid buffer address.");
++            ret = MEDIA_ERR;
+             break;
+         }
+-        if (CopyCodecOutput((uint8_t*)buf, &size, outInfo) != MEDIA_OK) {
++        ret = CopyCodecOutput(buf, &size, &outInfo);
++        if (ret != MEDIA_OK) {
+             MEDIA_ERR_LOG("No available buffer in capSurface_.");
++            capSurface_->CancelBuffer(surfaceBuf);
++            ret = MEDIA_ERR;
+             break;
+         }
+         surfaceBuf->SetSize(capSurface_->GetSize() - size);
++
+         if (capSurface_->FlushBuffer(surfaceBuf) != 0) {
+             MEDIA_ERR_LOG("Flush surface buffer failed.");
++            capSurface_->CancelBuffer(surfaceBuf);
++            ret = MEDIA_ERR;
+             break;
+         }
++
++        ret = MEDIA_OK;
++        CodecQueueOutput(vencHdl_, &outInfo, 0, -1); // 0:no timeout -1:no fd
+     } while (0);
+ 
+     CodecStop(vencHdl_);
+     CodecDestroy(vencHdl_);
+-    HalCameraStreamOff(cameraId_, streamId);
+-    HalCameraStreamDestroy(cameraId_, streamId);
+-    delete outInfo;
+-    outInfo = NULL;
++    halCameraDev_->HalCameraStreamOff(cameraId_.c_str(), streamId);
++    halCameraDev_->HalCameraStreamDestroy(cameraId_.c_str(), streamId);
+     state_ = LOOP_STOP;
+ 
+     return ret;
+@@ -725,7 +750,7 @@ int32_t CallbackAssistant::SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
+     StreamAttr stream = {};
+     StreamAttrInitialize(&stream, surface, STREAM_CALLBACK, fc);
+     stream.format = halImageFormat;
+-    int32_t ret = HalCameraStreamCreate(cameraId_, &stream, streamId);
++    int32_t ret = halCameraDev_->HalCameraStreamCreate(cameraId_.c_str(), &stream, streamId);
+     if (ret != MEDIA_OK) {
+         MEDIA_ERR_LOG(" creat callback stream failed.");
+         return MEDIA_ERR;
+@@ -746,7 +771,7 @@ int32_t CallbackAssistant::Start(uint32_t streamId)
+     if (retCode != 0) {
+         MEDIA_ERR_LOG("fork thread StreamCopyProcess failed: %d.", retCode);
+     }
+-    HalCameraStreamOn(cameraId_, streamId);
++    halCameraDev_->HalCameraStreamOn(cameraId_.c_str(), streamId);
+     return MEDIA_OK;
+ }
+ 
+@@ -761,7 +786,6 @@ void* CallbackAssistant::StreamCopyProcess(void *arg)
+         MEDIA_ERR_LOG("capSurface_ is null.\n");
+         return nullptr;
+     }
+-
+     int32_t ret;
+     HalBuffer streamBuffer;
+     (void)memset_s(&streamBuffer, sizeof(HalBuffer), 0, sizeof(HalBuffer));
+@@ -772,10 +796,11 @@ void* CallbackAssistant::StreamCopyProcess(void *arg)
+             continue;
+         }
+ 
+-        if (streamBuffer.size != 0x0) {
+-            HalCameraQueueBuf(assistant->cameraId_, assistant->streamId_, &streamBuffer);
++        if (streamBuffer.size != 0) {
++            halCameraDev_->HalCameraQueueBuf(assistant->cameraId_.c_str(), assistant->streamId_, &streamBuffer);
+             (void)memset_s(&streamBuffer, sizeof(HalBuffer), 0, sizeof(HalBuffer));
+         }
++
+         streamBuffer.format = FORMAT_PRIVATE;
+         streamBuffer.size = assistant->capSurface_->GetSize();
+         if (surfaceBuf->GetVirAddr() == NULL) {
+@@ -784,7 +809,7 @@ void* CallbackAssistant::StreamCopyProcess(void *arg)
+         }
+         streamBuffer.virAddr = surfaceBuf->GetVirAddr();
+ 
+-        ret = HalCameraDequeueBuf(assistant->cameraId_, assistant->streamId_, &streamBuffer);
++        ret = halCameraDev_->HalCameraDequeueBuf(assistant->cameraId_.c_str(), assistant->streamId_, &streamBuffer);
+         if (ret != MEDIA_OK) {
+             usleep(DELAY_TIME_ONE_FRAME);
+             continue;
+@@ -797,8 +822,8 @@ void* CallbackAssistant::StreamCopyProcess(void *arg)
+         }
+         usleep(DELAY_TIME_ONE_FRAME);
+     }
+-    if (streamBuffer.size != 0x0) {
+-        HalCameraQueueBuf(assistant->cameraId_, assistant->streamId_, &streamBuffer);
++    if (streamBuffer.size != 0) {
++        halCameraDev_->HalCameraQueueBuf(assistant->cameraId_.c_str(), assistant->streamId_, &streamBuffer);
+     }
+     MEDIA_DEBUG_LOG(" yuv thread joined \n");
+     return nullptr;
+@@ -811,41 +836,217 @@ int32_t CallbackAssistant::Stop()
+     }
+     state_ = LOOP_STOP;
+     pthread_join(threadId, NULL);
+-    HalCameraStreamOff(cameraId_, streamId_);
+-    HalCameraStreamDestroy(cameraId_, streamId_);
++    halCameraDev_->HalCameraStreamOff(cameraId_.c_str(), streamId_);
++    halCameraDev_->HalCameraStreamDestroy(cameraId_.c_str(), streamId_);
++    return MEDIA_OK;
++}
++
++int32_t CallbackH264Assistant::OnVencBufferAvailble(UINTPTR hComponent, UINTPTR dataIn, OutputInfo *buffer)
++{
++    CODEC_HANDLETYPE hdl = reinterpret_cast<CODEC_HANDLETYPE>(hComponent);
++    CallbackH264Assistant *assistant = reinterpret_cast<CallbackH264Assistant *>(dataIn);
++    list<Surface *> *surfaceList = nullptr;
++    for (uint32_t idx = 0; idx < assistant->vencHdls_.size(); idx++) {
++        if (assistant->vencHdls_[idx] == hdl) {
++            surfaceList = &(assistant->vencSurfaces_[idx]);
++            break;
++        }
++    }
++    if (surfaceList == nullptr || surfaceList->empty()) {
++        MEDIA_ERR_LOG("Encoder handle is illegal.");
++        return MEDIA_ERR;
++    }
++    int32_t ret = -1;
++    for (auto &surface : *surfaceList) {
++        SurfaceBuffer *surfaceBuf = surface->RequestBuffer();
++        if (surfaceBuf == nullptr) {
++            MEDIA_ERR_LOG("No available buffer in surface.");
++            break;
++        }
++        uint32_t size = surface->GetSize();
++        void *buf = surfaceBuf->GetVirAddr();
++        if (buf == nullptr) {
++            MEDIA_ERR_LOG("Invalid buffer address.");
++            break;
++        }
++        ret = CopyCodecOutput(buf, &size, buffer);
++        if (ret != MEDIA_OK) {
++            MEDIA_ERR_LOG("No available buffer in surface.");
++        surface->CancelBuffer(surfaceBuf);
++            break;
++        }
++        surfaceBuf->SetInt32(KEY_IS_SYNC_FRAME, (((buffer->flag & STREAM_FLAG_KEYFRAME) == 0) ? 0 : 1));
++        surfaceBuf->SetInt64(KEY_TIME_US, buffer->timeStamp);
++        surfaceBuf->SetSize(surface->GetSize() - size);
++        if (surface->FlushBuffer(surfaceBuf) != 0) {
++            MEDIA_ERR_LOG("Flush surface failed.");
++            surface->CancelBuffer(surfaceBuf);
++            ret = -1;
++            break;
++        }
++    }
++    if (CodecQueueOutput(hdl, buffer, 0, -1) != 0) {
++        MEDIA_ERR_LOG("Codec queue output failed.");
++    }
++    return ret;
++}
++
++CodecCallback CallbackH264Assistant::callbackH264CodecCb_ = {nullptr, nullptr, CallbackH264Assistant::OnVencBufferAvailble};
++
++void CallbackH264Assistant::ClearFrameConfig()
++{
++    for (uint32_t i = 0; i < vencHdls_.size(); i++) {
++        CodecStop(vencHdls_[i]);
++        CodecDestroy(vencHdls_[i]);
++    }
++    vencHdls_.clear();
++    vencSurfaces_.clear();
++}
++
++int32_t CallbackH264Assistant::SetFrameConfig(FrameConfig &fc, uint32_t *streamId)
++{
++    fc_ = &fc;
++    auto surfaceList = fc.GetSurfaces();
++    if (surfaceList.size() != 1) {
++        MEDIA_ERR_LOG("Only support one surface in frame config now.");
++        return MEDIA_ERR;
++    }
++    uint32_t num = 0;
++    Surface *surface = surfaceList.front();
++    CODEC_HANDLETYPE codecHdl = nullptr;
++    StreamAttr stream = {};
++    StreamAttrInitialize(&stream, surface, STREAM_CALLBACK, fc);
++    int32_t ret = halCameraDev_->HalCameraStreamCreate(cameraId_.c_str(), &stream, streamId);
++    if (ret != MEDIA_OK) {
++        MEDIA_ERR_LOG(" creat callback stream failed.");
++        return MEDIA_ERR;
++    }
++    streamId_ = *streamId;
++    streamIdNum_[num] = *streamId;
++    num++;
++    StreamInfo streamInfo;
++    streamInfo.type = STERAM_INFO_PRIVATE;
++    fc.GetVendorParameter(streamInfo.u.data, PRIVATE_TAG_LEN);
++    halCameraDev_->HalCameraStreamSetInfo(cameraId_.c_str(), *streamId, &streamInfo);
++    uint32_t deviceId = 0;
++    halCameraDev_->HalCameraGetDeviceId(cameraId_.c_str(), *streamId, &deviceId);
++    ret = CameraCreateVideoEnc(fc, stream, deviceId, &codecHdl);
++    if (ret != MEDIA_OK) {
++        MEDIA_ERR_LOG("Cannot create suitble video encoder.");
++        ClearFrameConfig();
++        return MEDIA_ERR;
++    }
++    ret = CodecSetCallback(codecHdl, &callbackH264CodecCb_, reinterpret_cast<UINTPTR>(this));
++    if (ret != 0) {
++        MEDIA_ERR_LOG("Set codec callback failed.(ret=%d)", ret);
++        CodecDestroy(codecHdl);
++        ClearFrameConfig();
++        return MEDIA_ERR;
++    }
++    vencHdls_.emplace_back(codecHdl);
++    list<Surface*> conList({surface});
++    vencSurfaces_.emplace_back(conList);
++    state_ = LOOP_READY;
++    MEDIA_ERR_LOG("sucess.");
++    return MEDIA_OK;
++}
++
++int32_t CallbackH264Assistant::Start(uint32_t streamId)
++{
++    if (state_ != LOOP_READY) {
++        return MEDIA_ERR;
++    }
++    halCameraDev_->HalCameraStreamOn(cameraId_.c_str(), streamId);
++    int32_t ret = MEDIA_OK;
++    int32_t i;
++    for (i = 0; static_cast<uint32_t>(i) < vencHdls_.size(); i++) {
++        ret = CodecStart(vencHdls_[i]);
++        if (ret != MEDIA_OK) {
++            MEDIA_ERR_LOG("Video encoder start failed.");
++            ret = MEDIA_ERR;
++            break;
++        }
++    }
++    if (ret == MEDIA_ERR) {
++        /* rollback */
++        for (; i >= 0; i--) {
++            CodecStop(vencHdls_[i]);
++        }
++        return MEDIA_ERR;
++    }
++    state_ = LOOP_LOOPING;
++    MEDIA_INFO_LOG("Start camera recording succeed.");
++    return MEDIA_OK;
++}
++
++int32_t CallbackH264Assistant::Stop()
++{
++    if (state_ != LOOP_LOOPING) {
++        return MEDIA_ERR;
++    }
++    ClearFrameConfig();
++    for(uint32_t i = 0; i < MAX_STREAM_NUM; i++) {
++        if (streamIdNum_[i] != INVALID_STREAM_ID) {
++            halCameraDev_->HalCameraStreamOff(cameraId_.c_str(), streamIdNum_[i]);
++            halCameraDev_->HalCameraStreamDestroy(cameraId_.c_str(), streamIdNum_[i]);
++        }
++        streamIdNum_[i] = INVALID_STREAM_ID;
++    }
++    state_ = LOOP_STOP;
+     return MEDIA_OK;
+ }
+ 
+ CameraDevice::CameraDevice() {}
+-CameraDevice::CameraDevice(uint32_t cameraId)
++CameraDevice::CameraDevice(string cameraId, HalCameraManager *halCameraDev)
+ {
+-    this->cameraId = cameraId;
++    this->cameraId_ = cameraId;
++    this->halCameraDev_ = halCameraDev;
+ }
+ 
+ CameraDevice::~CameraDevice() {}
+ 
+ int32_t CameraDevice::Initialize()
+ {
+-    // Need to be Refactored when delete config file
+-    int32_t ret = CodecInit();
++    int32_t ret;
++    if (cameraId_.find(CAMERA_ID_PREFIX) == std::string::npos) {
++        // Need to be Refactored when delete config file
++        ret = CodecInit();
++        if (ret != 0) {
++            MEDIA_ERR_LOG("Codec module init failed.(ret=%d)", ret);
++            return MEDIA_ERR;
++        }
++        MEDIA_INFO_LOG("Codec module init succeed.");
++    }
++    ret = halCameraDev_->HalCameraDeviceOpen(cameraId_.c_str());
+     if (ret != 0) {
+-        MEDIA_ERR_LOG("Codec module init failed.(ret=%d)", ret);
++        MEDIA_ERR_LOG("HalCameraDeviceOpen failed. ret(%d)", ret);
+         return MEDIA_ERR;
+     }
+-    MEDIA_INFO_LOG("Codec module init succeed.");
+     captureAssistant_.state_ = LOOP_READY;
+     previewAssistant_.state_ = LOOP_READY;
+     recordAssistant_.state_ = LOOP_READY;
+     callbackAssistant_.state_ = LOOP_READY;
+-    captureAssistant_.cameraId_ = cameraId;
+-    previewAssistant_.cameraId_ = cameraId;
+-    recordAssistant_.cameraId_ = cameraId;
+-    callbackAssistant_.cameraId_ = cameraId;
++    callbackH264Assistant_.state_ = LOOP_READY;
++    captureAssistant_.cameraId_ = cameraId_;
++    captureAssistant_.halCameraDev_ = halCameraDev_;
++    previewAssistant_.cameraId_ = cameraId_;
++    previewAssistant_.halCameraDev_ = halCameraDev_;
++    recordAssistant_.cameraId_ = cameraId_;
++    recordAssistant_.halCameraDev_ = halCameraDev_;
++    callbackAssistant_.cameraId_ = cameraId_;
++    callbackAssistant_.halCameraDev_ = halCameraDev_;
++    callbackH264Assistant_.cameraId_ = cameraId_;
++    callbackH264Assistant_.halCameraDev_ = halCameraDev_;
+     return MEDIA_OK;
+ }
+ 
+ int32_t CameraDevice::UnInitialize()
+ {
++    int32_t ret = halCameraDev_->HalCameraDeviceClose(cameraId_.c_str());
++    if (ret != 0) {
++        MEDIA_ERR_LOG("HalCameraDeviceClose failed. ret(%d)", ret);
++    }
++    MEDIA_INFO_LOG("CameraDevice:UnInitialize, success");
+     return MEDIA_OK;
+ }
+ 
+@@ -867,6 +1068,9 @@ int32_t CameraDevice::TriggerLoopingCapture(FrameConfig &fc, uint32_t *streamId)
+         case FRAME_CONFIG_CALLBACK:
+             assistant = &callbackAssistant_;
+             break;
++        case FRAME_CONFIG_CALLBACK_H264:
++            assistant = &callbackH264Assistant_;
++            break;
+         default:
+             break;
+     }
+@@ -874,7 +1078,8 @@ int32_t CameraDevice::TriggerLoopingCapture(FrameConfig &fc, uint32_t *streamId)
+         MEDIA_ERR_LOG("Invalid frame config type.(type=%d)", fcType);
+         return MEDIA_ERR;
+     }
+-    if (assistant->state_ == LOOP_IDLE || assistant->state_ == LOOP_LOOPING || assistant->state_ == LOOP_ERROR) {
++    if (assistant->state_ == LOOP_LOOPING ||
++        assistant->state_ == LOOP_ERROR) {
+         MEDIA_ERR_LOG("Device state is %d, cannot start looping capture.", assistant->state_);
+         return MEDIA_ERR;
+     }
+@@ -882,52 +1087,35 @@ int32_t CameraDevice::TriggerLoopingCapture(FrameConfig &fc, uint32_t *streamId)
+     if (fcType == FRAME_CONFIG_CAPTURE) {
+         auto surfaceList = fc.GetSurfaces();
+         if (surfaceList.size() != 1) {
+-            MEDIA_ERR_LOG("Only support one surface in frame config now");
++            MEDIA_ERR_LOG("Only support one surface in frame config now.");
+             return MEDIA_ERR;
+         }
+-        Surface* surface = surfaceList.front();
++        Surface *surface = surfaceList.front();
+         count = surface->GetQueueSize();
+     }
+-
+     do {
+         int32_t ret = assistant->SetFrameConfig(fc, streamId);
+         if (ret != MEDIA_OK) {
+-            MEDIA_ERR_LOG("Check and set frame config failed (ret=%d)", ret);
++            MEDIA_ERR_LOG("Check and set frame config failed.(ret=%d)", ret);
+             return MEDIA_ERR;
+         }
++
+         ret = assistant->Start(*streamId);
+         if (ret != MEDIA_OK) {
+-            MEDIA_ERR_LOG("Start looping capture failed (ret=%d)", ret);
++            MEDIA_ERR_LOG("Start looping capture failed.(ret=%d)", ret);
+             return MEDIA_ERR;
+         }
+-    } while (--count);
++    } while(--count);
+     return MEDIA_OK;
+ }
+ 
+ void CameraDevice::StopLoopingCapture(int32_t type)
+ {
+-    MEDIA_INFO_LOG("Stop looping capture in camera_device.cpp");
+-
+-    switch (type) {
+-        case FRAME_CONFIG_RECORD:
+-            MEDIA_INFO_LOG("Stop recorder");
+-            recordAssistant_.Stop();;
+-            break;
+-        case FRAME_CONFIG_PREVIEW:
+-            MEDIA_INFO_LOG("Stop preview");
+-            previewAssistant_.Stop();
+-            break;
+-        case FRAME_CONFIG_CALLBACK:
+-            MEDIA_INFO_LOG("Stop callback");
+-            callbackAssistant_.Stop();
+-            break;
+-        default:
+-            MEDIA_INFO_LOG("Stop all");
+-            previewAssistant_.Stop();
+-            recordAssistant_.Stop();
+-            callbackAssistant_.Stop();
+-            break;
+-    }
++    (void)type;
++    previewAssistant_.Stop();
++    recordAssistant_.Stop();
++    callbackAssistant_.Stop();
++    callbackH264Assistant_.Stop();
+ }
+ 
+ int32_t CameraDevice::TriggerSingleCapture(FrameConfig &fc, uint32_t *streamId)
+@@ -935,8 +1123,28 @@ int32_t CameraDevice::TriggerSingleCapture(FrameConfig &fc, uint32_t *streamId)
+     return TriggerLoopingCapture(fc, streamId);
+ }
+ 
+-int32_t CameraDevice::SetCameraConfig()
++int32_t CameraDevice::SetCameraConfig(const char *dataBuff, uint32_t len)
++{
++    if (dataBuff != nullptr) {
++        int32_t ret = UpdataCameraSetting(dataBuff, len);
++        if (ret != 0) {
++            MEDIA_ERR_LOG("UpdataCameraSetting failed. ret(%d)", ret);
++            return MEDIA_ERR;
++        }
++    }
++    return MEDIA_OK;
++}
++
++int32_t CameraDevice::UpdataCameraSetting(const char *dataBuff, uint32_t len)
+ {
++    if (dataBuff == nullptr) {
++        MEDIA_ERR_LOG("dataBuff is null");
++        return MEDIA_ERR;
++    }
++    int32_t ret = halCameraDev_->HalCameraUpdateSettings(cameraId_.c_str(), dataBuff, len);
++    if (ret != 0) {
++        return MEDIA_ERR;
++    }
+     return MEDIA_OK;
+ }
+ } // namespace Media
+diff --git a/services/impl/src/camera_service.cpp b/services/impl/src/camera_service.cpp
+index d198298..eca5b5e 100644
+--- a/services/impl/src/camera_service.cpp
++++ b/services/impl/src/camera_service.cpp
+@@ -13,10 +13,14 @@
+  * limitations under the License.
+  */
+ #include "camera_service.h"
+-#include "hal_camera.h"
++#include <string>
++#include <iostream>
++#include <unistd.h>
+ #include "media_log.h"
+ #include "codec_interface.h"
+ 
++const std::string CAMERA_ID_PREFIX = "Camera_";
++
+ using namespace std;
+ namespace OHOS {
+ namespace Media {
+@@ -26,21 +30,28 @@ CameraService::~CameraService()
+ {
+     auto iter = deviceMap_.begin();
+     while (iter != deviceMap_.end()) {
+-        if (iter->second != nullptr) {
+-            iter->second->StopLoopingCapture(-1);
+-            int32_t ret = HalCameraDeviceClose((uint32_t)std::atoi(iter->first.c_str()));
++        if (iter->second.first != nullptr) {
++            CameraDevice *cameraDev = (CameraDevice *)iter->second.first;
++            cameraDev->StopLoopingCapture(-1);
++            int32_t ret = cameraDev->UnInitialize();
+             if (ret != 0) {
+-                MEDIA_ERR_LOG("HalCameraDeviceClose failed. ret(%d)", ret);
++                MEDIA_ERR_LOG("UnInitialize failed. ret(%d)", ret);
+             }
+             deviceMap_.erase(iter++);
++            delete cameraDev;
+         } else {
+             ++iter;
+         }
+     }
+-    int32_t ret = HalCameraDeinit();
+-    if (ret != 0) {
+-        MEDIA_ERR_LOG("HiCameraDeInit return failed ret(%d).", ret);
++    int32_t ret;
++    if (localHalCameraDev_ != nullptr) {
++        ret = localHalCameraDev_->HalCameraDeinit();
++        if (ret != 0) {
++            MEDIA_ERR_LOG("localHalCameraDev_ HiCameraDeInit return failed ret(%d).", ret);
++        }
+     }
++
++    inited_ = false;
+ }
+ 
+ CameraService *CameraService::GetInstance()
+@@ -49,49 +60,100 @@ CameraService *CameraService::GetInstance()
+     return &instance;
+ }
+ 
++void DistributedCameraDetectCb(const char *cameraId, CameraStatus status)
++{
++    MEDIA_INFO_LOG("cameraId :%s status:%d", cameraId, status);
++    CameraService *cameraService = CameraService::GetInstance();
++    std::string camId(cameraId);
++    cameraService->CameraStatusChange(camId, status);
++}
++
++void CameraService::CameraStatusChange(std::string &cameraId, CameraStatus status)
++{
++    if (cameraServiceCb_ == nullptr) {
++        MEDIA_ERR_LOG("callback cameraServiceCb_ is uninitialized");
++        return;
++    }
++    switch (status) {
++        case CAMERA_STATUS_NOT_PRESENT:
++            MEDIA_INFO_LOG("callback cameraId:%s CAMERA_STATUS_NOT_PRESENT", cameraId.c_str());
++            cameraServiceCb_->OnCameraStatusChange(cameraId, CameraServiceCallback::CAMERA_STATUS_UNAVAIL);
++            break;
++        case CAMERA_STATUS_PRESENT:
++            MEDIA_INFO_LOG("callback cameraId:%s CAMERA_STATUS_PRESENT", cameraId.c_str());
++            cameraServiceCb_->OnCameraStatusChange(cameraId, CameraServiceCallback::CAMERA_STATUS_AVAIL);
++            break;
++        default:
++            break;
++    }
++}
++
+ void CameraService::Initialize()
+ {
+-    int32_t ret = HalCameraInit();
+-    if (ret != 0) {
+-        MEDIA_ERR_LOG("HiCameraInit failed. ret(%d)", ret);
++    if (inited_) {
++        return;
++    }
++    int32_t ret;
++    if (localHalCameraDev_ == nullptr) {
++        localHalCameraDev_ = GetHalCameraFuncs();
++        ret = localHalCameraDev_->HalCameraInit();
++        MEDIA_INFO_LOG("localHalCameraDev Init ret(%d)", ret);
+     }
++
++    inited_ = true;
++}
++
++HalCameraManager *CameraService::GetHalCameraDevice(const std::string &cameraId)
++{
++    (void)cameraId;
++    return localHalCameraDev_;
+ }
+ 
+ CameraAbility *CameraService::GetCameraAbility(std::string &cameraId)
+ {
++    if (!inited_) {
++        MEDIA_ERR_LOG("not inited  %s ", cameraId.c_str());
++        return NULL;
++    }
+     std::map<string, CameraAbility*>::iterator iter = deviceAbilityMap_.find(cameraId);
+     if (iter != deviceAbilityMap_.end()) {
++        MEDIA_ERR_LOG("return GetCameraAbility  %s ", cameraId.c_str());
+         return iter->second;
+     }
++    HalCameraManager *halCameraDev = GetHalCameraDevice(cameraId);
+     CameraAbility *ability = new (nothrow) CameraAbility;
+     if (ability == nullptr) {
+         return nullptr;
+     }
+-    uint32_t streamCapNum;
++    uint32_t streamCapNum = 0;
+     StreamCap *streamCap = nullptr;
+-    int32_t ret = HalCameraGetStreamCapNum(atoi(cameraId.c_str()), &streamCapNum);
++    int32_t ret = halCameraDev->HalCameraGetStreamCapNum(cameraId.c_str(), &streamCapNum);
+     streamCap = new StreamCap[streamCapNum];
+     for (uint32_t pos = 0; pos < streamCapNum; pos++) {
+         streamCap[pos].type = CAP_DESC_ENUM;
+     }
+-    ret = HalCameraGetStreamCap(atoi(cameraId.c_str()), streamCap, streamCapNum);
++    ret = halCameraDev->HalCameraGetStreamCap(cameraId.c_str(), streamCap, streamCapNum);
+     list<CameraPicSize> range;
+     for (int pos = 0; pos < streamCapNum; pos++) {
+-        CameraPicSize tmpSize = {.width = (uint32_t)streamCap[pos].u.formatEnum.width,
+-            .height = (uint32_t)streamCap[pos].u.formatEnum.height};
++        CameraPicSize tmpSize = {.width = (uint32_t)streamCap[pos].u.formatEnum.width, .height =
++            (uint32_t)streamCap[pos].u.formatEnum.height};
+         range.emplace_back(tmpSize);
+     }
+     ability->SetParameterRange(CAM_FORMAT_YVU420, range);
+     ability->SetParameterRange(CAM_FORMAT_JPEG, range);
+     ability->SetParameterRange(CAM_FORMAT_H264, range);
+     ability->SetParameterRange(CAM_FORMAT_H265, range);
++
+     AbilityInfo cameraAbility = {};
+-    HalCameraGetAbility(atoi(cameraId.c_str()), &cameraAbility);
++    halCameraDev->HalCameraGetAbility(cameraId.c_str(), &cameraAbility);
++    // Get supported AF Modes
+     list<int32_t> afModes;
+     for (int i = 0; i < cameraAbility.afModeNum; i++) {
+         afModes.emplace_back(cameraAbility.afModes[i]);
+     }
+     ability->SetParameterRange(CAM_AF_MODE, afModes);
++
++    // Get supported AE Modes
+     list<int32_t> aeModes;
+     for (int i = 0; i < cameraAbility.aeModeNum; i++) {
+         aeModes.emplace_back(cameraAbility.aeModes[i]);
+@@ -104,12 +166,17 @@ CameraAbility *CameraService::GetCameraAbility(std::string &cameraId)
+ 
+ CameraInfo *CameraService::GetCameraInfo(std::string &cameraId)
+ {
++    if (!inited_) {
++        MEDIA_ERR_LOG("not inited  %s ", cameraId.c_str());
++        return NULL;
++    }
+     std::map<string, CameraInfo*>::iterator iter = deviceInfoMap_.find(cameraId);
+     if (iter != deviceInfoMap_.end()) {
+         return iter->second;
+     }
++    HalCameraManager *halCameraDev = GetHalCameraDevice(cameraId);
+     AbilityInfo deviceAbility;
+-    int32_t ret = HalCameraGetAbility((uint32_t)std::atoi(cameraId.c_str()), &deviceAbility);
++    int32_t ret = halCameraDev->HalCameraGetAbility(cameraId.c_str(), &deviceAbility);
+     if (ret != MEDIA_OK) {
+         MEDIA_ERR_LOG("HalCameraGetAbility failed. ret(%d)", ret);
+         return nullptr;
+@@ -124,45 +191,57 @@ CameraInfo *CameraService::GetCameraInfo(std::string &cameraId)
+ 
+ CameraDevice *CameraService::GetCameraDevice(std::string &cameraId)
+ {
+-    std::map<string, CameraDevice*>::iterator iter = deviceMap_.find(cameraId);
++    std::map<std::string, std::pair<CameraDevice*, HalCameraManager*>>::iterator iter = deviceMap_.find(cameraId);
+     if (iter != deviceMap_.end()) {
+-        return iter->second;
++        return iter->second.first;
+     }
+     return nullptr;
+ }
+ 
++std::pair<CameraDevice*, HalCameraManager*> CameraService::GetCameraDeviceInfo(std::string &cameraId)
++
++{
++    std::map<std::string, std::pair<CameraDevice*, HalCameraManager*>>::iterator iter = deviceMap_.find(cameraId);
++    if (iter != deviceMap_.end()) {
++        return iter->second;
++    }
++    return {};
++}
++
+ list<string> CameraService::GetCameraIdList()
+ {
+     uint8_t camNum = 0;
+-    HalCameraGetDeviceNum(&camNum);
+-    uint32_t *cameraList = new uint32_t[camNum];
+-    HalCameraGetDeviceList(cameraList, camNum);
++    localHalCameraDev_->HalCameraGetDeviceNum(&camNum);
++    char (*cameraList)[CAMERA_NAME_MAX_LEN] = new char[camNum][CAMERA_NAME_MAX_LEN];
++    localHalCameraDev_->HalCameraGetDeviceList(cameraList, camNum);
+     list<string> cameraStrList;
++    MEDIA_INFO_LOG("Local camNum(%u)\n", camNum);
+     for (uint32_t pos = 0; pos < camNum; pos++) {
+-        cameraStrList.push_back(to_string(cameraList[pos]));
++        MEDIA_INFO_LOG("index(%u) name: %s \n", pos, cameraList[pos]);
++        cameraStrList.push_back(cameraList[pos]);
+     }
+-    delete[] cameraList;
++    delete cameraList;
+     return cameraStrList;
+ }
+ 
+ uint8_t CameraService::GetCameraModeNum()
+ {
+     uint8_t num;
+-    int32_t ret = HalCameraGetModeNum(&num);
+-    if (ret == MEDIA_OK) {
++    int32_t ret = localHalCameraDev_->HalCameraGetModeNum(&num);
++    if (ret == 0) {
+         return num;
+     }
+     return 0;
+ }
+ 
+-int32_t CameraService::CreateCamera(string cameraId)
++int32_t CameraService::CreateCamera(std::string &cameraId)
+ {
+-    int32_t ret = HalCameraDeviceOpen((uint32_t)std::atoi(cameraId.c_str()));
+-    if (ret != 0) {
+-        MEDIA_ERR_LOG("HalCameraDeviceOpen failed. ret(%d)", ret);
+-        return CameraServiceCallback::CAMERA_STATUS_CREATE_FAILED;
++    if (!inited_) {
++        MEDIA_ERR_LOG("not inited  %s ", cameraId.c_str());
++        return MEDIA_ERR;
+     }
+-    CameraDevice *device = new (nothrow) CameraDevice((uint32_t)std::atoi(cameraId.c_str()));
++    HalCameraManager *halCameraDev = GetHalCameraDevice(cameraId);
++    CameraDevice *device = new (nothrow) CameraDevice(cameraId.c_str(), halCameraDev);
+     if (device == nullptr) {
+         MEDIA_FATAL_LOG("New device object failed.");
+         return MEDIA_ERR;
+@@ -172,30 +251,37 @@ int32_t CameraService::CreateCamera(string cameraId)
+         delete device;
+         return MEDIA_ERR;
+     }
+-    deviceMap_.insert(pair<string, CameraDevice*>(cameraId, device));
++    deviceMap_.insert(pair<string, pair<CameraDevice*, HalCameraManager*>>(cameraId, {device, halCameraDev}));
+     return CameraServiceCallback::CAMERA_STATUS_CREATED;
+ }
+ 
+-int32_t CameraService::CloseCamera(string cameraId)
++int32_t CameraService::CloseCamera(std::string &cameraId)
+ {
+     CameraDevice *device = GetCameraDevice(cameraId);
+     if (device != NULL) {
+         device->StopLoopingCapture(-1);
+         deviceMap_.erase(cameraId);
++        int32_t ret = device->UnInitialize();
++        if (ret != 0) {
++            MEDIA_ERR_LOG("UnInitialize failed. ret(%d)", ret);
++        }
+     }
+-    int32_t ret = HalCameraDeviceClose((uint32_t)std::atoi(cameraId.c_str()));
+-    if (ret != 0) {
+-        MEDIA_ERR_LOG("HalCameraDeviceClose failed. ret(%d)", ret);
+-    }
++    MEDIA_INFO_LOG("CameraService:CloseCamera, success");
+     return CameraServiceCallback::CAMERA_STATUS_CLOSE;
+ }
+ 
+ int32_t CameraService::SetCameraMode(uint8_t modeIndex)
+ {
+     CodecDeinit();
+-    int32_t ret = HalCameraSetMode(modeIndex);
++    int32_t ret = localHalCameraDev_->HalCameraSetMode(modeIndex);
+     CodecInit();
+     return ret;
+ }
++
++void CameraService::RegCameraServiceCallback(CameraServiceCallback *callback)
++{
++    cameraServiceCb_ = callback;
++}
++
+ } // namespace Media
+-} // namespace OHOS
+\ No newline at end of file
++} // namespace OHOS
+diff --git a/services/server/include/camera_server.h b/services/server/include/camera_server.h
+index 747d8c0..b24997a 100644
+--- a/services/server/include/camera_server.h
++++ b/services/server/include/camera_server.h
+@@ -18,10 +18,11 @@
+ #include "camera_service.h"
+ #include "ipc_skeleton.h"
+ #include "camera_ability.h"
++#include "camera_service_callback.h"
+ 
+ namespace OHOS {
+ namespace Media {
+-class CameraServer {
++class CameraServer : public CameraServiceCallback {
+ public:
+     static CameraServer *GetInstance();
+     ~CameraServer() {}
+@@ -39,12 +40,14 @@ public:
+     void StopLoopingCapture(IpcIo *req, IpcIo *reply);
+     void TriggerSingleCapture(IpcIo *req, IpcIo *reply);
+     void SetCameraCallback(IpcIo *req, IpcIo *reply);
++    void ProcessCameraStatusChange(CameraStatus status, std::string &cameraId, SvcIdentity &sid);
+     void OnTriggerSingleCaptureFinished(int32_t ret);
+     void OnTriggerLoopingCaptureFinished(int32_t ret, int32_t streamId);
+-    void OnCameraStatusChange(int32_t ret, SvcIdentity *sid);
+     void OnCameraConfigured(int32_t ret);
+     void GetCameraModeNum(IpcIo *req, IpcIo *reply);
+     void SetCameraMode(IpcIo *req, IpcIo *reply);
++
++    void OnCameraStatusChange(std::string &cameraId, CameraStatus status) override;
+ private:
+     CameraServer()
+     {
+diff --git a/services/server/src/camera_server.cpp b/services/server/src/camera_server.cpp
+index 4fa3335..d0109d3 100644
+--- a/services/server/src/camera_server.cpp
++++ b/services/server/src/camera_server.cpp
+@@ -83,6 +83,12 @@ void CameraServer::InitCameraServer()
+ {
+     CameraService *service = CameraService::GetInstance();
+     service->Initialize();
++    service->RegCameraServiceCallback(this);
++}
++
++void CameraServer::OnCameraStatusChange(std::string &cameraId, CameraStatus status)
++{
++    ProcessCameraStatusChange(status, cameraId, sid_);
+ }
+ 
+ void CameraServer::GetCameraAbility(IpcIo *req, IpcIo *reply)
+@@ -158,7 +164,7 @@ void CameraServer::CreateCamera(IpcIo *req, IpcIo *reply)
+         MEDIA_ERR_LOG("sid is null, failed.");
+         return;
+     }
+-    OnCameraStatusChange(cameraStatus, &sid);
++    OnCameraStatusChange(cameraId, (CameraServiceCallback::CameraStatus)cameraStatus);
+ }
+ 
+ void CameraServer::CloseCamera(IpcIo *req, IpcIo *reply)
+@@ -172,7 +178,7 @@ void CameraServer::CloseCamera(IpcIo *req, IpcIo *reply)
+         MEDIA_ERR_LOG("sid is null, failed.");
+         return;
+     }
+-    OnCameraStatusChange(cameraStatus, &sid);
++    OnCameraStatusChange(cameraId, (CameraServiceCallback::CameraStatus)cameraStatus);
+ }
+ 
+ void CameraServer::SetCameraConfig(IpcIo *req, IpcIo *reply)
+@@ -180,7 +186,13 @@ void CameraServer::SetCameraConfig(IpcIo *req, IpcIo *reply)
+     size_t sz;
+     string cameraId((const char*)(ReadString(req, &sz)));
+     CameraDevice *device_ = CameraService::GetInstance()->GetCameraDevice(cameraId);
+-    int32_t setStatus = device_->SetCameraConfig();
++    uint32_t settingSize = 0;
++    ReadUint32(req, &settingSize);
++    char *dataBuff = nullptr;
++    if (settingSize > 0) {
++        dataBuff = (char *)ReadBuffer(req, settingSize);
++    }
++    int32_t setStatus = device_->SetCameraConfig(dataBuff, settingSize);
+     WriteInt32(reply, setStatus);
+     OnCameraConfigured(setStatus);
+ }
+@@ -225,6 +237,12 @@ FrameConfig *DeserializeFrameConfig(IpcIo &io)
+     int32_t invertMode = 0;
+     ReadInt32(&io, &invertMode);
+     fc->SetParameter(CAM_IMAGE_INVERT_MODE, invertMode);
++    int32_t width = 0;
++    ReadInt32(&io, &width);
++    fc->SetParameter(CAM_IMAGE_WIDTH, width);
++    int32_t height = 0;
++    ReadInt32(&io, &height);
++    fc->SetParameter(CAM_IMAGE_HEIGHT, height);
+     CameraRect streamCrop;
+     ReadInt32(&io, &streamCrop.x);
+     ReadInt32(&io, &streamCrop.y);
+@@ -308,18 +326,20 @@ void CameraServer::StopLoopingCapture(IpcIo *req, IpcIo *reply)
+     device_->StopLoopingCapture(type);
+ }
+ 
+-void CameraServer::OnCameraStatusChange(int32_t ret, SvcIdentity *sid)
++void CameraServer::ProcessCameraStatusChange(CameraStatus status, std::string &cameraId, SvcIdentity &sid)
+ {
+     IpcIo io;
+     uint8_t tmpData[DEFAULT_IPC_SIZE];
+     IpcIoInit(&io, tmpData, DEFAULT_IPC_SIZE, 0);
+-    WriteInt32(&io, ret);
++    WriteInt32(&io, status);
++    WriteString(&io, cameraId.c_str());
+     MessageOption option;
+     MessageOptionInit(&option);
+     option.flags = TF_OP_ASYNC;
+-    int32_t result = SendRequest(*sid, ON_CAMERA_STATUS_CHANGE, &io, nullptr, option, nullptr);
++    MEDIA_INFO_LOG("ProcessCameraStatusChange cameraId:%s status:%d", cameraId.c_str(), status);
++    int32_t result = SendRequest(sid, ON_CAMERA_STATUS_CHANGE, &io, nullptr, option, nullptr);
+     if (result != ERR_NONE) {
+-        MEDIA_ERR_LOG("Create camera callback : on camera status change failed.");
++        MEDIA_ERR_LOG("on camera status change failed.:%d", result);
+     }
+ }
+ 
+diff --git a/test/BUILD.gn b/test/BUILD.gn
+index 727158b..7764e59 100644
+--- a/test/BUILD.gn
++++ b/test/BUILD.gn
+@@ -28,6 +28,7 @@ if (ohos_build_type == "debug") {
+       "//foundation/multimedia/camera_lite/interfaces/kits",
+       "//foundation/multimedia/media_lite/interfaces/kits/recorder_lite",
+       "//foundation/multimedia/camera_lite/test/unittest",
++      "//foundation/arkui/ui_lite/interfaces/kits"
+     ]
+     deps = [
+       "//foundation/arkui/ui_lite:ui_lite",

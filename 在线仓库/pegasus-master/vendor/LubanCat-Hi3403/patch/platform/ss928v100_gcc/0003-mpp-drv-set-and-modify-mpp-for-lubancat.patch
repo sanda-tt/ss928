@@ -1,0 +1,270 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: hejiawencc <hjw0415@outlook.com>
+Date: Sat, 28 Mar 2026 16:15:40 +0800
+Subject: [PATCH 3/3] mpp&drv set and modify mpp for lubancat
+
+---
+ smp/a55_linux/interdrv/sysconfig/pin_mux.c    | 25 +++++
+ smp/a55_linux/mpp/out/ko/load_ss928v100_user  |  9 +-
+ smp/a55_linux/mpp/sample/Makefile.param       |  8 +-
+ .../mpp/sample/common/sample_comm_audio.c     |  2 +-
+ smp/a55_linux/mpp/sample/vio/sample_vio.c     |  4 +-
+ smp/a55_linux/mpp/sample/vo/sample_vo.c       | 97 +++++++++++++++++++
+ 6 files changed, 134 insertions(+), 11 deletions(-)
+
+diff --git a/smp/a55_linux/interdrv/sysconfig/pin_mux.c b/smp/a55_linux/interdrv/sysconfig/pin_mux.c
+index c621a29e0..eebc80660 100644
+--- a/smp/a55_linux/interdrv/sysconfig/pin_mux.c
++++ b/smp/a55_linux/interdrv/sysconfig/pin_mux.c
+@@ -739,6 +739,29 @@ static void uart_pin_mux(int uart_index)
+ }
+ 
+ #endif
++
++#define FAN_CTRL_PWM 0
++
++void lubancat_hi3403_pin_mux(void)
++{
++    void *iocfg2_base = sys_config_get_reg_iocfg2(); 
++
++    sys_writel(iocfg2_base + 0x0030, 0x1200); /* SYS_LED GPIO4_2 */
++    sys_writel(iocfg2_base + 0x005C, 0x1200); /* WIFI_PWR_EN GPIO0_1 */
++
++#if FAN_CTRL_PWM
++    sys_writel(iocfg2_base + 0x0100, 0x1205); /* FAN_CTRL PWM0_OUT14 */
++#else
++    sys_writel(iocfg2_base + 0x0100, 0x1201); /* FAN_CTRL GPIO10_1 */
++#endif
++
++    sys_writel(iocfg2_base + 0x0110, 0x1201); /* TP_INT GPIO10_5 */
++    sys_writel(iocfg2_base + 0x0104, 0x1201); /* TP_RST GPIO10_2 */
++    sys_writel(iocfg2_base + 0x0108, 0x1101); /* LCD_PWR_EN GPIO10_3 */
++    sys_writel(iocfg2_base + 0x010C, 0x1101); /* LCD_RST GPIO10_4 */
++    // sys_writel(iocfg2_base + 0x01EC, 0x1201); /* LCD_BL PWM0_OUT1 */
++}
++
+ void pin_mux(void)
+ {
+     int vo_intf_type = sys_config_get_vo_intf_type();
+@@ -775,4 +798,6 @@ void pin_mux(void)
+     if (audio_en != 0) {
+         amp_unmute_pin_mux();
+     }
++
++    lubancat_hi3403_pin_mux();
+ }
+diff --git a/smp/a55_linux/mpp/out/ko/load_ss928v100_user b/smp/a55_linux/mpp/out/ko/load_ss928v100_user
+index a4efc0560..6872c0027 100755
+--- a/smp/a55_linux/mpp/out/ko/load_ss928v100_user
++++ b/smp/a55_linux/mpp/out/ko/load_ss928v100_user
+@@ -19,12 +19,13 @@
+ 
+ ####### select sensor type for your test ########################
+ ####      hy_s0603            ####
++####      imx415              ####
+ ####################Variables Definition##########################
+ 
+-SNS_TYPE0=hy_s0603;               # sensor type
+-SNS_TYPE1=hy_s0603;               # sensor type
+-SNS_TYPE2=hy_s0603;               # sensor type
+-SNS_TYPE3=hy_s0603;               # sensor type
++SNS_TYPE0=imx415;               # sensor type
++SNS_TYPE1=imx415;               # sensor type
++SNS_TYPE2=imx415;               # sensor type
++SNS_TYPE3=imx415;               # sensor type
+ 
+ #DDR start:0x40000000, IPCM(2M); DSP(62M); MCU(192M); kernel start:0x50000000,  OS(512M); MMZ start:0x70000000
+ mem_total=4096                # 4096M, total mem
+diff --git a/smp/a55_linux/mpp/sample/Makefile.param b/smp/a55_linux/mpp/sample/Makefile.param
+index 8f6803d0e..11e4903c0 100644
+--- a/smp/a55_linux/mpp/sample/Makefile.param
++++ b/smp/a55_linux/mpp/sample/Makefile.param
+@@ -11,10 +11,10 @@ endif
+ 
+ ## change sensor type here. default: hy_s0603
+ 
+-SENSOR0_TYPE ?= HY_S0603_MIPI_8M_30FPS_12BIT
+-SENSOR1_TYPE ?= HY_S0603_MIPI_8M_30FPS_12BIT
+-SENSOR2_TYPE ?= HY_S0603_MIPI_8M_30FPS_12BIT
+-SENSOR3_TYPE ?= HY_S0603_MIPI_8M_30FPS_12BIT
++SENSOR0_TYPE ?= SONY_IMX415_MIPI_8M_30FPS_12BIT
++SENSOR1_TYPE ?= SONY_IMX415_MIPI_8M_30FPS_12BIT
++SENSOR2_TYPE ?= SONY_IMX415_MIPI_8M_30FPS_12BIT
++SENSOR3_TYPE ?= SONY_IMX415_MIPI_8M_30FPS_12BIT
+ 
+ MPI_LIBS := $(REL_LIB)/libss_mpi.a
+ 
+diff --git a/smp/a55_linux/mpp/sample/common/sample_comm_audio.c b/smp/a55_linux/mpp/sample/common/sample_comm_audio.c
+index de06da3e9..9bf45b56e 100644
+--- a/smp/a55_linux/mpp/sample/common/sample_comm_audio.c
++++ b/smp/a55_linux/mpp/sample/common/sample_comm_audio.c
+@@ -45,7 +45,7 @@
+ #define AUDIO_ADPCM_TYPE OT_ADPCM_TYPE_DVI4 /* ADPCM_TYPE_IMA, ADPCM_TYPE_DVI4 */
+ #define G726_BPS OT_MEDIA_G726_40K          /* MEDIA_G726_16K, MEDIA_G726_24K ... */
+ 
+-#define AUDIO_MICIN_GAIN_OPEN 0             /* should be 1 when micin */
++#define AUDIO_MICIN_GAIN_OPEN 1             /* should be 1 when micin */
+ 
+ static ot_aac_type g_aac_type = OT_AAC_TYPE_AACLC;
+ static ot_aac_bps g_aac_bps = OT_AAC_BPS_96K;
+diff --git a/smp/a55_linux/mpp/sample/vio/sample_vio.c b/smp/a55_linux/mpp/sample/vio/sample_vio.c
+index f50bcd4a6..d7f687477 100644
+--- a/smp/a55_linux/mpp/sample/vio/sample_vio.c
++++ b/smp/a55_linux/mpp/sample/vio/sample_vio.c
+@@ -63,7 +63,7 @@ static td_u16 g_lmf_coef[128] = {
+ static sample_vo_cfg g_vo_cfg = {
+     .vo_dev            = SAMPLE_VO_DEV_UHD,
+     .vo_intf_type      = OT_VO_INTF_HDMI,
+-    .intf_sync         = OT_VO_OUT_1080P30,
++    .intf_sync         = OT_VO_OUT_1080P60,
+     .bg_color          = COLOR_RGB_BLACK,
+     .pix_format        = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420,
+     .disp_rect         = {0, 0, 1920, 1080},
+@@ -459,7 +459,7 @@ static td_void sample_vi_get_two_sensor_vi_cfg(sample_sns_type sns_type, sample_
+ 
+     vi_cfg0->mipi_info.divide_mode = LANE_DIVIDE_MODE_1;
+ 
+-    vi_cfg1->sns_info.bus_id = 5; /* i2c5 */
++    vi_cfg1->sns_info.bus_id = 3; /* i2c3 */
+     vi_cfg1->sns_info.sns_clk_src = 1;
+     vi_cfg1->sns_info.sns_rst_src = 1;
+ 
+diff --git a/smp/a55_linux/mpp/sample/vo/sample_vo.c b/smp/a55_linux/mpp/sample/vo/sample_vo.c
+index b2db0cb0d..9ee4000fb 100644
+--- a/smp/a55_linux/mpp/sample/vo/sample_vo.c
++++ b/smp/a55_linux/mpp/sample/vo/sample_vo.c
+@@ -37,6 +37,28 @@ volatile static sig_atomic_t g_vo_sample_exit = 0;
+ #define USLEEP_100000 100000
+ #define USLEEP_60000  60000
+ #define CMD_COUNT_1200X1920 304
++#define CMD_COUNT_1024X600 304
++
++const unsigned char ATTRIBUTE cmd1[2] = {0x80,0xAC};
++const unsigned char ATTRIBUTE cmd2[2] = {0x81,0xB8};
++const unsigned char ATTRIBUTE cmd3[2] = {0x82,0x09};
++const unsigned char ATTRIBUTE cmd4[2] = {0x83,0x78};
++const unsigned char ATTRIBUTE cmd5[2] = {0x84,0x7F};
++const unsigned char ATTRIBUTE cmd6[2] = {0x85,0xBB};
++const unsigned char ATTRIBUTE cmd7[2] = {0x86,0x70};
++static mipi_tx_cmd_info g_cmd_info_1024x600[CMD_COUNT_1024X600] = {
++    /* {devno work_mode lp_clk_en data_type cmd_size cmd}, usleep_value */
++    {{0, 0, 0, 0x39, 0x0002, cmd1}, USLEEP_6000},
++    {{0, 0, 0, 0x39, 0x0002, cmd2}, USLEEP_50},
++    {{0, 0, 0, 0x39, 0x0002, cmd3}, USLEEP_50},
++    {{0, 0, 0, 0x39, 0x0002, cmd4}, USLEEP_50},
++    {{0, 0, 0, 0x39, 0x0002, cmd5}, USLEEP_50},
++    {{0, 0, 0, 0x39, 0x0002, cmd6}, USLEEP_50},
++    {{0, 0, 0, 0x39, 0x0002, cmd7}, USLEEP_50},
++    {{0, 0, 0, 0x23, 0x0011, NULL}, USLEEP_100000},
++    {{0, 0, 0, 0x23, 0x0029, NULL}, USLEEP_6000},
++};
++
+ static mipi_tx_cmd_info g_cmd_info_1200x1920[CMD_COUNT_1200X1920] = {
+     /* {devno work_mode lp_clk_en data_type cmd_size cmd}, usleep_value */
+     {{0, 0, 0, 0x23, 0x00B0, NULL}, USLEEP_6000},
+@@ -345,6 +367,71 @@ static mipi_tx_cmd_info g_cmd_info_1200x1920[CMD_COUNT_1200X1920] = {
+     {{0, 0, 0, 0x23, 0x0029, NULL}, USLEEP_60000},
+ };
+ 
++/* VO: USER 1024x600_60, TX: USER 1024x600 */
++static const sample_vo_mipi_tx_cfg g_vo_tx_cfg_1024x600_user = {
++    .vo_config = {
++        .vo_dev = SAMPLE_VO_DEV_UHD,
++        .vo_intf_type = OT_VO_INTF_MIPI,
++        .intf_sync = OT_VO_OUT_USER,
++        .bg_color = COLOR_RGB_BLACK,
++        .pix_format = OT_PIXEL_FORMAT_YVU_SEMIPLANAR_420,
++        .disp_rect = {0, 0, 1024, 600},
++        .image_size = {1024, 600},
++        .vo_part_mode = OT_VO_PARTITION_MODE_SINGLE,
++        .dis_buf_len = 3, /* 3: def buf len for single */
++        .dst_dynamic_range = OT_DYNAMIC_RANGE_SDR8,
++        .vo_mode = VO_MODE_1MUX,
++        .compress_mode = OT_COMPRESS_MODE_NONE,
++
++        .sync_info = {0, 1, 1, 600, 23, 12, 1024, 160, 160, 0, 0, 0, 0, 1, 1, 0, 0, 0},
++        .user_sync = {
++            .user_sync_attr = {
++                .clk_src = OT_VO_CLK_SRC_PLL, /* 24M x 52 / 1 / 6 / 4 = 52M  */
++                .vo_pll = { /* if hdmi, set it by pixel clk and div mode */
++                    .fb_div = 52, /* 80 fb div */
++                    .frac = 0,
++                    .ref_div = 1, /* 1 ref div */
++                    .post_div1 = 6, /* 6 post div1 */
++                    .post_div2 = 4, /* 2 post div2 */
++                },
++            },
++            .pre_div = 1, /* if hdmi, set it by pixel clk */
++            .dev_div = 1, /* if rgb, set it by serial mode */
++            .clk_reverse_en = TD_FALSE,
++        },
++        .dev_frame_rate = SAMPLE_VO_DEV_FRAME_RATE,
++    },
++    .tx_config = {
++        /* for combo dev config */
++        .intf_sync = OT_MIPI_TX_OUT_USER,
++
++        /* for screen cmd */
++        .cmd_count = CMD_COUNT_1024X600,
++        .cmd_info = g_cmd_info_1024x600,
++
++        /* for user sync */
++        .combo_dev_cfg = {
++            .devno = 0,
++            .lane_id = {0, 1, 2, 3},
++            .out_mode = OUT_MODE_DSI_VIDEO,
++            .out_format = OUT_FORMAT_RGB_24BIT,
++            .video_mode =  BURST_MODE,
++            .sync_info = {
++                .hsa_pixels = 1, /* 0 pixel */
++                .hbp_pixels = 160, /* 160 pixel */
++                .hact_pixels = 1024, /* 1024 pixel */
++                .hfp_pixels = 160, /* 160 pixel */
++                .vsa_lines = 1, /* 0 line */
++                .vbp_lines = 23, /* 23 line */
++                .vact_lines = 600, /* 600 line */
++                .vfp_lines = 12, /* 12 line */
++            },
++            .phy_data_rate = 999, /* 999 Mbps */
++            .pixel_clk = 51207, /* 51207 KHz */
++        },
++    },
++};
++
+ /* VO: USER 1200x1920_60, TX: USER 1200x1920 */
+ static const sample_vo_mipi_tx_cfg g_vo_tx_cfg_1200x1920_user = {
+     .vo_config = {
+@@ -625,6 +712,11 @@ static td_s32 sample_vo_mipi_tx(const sample_vo_mipi_tx_cfg *vo_tx_cfg)
+     return ret;
+ }
+ 
++static td_s32 sample_vo_mipi_tx_1024x600_user(td_void)
++{
++    return sample_vo_mipi_tx(&g_vo_tx_cfg_1024x600_user);
++}
++
+ static td_s32 sample_vo_mipi_tx_1200x1920_user(td_void)
+ {
+     return sample_vo_mipi_tx(&g_vo_tx_cfg_1200x1920_user);
+@@ -635,6 +727,7 @@ static void sample_vo_usage(const char *name)
+     printf("usage : %s <index>\n", name);
+     printf("index:\n");
+     printf("\t0: vo dhd0 mipi_tx USER    1200x1920@60 output.\n");
++    printf("\t1: vo dhd0 mipi_tx USER    1024x600@60(7inch-EBF410655) output.\n");
+ }
+ 
+ static td_s32 sample_vo_execute_case(td_s32 index)
+@@ -643,6 +736,10 @@ static td_s32 sample_vo_execute_case(td_s32 index)
+         return sample_vo_mipi_tx_1200x1920_user();
+     }
+ 
++    if (index == 1) {
++        return sample_vo_mipi_tx_1024x600_user();
++    }
++
+     sample_print("the index %d is invalid!\n", index);
+     return TD_FAILURE;
+ }
+-- 
+2.25.1
+

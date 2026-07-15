@@ -1,0 +1,55 @@
+diff --git a/camera_sample.cpp b/camera_sample.cpp
+old mode 100755
+new mode 100644
+index cf95d39..a21f404
+--- a/camera_sample.cpp
++++ b/camera_sample.cpp
+@@ -78,7 +78,7 @@ Recorder *SampleCreateRecorder()
+     int32_t channelCount = 1;
+     AudioCodecFormat audioFormat = AAC_LC;
+     AudioSourceType inputSource = AUDIO_MIC;
+-    int32_t audioEncodingBitRate = sampleRate;
++    int32_t audioEncodingBitRate = 96000;
+     VideoSourceType source = VIDEO_SOURCE_SURFACE_ES;
+     int32_t frameRate = 30;
+     double fps = 30;
+@@ -87,8 +87,30 @@ Recorder *SampleCreateRecorder()
+     int32_t audioSourceId = 0;
+     int32_t width = 1920;
+     int32_t height = 1080;
+-    VideoCodecFormat encoder = HEVC;
++    VideoCodecFormat encoder = H264;
+     Recorder *recorder = new Recorder();
++
++    if ((ret = recorder->SetAudioSource(inputSource, audioSourceId)) != SUCCESS) {
++        cout << "SetAudioSource failed." << ret << endl;
++        goto ERROR;
++    }
++    if ((ret = recorder->SetAudioEncoder(audioSourceId, audioFormat)) != SUCCESS) {
++        cout << "SetAudioEncoder failed." << ret << endl;
++        goto ERROR;
++    }
++    if ((ret = recorder->SetAudioSampleRate(audioSourceId, sampleRate)) != SUCCESS) {
++        cout << "SetAudioSampleRate failed." << ret << endl;
++        goto ERROR;
++    }
++    if ((ret = recorder->SetAudioChannels(audioSourceId, channelCount)) != SUCCESS) {
++        cout << "SetAudioChannels failed." << ret << endl;
++        goto ERROR;
++    }
++    if ((ret = recorder->SetAudioEncodingBitRate(audioSourceId, audioEncodingBitRate)) != SUCCESS) {
++        cout << "SetAudioEncodingBitRate failed." << ret << endl;
++        goto ERROR;
++    }
++
+     if ((ret = recorder->SetVideoSource(source, sourceId)) != SUCCESS) {
+         cout << "SetVideoSource failed." << ret << endl;
+         goto ERROR;
+@@ -249,6 +271,7 @@ public:
+         int size = 1024;
+         surface->SetSize(size * size);
+         fc->AddSurface(*surface);
++        fc->SetParameter(CAM_IMAGE_FORMAT, FORMAT_AVC);
+         ret = cam_->TriggerLoopingCapture(*fc);
+         if (ret != 0) {
+             delete fc;

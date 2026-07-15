@@ -1,0 +1,24 @@
+# Makefile.param 
+# Only global variable should be defined here.
+
+export CROSS_TYPE?=GLIBC
+
+ifeq ($(CROSS_TYPE),MUSL)
+MUSL_DIR := $(shell dirname $$(which clang))
+MUSL_VER := $(shell clang -v 2>&1 | awk '/clang version/ {print $$3}')
+MPP_SYSROOT := $(MUSL_DIR)/../sysroot/
+export CC:=clang --target=aarch64-linux-ohos -Wno-unused-command-line-argument --sysroot $(MPP_SYSROOT) -isystem $(MPP_SYSROOT)/usr/include
+export LLVM_KERNEL_TOOLCHAIN_ARGS:=LLVM=1 KBUILD_MODPOST_WARN=1 CROSS_COMPILE=$(CROSS_COMPILE) CC="$(CC)"
+CC += -fuse-ld=lld -rtlib=compiler-rt
+endif
+
+ifeq ($(CROSS_TYPE),GLIBC)
+export CC:=aarch64-v01c01-linux-gnu-gcc
+export LLVM_KERNEL_TOOLCHAIN_ARGS:=KBUILD_MODPOST_WARN=1
+GLIBC_DIR := $(shell dirname $$(which $(CC)))
+GLIBC_VER := $(shell $(CC) -v 2>&1 | awk '/gcc version/ {print $$3}')
+MPP_CFLAGS += -isystem $(GLIBC_DIR)/../lib/gcc/aarch64-linux-gnu/$(GLIBC_VER)/include/ -Wno-unused-command-line-argument
+endif
+
+
+# End!!

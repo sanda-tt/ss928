@@ -1,0 +1,35 @@
+#!/bin/sh
+
+#首次启动删除Ubuntu-base安装ssh时生成的key,重新生成key
+SSH_CLEAN_FLAG="/etc/.ssh_clean_done"
+
+if [ ! -f "$SSH_CLEAN_FLAG" ]; then
+	rm -f /etc/ssh/ssh_host_* 2>/dev/null
+	touch "$SSH_CLEAN_FLAG"
+	/opt/bin/ssh-keycheck.sh /usr/bin/ssh-keygen /etc/ssh
+fi
+
+CONFIG_FILE="/opt/cfg/dev_info.config"
+CONFIG_DONE_FLAG="/etc/.config_fs_type_done"
+
+if [ ! -f "$CONFIG_DONE_FLAG" ]; then
+	if [ -f "$CONFIG_FILE" ]; then
+		if grep -qi "openEuler" /etc/os-release 2>/dev/null; then
+			version=$(grep VERSION_ID /etc/os-release 2>/dev/null | cut -d'=' -f2)
+			fs_type="openEuler$version"
+		elif grep -qi "Ubuntu" /etc/os-release; then
+			version=$(grep VERSION_ID /etc/os-release 2>/dev/null | cut -d'"' -f2)
+			fs_type="Ubuntu$version"
+		elif grep -qi "OpenHarmony" /etc/os-release 2>/dev/null; then
+			fs_type="openHarmony"
+		else
+			fs_type="Linux"
+		fi
+		sed -i "s/\"fs_type\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"fs_type\": \"$fs_type\"/" "$CONFIG_FILE"
+		touch "$CONFIG_DONE_FLAG"
+	fi
+fi
+
+/opt/bin/search_tool /opt/cfg/dev_info.config  > /dev/null 2>&1 &
+
+

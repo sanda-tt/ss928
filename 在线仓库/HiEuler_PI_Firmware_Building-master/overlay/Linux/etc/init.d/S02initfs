@@ -1,0 +1,20 @@
+#!/bin/sh
+
+for dir in \
+	/var/empty \
+	/var/run/sshd \
+	/var/run/wpa_supplicant \
+	/var/lock
+do
+	[ -d "$dir" ] || mkdir -p "$dir"
+done
+
+RESIZE_DONE_FLAG="/etc/.resize2fs_done"
+if [ ! -f "$RESIZE_DONE_FLAG" ]; then
+	root=$(grep -o 'root=[^ ]*' /proc/cmdline | cut -d= -f2)
+	if /usr/local/bin/resize2fs "$root"; then
+		touch "$RESIZE_DONE_FLAG"
+	fi
+fi
+
+

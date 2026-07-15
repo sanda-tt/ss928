@@ -1,0 +1,19 @@
+OS_TYPE			?=linux
+#linux openeuler ohos
+
+CROSS_COMPILE	?=aarch64-mix210-linux-
+
+ifeq ($(OS_TYPE), linux)
+	CROSS_COMPILE=aarch64-mix210-linux-
+else ifeq ($(OS_TYPE), openeuler)
+	CROSS_COMPILE=arm-openeuler-linux-gnueabi-
+else ifeq ($(OS_TYPE), ohos)
+	CROSS_COMPILE=aarch64-mix210-linux-
+else
+	CROSS_COMPILE=aarch64-mix210-linux-
+endif
+
+CC			=$(CROSS_COMPILE)gcc
+CXX			=$(CROSS_COMPILE)g++
+STRIP			=$(CROSS_COMPILE)strip
+

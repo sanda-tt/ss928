@@ -1,0 +1,24 @@
+#!/bin/sh
+
+
+# ANSI COLORS
+CRE="
+[K"
+NORMAL="[0;39m"
+RED="[1;31m"
+GREEN="[1;32m"
+YELLOW="[1;33m"
+BLUE="[1;34m"
+MAGENTA="[1;35m"
+CYAN="[1;36m"
+WHITE="[1;37m"
+
+echo "${GREEN}  _    _   _   ______           _                          _____    _____  ${NORMAL}"
+echo "${GREEN} | |  | | (_) |  ____|         | |                        |  __ \  |_   _| ${NORMAL}"
+echo "${GREEN} | |__| |  _  | |__     _   _  | |   ___   _ __           | |__) |   | |   ${NORMAL}"
+echo "${GREEN} |  __  | | | |  __|   | | | | | |  / _ \ | '__|          |  ___/    | |   ${NORMAL}"
+echo "${GREEN} | |  | | | | | |____  | |_| | | | |  __/ | |             | |       _| |_  ${NORMAL}"
+echo "${GREEN} |_|  |_| |_| |______|  \__,_| |_|  \___| |_|             |_|      |_____| ${NORMAL}"
+
+VERSION=$(cat /etc/firmware_version)
+echo "${GREEN}$VERSION${NORMAL}"

@@ -1,0 +1,11 @@
+# 预处理后二进制文件保存路径，为空则不保存
+save_preprocess_bin="../data/preprocess/bin"
+
+# 预处理后二进制文件列表，为空则不保存
+save_preprocess_txt="../data/preprocess"
+
+# 模型推理原始二进制结果路径（供Python后处理用），为空则不保存
+save_result_bin="../out/result/bin"
+
+# 模型推理原结果路径，为空则不保存
+save_result_img="../out/result/img"

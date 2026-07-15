@@ -1,0 +1,39 @@
+diff --git a/samgr/source/service.c b/samgr/source/service.c
+index c3556e0..f0c602b 100644
+--- a/samgr/source/service.c
++++ b/samgr/source/service.c
+@@ -14,12 +14,18 @@
+  */
+ #include "service_impl.h"
+ #include <string.h>
++#include <log.h>
+ #include "memory_adapter.h"
+ #include "thread_adapter.h"
+ #include "time_adapter.h"
+ #include "feature_impl.h"
+ #include "service_registry.h"
+ 
++#undef LOG_TAG
++#undef LOG_DOMAIN
++#define LOG_TAG "Samgr"
++#define LOG_DOMAIN 0xD001800
++
+ static const char *GetFeatureName(const FeatureImpl *featureImpl);
+ 
+ ServiceImpl *SAMGR_CreateServiceImpl(Service *service, uint8 step)
+@@ -72,6 +78,7 @@ void DEFAULT_Initialize(ServiceImpl *impl)
+ 
+     impl->service->Initialize(impl->service, id);
+     const char *serviceName = impl->service->GetName(impl->service);
++    HILOG_INFO(HILOG_MODULE_SAMGR, "SAMGR_RegisterServiceApi serviceName %s", serviceName);
+     SAMGR_RegisterServiceApi(serviceName, NULL, &id, impl->defaultApi);
+ 
+     int16 size = VECTOR_Size(&impl->features);
+@@ -95,6 +102,7 @@ void DEFAULT_MessageHandle(ServiceImpl *serviceImpl, const Identity *identity, R
+ 
+     if (identity->featureId < 0) {
+         if (serviceImpl->service->MessageHandle != NULL) {
++            HILOG_INFO(HILOG_MODULE_SAMGR, "serviceImpl->service->MessageHandle");
+             serviceImpl->service->MessageHandle(serviceImpl->service, msg);
+         }
+         return;

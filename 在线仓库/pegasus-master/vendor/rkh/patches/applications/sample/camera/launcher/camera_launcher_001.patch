@@ -1,0 +1,42 @@
+diff --git a/launcher/src/main/cpp/app_info.cpp b/launcher/src/main/cpp/app_info.cpp
+index f2d2036..240d5d0 100755
+--- a/launcher/src/main/cpp/app_info.cpp
++++ b/launcher/src/main/cpp/app_info.cpp
+@@ -64,8 +64,9 @@ void AppInfo::SetButton(UILabelButton* button)
+     button->SetStyle(STYLE_BORDER_RADIUS, BUTTON_RADIUS);
+     button->SetStyle(STYLE_BACKGROUND_OPA, TOTAL_OPACITY);
+     button->SetStyle(STYLE_BORDER_OPA, TOTAL_OPACITY);
+-    button->SetStyle(STYLE_TEXT_COLOR, Color::ColorTo32(Color::White()));
++    button->SetStyle(STYLE_TEXT_COLOR, Color::ColorTo32(Color::Black()));
+     button->SetImageSrc(appIconDir_, appIconDir_);
++    button->SetImagePosition(buttonHV_.x / 4, buttonHV_.y / 4);
+     button_ = button;
+ }
+ 
+diff --git a/launcher/src/main/cpp/main_ability_slice.cpp b/launcher/src/main/cpp/main_ability_slice.cpp
+index 2ee787e..03203c4 100755
+--- a/launcher/src/main/cpp/main_ability_slice.cpp
++++ b/launcher/src/main/cpp/main_ability_slice.cpp
+@@ -112,7 +112,8 @@ void MainAbilitySlice::OnStart(const Want& want)
+     rootview_->Resize(Screen::GetInstance().GetWidth(), Screen::GetInstance().GetHeight());
+     rootview_->SetStyle(STYLE_BACKGROUND_OPA, UN_OPACITY);
+     rootview_->SetStyle(STYLE_BACKGROUND_COLOR, Color::ColorTo32(Color::GetColorFromRGB(0x30, 0x30, 0x30)));
+-
++    SetImageView();
++    // SetOhos();
+     SetHead();
+     SetTail();
+     SetSwipe();
+diff --git a/launcher/src/main/cpp/ui_config.h b/launcher/src/main/cpp/ui_config.h
+index 34bd039..0058f62 100755
+--- a/launcher/src/main/cpp/ui_config.h
++++ b/launcher/src/main/cpp/ui_config.h
+@@ -24,7 +24,7 @@ static constexpr int16_t LABLE_TITLE_HEIGHT = 30; // tail lable height
+ static constexpr int16_t LABLE_TAIL_HEIGHT = 30;
+ static constexpr int16_t APP_WIDTH_COUNT = 7;       // blank + app + blank + app + blank
+ static constexpr int16_t APP_HEIGHT_COUNT = 4;      // app + lable + app + lable
+-static constexpr int16_t MAX_VIEWGROUP = 3;         // swipe window count
++static constexpr int16_t MAX_VIEWGROUP = 1;         // swipe window count
+ static constexpr int16_t APP_ROW_COUNT = 2;         // a swipe view app count in row
+ static constexpr int16_t APP_COL_COUNT = 3;         // a sswipe view app count in col
+ static constexpr int16_t LAUNCHER_FOND_ID = 16;     // other view fond id

@@ -1,0 +1,143 @@
+# Copyright (c) 2025 HiSilicon (Shanghai) Technologies Co., Ltd.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#     http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+SDK_LINUX_PATH = "//device/soc/hisilicon/hi3403v100/sdk_linux"
+SDK_LINUX_LIB_LITE_PATH = "$SDK_LINUX_PATH/smp/a55_linux/mpp/out/lib"
+if (defined(ohos_lite)) {
+  import("//build/lite/config/component/lite_component.gni")
+  import("//build/ohos/kernel/kernel.gni")
+  group("hispark_aifly_sdk") {
+    deps = [
+      ":sdk_linux_lite_libs",
+      ":sdk_make",
+      "//device/board/hisilicon/${device_name}/kernel:build_kernel",
+      ]
+  }
+  
+  build_ext_component("sdk_make") {
+    exec_path = rebase_path(".", root_build_dir)
+    outdir = rebase_path("$root_out_dir")
+    clang_dir = ""
+    if (ohos_build_compiler_dir != "") {
+      clang_dir = rebase_path("$ohos_build_compiler_dir")
+    }
+    chip = "ss928v100"
+    if (board_name == "hispark_aiflylite") {
+      chip = "ss927v100"
+    }
+    command = "chmod +x ./build.sh && ./build.sh ${ohos_root_path} ${outdir} y ${clang_dir} ${linux_kernel_version} ${chip}"
+    deps = [ "//device/board/hisilicon/${device_name}/kernel:build_kernel" ]
+  }
+
+    sdk_libs_name_set = [
+      "libaac_comm.so",
+      "libaac_dec.so",
+      "libaac_enc.so",
+      "libaac_sbr_dec.so",
+      "libaac_sbr_enc.so",
+      "libaiv.so",
+      "libot_acodec.so",
+      "libot_adec.so",
+      "libot_aenc.so",
+      "libot_ai.so",
+      "libot_aio.so",
+      "libot_ao.so",
+      "libot_base.so",
+      "libot_chnl.so",
+      "libot_dis.so",
+      "libot_gdc.so",
+      "libot_gyrodis.so",
+      "libot_h264e.so",
+      "libot_h265e.so",
+      "libot_irq.so",
+      "libot_isp.so",
+      "libot_jpegd.so",
+      "libot_jpege.so",
+      "libot_motionfusion_user.so",
+      "libot_mpi_isp.so",
+      "libot_osal.so",
+      "libot_rc.so",
+      "libot_rgn.so",
+      "libot_sensor_i2c.so",
+      "libot_sensor_spi.so",
+      "libot_sys.so",
+      "libot_vdec.so",
+      "libot_vedu.so",
+      "libot_venc.so",
+      "libot_vfmw.so",
+      "libot_vgs.so",
+      "libot_vi.so",
+      "libot_vo.so",
+      "libot_vpp.so",  
+      "libot_vpss.so",
+      "libsecurec.so",
+      "libsns_hy_s0603.so",
+      "libss_acs.so",
+      "libss_ae.so",
+      "libss_awb.so",
+      "libss_bnr.so",
+      "libss_calcflicker.so",
+      "libss_cipher.so",
+      "libss_crb.so",
+      "libss_dehaze.so",
+      "libss_dnvqe.so",
+      "libss_dpu_match.so",
+      "libss_dpu_rect.so",
+      "libss_drc.so",
+      "libss_extend_stats.so",
+      "libss_fisheye_calibrate.so",
+      "libss_hdmi.so",
+      "libss_hnr.so",
+      "libss_ir_auto.so",
+      "libss_isp.so",
+      "libss_ive.so",
+      "libss_klad.so",
+      "libss_ldci.so",
+      "libss_mau.so",
+      "libss_md.so",
+      "libss_motionfusion.so",
+      "libss_mpi.so",
+      "libss_otp.so",
+      "libss_pciv.so",
+      "libss_pqp.so",
+      "libss_snap.so",
+      "libss_tde.so",
+      "libss_upvqe.so",
+      "libss_voice_engine.so",
+      "libvqe_aec.so",
+      "libvqe_agc.so",
+      "libvqe_anr.so",
+      "libvqe_common.so",
+      "libvqe_eq.so",
+      "libvqe_hpf.so",
+      "libvqe_record.so",
+      "libvqe_res.so",
+      "libvqe_talkv2.so",
+      "svp_npu/libprotobuf-c.so.1",
+      "svp_npu/libsvp_acl.so",
+      "svp_npu/libsvp_aicpu.so",
+    ]
+
+    lib_lite_abspath = rebase_path("$SDK_LINUX_LIB_LITE_PATH", ".")
+    sdk_linux_libs_targets = []
+      
+    foreach(lib, sdk_libs_name_set) {
+      copy("$lib") {
+        sources = [ "$lib_lite_abspath/$lib" ]
+        outputs = [ "$root_out_dir/$lib" ]
+      }
+      sdk_linux_libs_targets += [ ":$lib" ]
+    }
+      
+    group("sdk_linux_lite_libs") {
+      deps = sdk_linux_libs_targets
+    }
+}

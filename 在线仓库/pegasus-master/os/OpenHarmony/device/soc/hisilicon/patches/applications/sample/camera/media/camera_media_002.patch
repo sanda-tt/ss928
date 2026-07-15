@@ -1,0 +1,12 @@
+diff --git a/audio_capture_sample.cpp b/audio_capture_sample.cpp
+index de1e2c3..d9e4894 100644
+--- a/audio_capture_sample.cpp
++++ b/audio_capture_sample.cpp
+@@ -282,6 +282,7 @@ int main(int argc, char *argv[])
+     AudioCapturer audioCap;
+ 
+     AudioCapturerInfo info;
++    info.deviceId = "0";
+     info.inputSource = AUDIO_MIC;
+     info.bitWidth = BIT_WIDTH_16;
+     AudioCodecFormat audioFormat = GetAudioFormat();

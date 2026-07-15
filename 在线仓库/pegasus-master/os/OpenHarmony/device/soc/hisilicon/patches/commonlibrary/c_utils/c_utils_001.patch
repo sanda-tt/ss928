@@ -1,0 +1,451 @@
+diff --git a/base/BUILD.gn b/base/BUILD.gn
+index fd26200..3dd03b7 100644
+--- a/base/BUILD.gn
++++ b/base/BUILD.gn
+@@ -10,7 +10,11 @@
+ # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+-import("//build/ohos.gni")
++if (defined(ohos_lite)) {
++  import("//build/lite/config/component/lite_component.gni")
++} else {
++  import("//build/ohos.gni")
++}
+ 
+ ###############################################################################
+ declare_args() {
+@@ -105,174 +109,200 @@ if (current_os == "ios") {
+   ]
+ }
+ 
+-ohos_static_library("utilsbase") {
+-  if (current_os == "ios") {
+-    sources = sources_utils_ios
+-    configs = [ ":utils_coverage_config" ]
+-    public_configs = [ ":utils_config" ]
++if (defined(ohos_lite)) {
++    shared_library("utils") {
++        sources = sources_utils
++        if (c_utils_debug_refbase) {
++          configs += [ ":debug_refbase" ]
++          if (c_utils_track_all) {
++            configs += [ ":track_all" ]
++          }
++          if (c_utils_print_track_at_once) {
++            configs += [ ":print_track_at_once" ]
++          }
++        }
++        all_dependent_configs = [ ":utils_config" ]
++        #if (current_os != "android" && current_os != "ios") {
++        #  defines = [ "CONFIG_HILOG" ]
++        #}
++        if (c_utils_debug_log_enabled) {
++          configs += [ ":debug_log_enabled" ]
++        }
++        deps = [
++          "//base/hiviewdfx/hilog_lite/frameworks/featured:hilog_shared",
++        ]
++        public_deps = [ "//third_party/bounds_checking_function:libsec_shared" ]
++    }
++} else {
++  ohos_static_library("utilsbase") {
++    if (current_os == "ios") {
++      sources = sources_utils_ios
++      configs = [ ":utils_coverage_config" ]
++      public_configs = [ ":utils_config" ]
+ 
+-    public_external_deps = [ "bounds_checking_function:libsec_static" ]
++      public_external_deps = [ "bounds_checking_function:libsec_static" ]
+ 
+-    subsystem_name = "commonlibrary"
+-    part_name = "c_utils"
+-  } else {
++      subsystem_name = "commonlibrary"
++      part_name = "c_utils"
++    } else {
++      sources = sources_utils
++      configs = [ ":utils_coverage_config" ]
++      public_configs = [ ":utils_config" ]
++      if (current_os != "android" && current_os != "ios") {
++        defines = [ "CONFIG_HILOG" ]
++      }
++      if (c_utils_debug_log_enabled) {
++        configs += [ ":debug_log_enabled" ]
++      }
++      external_deps = [ "hilog:libhilog_base" ]
++
++      public_external_deps = [ "bounds_checking_function:libsec_static" ]
++      subsystem_name = "commonlibrary"
++      part_name = "c_utils"
++    }
++  }
++
++  ohos_static_library("utilsbase_rtti") {
++    visibility = [ "//foundation/multimedia/media_foundation/engine/plugin/plugins/source/video_capture:std_video_capture" ]
+     sources = sources_utils
+-    configs = [ ":utils_coverage_config" ]
+     public_configs = [ ":utils_config" ]
+     if (current_os != "android" && current_os != "ios") {
+       defines = [ "CONFIG_HILOG" ]
+     }
+-    if (c_utils_debug_log_enabled) {
+-      configs += [ ":debug_log_enabled" ]
+-    }
+     external_deps = [ "hilog:libhilog_base" ]
+ 
+     public_external_deps = [ "bounds_checking_function:libsec_static" ]
++    remove_configs = [ "//build/config/compiler:no_rtti" ]
++    cflags = [ "-frtti" ]
+     subsystem_name = "commonlibrary"
+     part_name = "c_utils"
+   }
+-}
+-
+-ohos_static_library("utilsbase_rtti") {
+-  visibility = [ "//foundation/multimedia/media_foundation/engine/plugin/plugins/source/video_capture:std_video_capture" ]
+-  sources = sources_utils
+-  public_configs = [ ":utils_config" ]
+-  if (current_os != "android" && current_os != "ios") {
+-    defines = [ "CONFIG_HILOG" ]
+-  }
+-  external_deps = [ "hilog:libhilog_base" ]
+-
+-  public_external_deps = [ "bounds_checking_function:libsec_static" ]
+-  remove_configs = [ "//build/config/compiler:no_rtti" ]
+-  cflags = [ "-frtti" ]
+-  subsystem_name = "commonlibrary"
+-  part_name = "c_utils"
+-}
+ 
+-ohos_shared_library("utils") {
+-  innerapi_tags = [
+-    "chipsetsdk",
+-    "platformsdk",
+-    "sasdk",
+-  ]
+-  if (current_os == "ios") {
+-    sources = sources_utils_ios
+-    configs = [ ":utils_coverage_config" ]
+-    all_dependent_configs = [ ":utils_config" ]
+-    public_configs = [ ":utils_config" ]
+-    public_external_deps = [ "bounds_checking_function:libsec_shared" ]
++  ohos_shared_library("utils") {
++    innerapi_tags = [
++      "chipsetsdk",
++      "platformsdk",
++      "sasdk",
++    ]
++    if (current_os == "ios") {
++      sources = sources_utils_ios
++      configs = [ ":utils_coverage_config" ]
++      all_dependent_configs = [ ":utils_config" ]
++      public_configs = [ ":utils_config" ]
++      public_external_deps = [ "bounds_checking_function:libsec_shared" ]
+ 
+-    subsystem_name = "commonlibrary"
+-    part_name = "c_utils"
+-  } else {
+-    sources = sources_utils
+-    configs = [ ":utils_coverage_config" ]
++      subsystem_name = "commonlibrary"
++      part_name = "c_utils"
++    } else {
++      sources = sources_utils
++      configs = [ ":utils_coverage_config" ]
+ 
+-    if (!is_arkui_x) {
+-      if (c_utils_feature_intsan) {
+-        sanitize = {
+-          integer_overflow = true
++      if (!is_arkui_x) {
++        if (c_utils_feature_intsan) {
++          sanitize = {
++            integer_overflow = true
++          }
++          branch_protector_ret = "pac_ret"
+         }
+-        branch_protector_ret = "pac_ret"
+       }
+-    }
+ 
+-    if (c_utils_debug_refbase) {
+-      configs += [ ":debug_refbase" ]
+-      if (c_utils_track_all) {
+-        configs += [ ":track_all" ]
++      if (c_utils_debug_refbase) {
++        configs += [ ":debug_refbase" ]
++        if (c_utils_track_all) {
++          configs += [ ":track_all" ]
++        }
++        if (c_utils_print_track_at_once) {
++          configs += [ ":print_track_at_once" ]
++        }
+       }
+-      if (c_utils_print_track_at_once) {
+-        configs += [ ":print_track_at_once" ]
++      if (c_utils_parcel_object_check) {
++        configs += [ ":parcel_object_check" ]
+       }
++      all_dependent_configs = [ ":utils_config" ]
++      public_configs = [ ":utils_config" ]
++      if (current_os != "android" && current_os != "ios") {
++        defines = [ "CONFIG_HILOG" ]
++      }
++      if (c_utils_debug_log_enabled) {
++        configs += [ ":debug_log_enabled" ]
++      }
++      external_deps = [ "hilog:libhilog_base" ]
++      public_external_deps = [ "bounds_checking_function:libsec_shared" ]
++      subsystem_name = "commonlibrary"
++      part_name = "c_utils"
++      install_images = [
++        "system",
++        "updater",
++      ]
+     }
+-    if (c_utils_parcel_object_check) {
+-      configs += [ ":parcel_object_check" ]
+-    }
+-    all_dependent_configs = [ ":utils_config" ]
+-    public_configs = [ ":utils_config" ]
+-    if (current_os != "android" && current_os != "ios") {
+-      defines = [ "CONFIG_HILOG" ]
+-    }
+-    if (c_utils_debug_log_enabled) {
+-      configs += [ ":debug_log_enabled" ]
+-    }
+-    external_deps = [ "hilog:libhilog_base" ]
+-    public_external_deps = [ "bounds_checking_function:libsec_shared" ]
+-    subsystem_name = "commonlibrary"
+-    part_name = "c_utils"
+-    install_images = [
+-      "system",
+-      "updater",
+-    ]
+-  }
+-}
+-
+-########## modules for `c_utils` in rust ##########
+-# rust compiler is not supportted on mac
+-if (host_os == "linux" && host_cpu != "arm64" && !is_arkui_x) {
+-  import("//build/templates/rust/rust_cxx.gni")  # used for templates rust_cxx()
+-  rust_cxx("cxx_rust_gen") {
+-    sources = [
+-      "src/rust/ashmem.rs",
+-      "src/rust/directory_ex.rs",
+-      "src/rust/file_ex.rs",
+-    ]
+-  }
+-
+-  ohos_static_library("utils_static_cxx_rust") {
+-    sources = [
+-      "src/ashmem.cpp",
+-      "src/directory_ex.cpp",
+-      "src/file_ex.cpp",
+-      "src/refbase.cpp",
+-    ]
+-    sources += get_target_outputs(":cxx_rust_gen")
+-    defines = [ "UTILS_CXX_RUST" ]
+-    include_dirs = [
+-      "include",
+-      "${target_gen_dir}",
+-    ]
+-    deps = [
+-      ":cxx_rust_gen",
+-      "//third_party/rust/crates/cxx:cxx_cppdeps",
+-    ]
+-    public_external_deps = [ "bounds_checking_function:libsec_shared" ]
+-    subsystem_name = "commonlibrary"
+-    part_name = "c_utils"
+   }
+-}
+ 
+-if (!is_arkui_x && !(host_os == "linux" && host_cpu == "arm64")) {
+-  ohos_rust_shared_library("utils_rust") {
+-    if (host_os == "linux") {
++  ########## modules for `c_utils` in rust ##########
++  # rust compiler is not supportted on mac
++  if (host_os == "linux" && host_cpu != "arm64" && !is_arkui_x) {
++    import("//build/templates/rust/rust_cxx.gni")  # used for templates rust_cxx()
++    rust_cxx("cxx_rust_gen") {
+       sources = [
+         "src/rust/ashmem.rs",
+         "src/rust/directory_ex.rs",
+         "src/rust/file_ex.rs",
+-        "src/rust/lib.rs",
++      ]
++    }
++
++    ohos_static_library("utils_static_cxx_rust") {
++      sources = [
++        "src/ashmem.cpp",
++        "src/directory_ex.cpp",
++        "src/file_ex.cpp",
++        "src/refbase.cpp",
++      ]
++      sources += get_target_outputs(":cxx_rust_gen")
++      defines = [ "UTILS_CXX_RUST" ]
++      include_dirs = [
++        "include",
++        "${target_gen_dir}",
+       ]
+       deps = [
+-        ":utils_static_cxx_rust",
+-        "//third_party/rust/crates/cxx:lib",
++        ":cxx_rust_gen",
++        "//third_party/rust/crates/cxx:cxx_cppdeps",
+       ]
+-      crate_root = "src/rust/lib.rs"
+-      crate_name = "utils_rust"
+-      crate_type = "dylib"
+-      output_extension = "dylib.so"
++      public_external_deps = [ "bounds_checking_function:libsec_shared" ]
+       subsystem_name = "commonlibrary"
+       part_name = "c_utils"
+-      install_images = [
+-        "system",
+-        "updater",
+-      ]
+-    } else {
+-      sources = [
+-        "src/rust/ashmem.rs",
+-        "src/rust/directory_ex.rs",
+-        "src/rust/file_ex.rs",
+-        "src/rust/lib.rs",
+-      ]
++    }
++  }
++
++  if (!is_arkui_x && !(host_os == "linux" && host_cpu == "arm64")) {
++    ohos_rust_shared_library("utils_rust") {
++      if (host_os == "linux") {
++        sources = [
++          "src/rust/ashmem.rs",
++          "src/rust/directory_ex.rs",
++          "src/rust/file_ex.rs",
++          "src/rust/lib.rs",
++        ]
++        deps = [
++          ":utils_static_cxx_rust",
++          "//third_party/rust/crates/cxx:lib",
++        ]
++        crate_root = "src/rust/lib.rs"
++        crate_name = "utils_rust"
++        crate_type = "dylib"
++        output_extension = "dylib.so"
++        subsystem_name = "commonlibrary"
++        part_name = "c_utils"
++        install_images = [
++          "system",
++          "updater",
++        ]
++      } else {
++        sources = [
++          "src/rust/ashmem.rs",
++          "src/rust/directory_ex.rs",
++          "src/rust/file_ex.rs",
++          "src/rust/lib.rs",
++        ]
++      }
+     }
+   }
+ }
+diff --git a/base/include/ashmem.h b/base/include/ashmem.h
+index 78d9304..4536a1d 100644
+--- a/base/include/ashmem.h
++++ b/base/include/ashmem.h
+@@ -24,7 +24,9 @@
+ #define UTILS_BASE_ASHMEM_H
+ 
+ #include <cstddef>
++#ifdef LINUX_ASHMEM
+ #include <linux/ashmem.h>
++#endif
+ #ifdef UTILS_CXX_RUST
+ #include <memory>
+ #endif
+diff --git a/base/src/ashmem.cpp b/base/src/ashmem.cpp
+index c65ee8a..bc16f20 100644
+--- a/base/src/ashmem.cpp
++++ b/base/src/ashmem.cpp
+@@ -57,6 +57,7 @@ const char* AsCharPtr(const c_void* inPtr)
+ 
+ static int AshmemOpenLocked()
+ {
++#ifdef LINUX_ASHMEM
+     int fd = TEMP_FAILURE_RETRY(open("/dev/ashmem", O_RDWR | O_CLOEXEC));
+     if (fd < 0) {
+         UTILS_LOGE("%{public}s: fd is invalid, fd = %{public}d, errno = %{public}d", __func__, fd, errno);
+@@ -77,6 +78,9 @@ static int AshmemOpenLocked()
+         return -1;
+     }
+     return fd;
++#else
++    return 0;
++#endif
+ }
+ 
+ static int AshmemOpen()
+@@ -100,7 +104,7 @@ int AshmemCreate(const char *name, size_t size)
+         UTILS_LOGE("%{public}s: Failed to exec AshmemOpen fd = %{public}d", __func__, fd);
+         return fd;
+     }
+-
++#ifdef LINUX_ASHMEM
+     if (name != nullptr) {
+         char buf[ASHMEM_NAME_LEN] = {0};
+         ret = strcpy_s(buf, sizeof(buf), name);
+@@ -124,17 +128,26 @@ int AshmemCreate(const char *name, size_t size)
+         close(fd);
+         return ret;
+     }
++#endif
+     return fd;
+ }
+ 
+ int AshmemSetProt(int fd, int prot)
+ {
++#ifdef LINUX_ASHMEM
+     return TEMP_FAILURE_RETRY(ioctl(fd, ASHMEM_SET_PROT_MASK, prot));
++#else
++    return 0;
++#endif
+ }
+ 
+ int AshmemGetSize(int fd)
+ {
++#ifdef LINUX_ASHMEM
+     return TEMP_FAILURE_RETRY(ioctl(fd, ASHMEM_GET_SIZE, NULL));
++#else
++    return 0;
++#endif
+ }
+ 
+ Ashmem::Ashmem(int fd, int32_t size) : memoryFd_(fd), memorySize_(size), flag_(0), startAddr_(nullptr)
+@@ -171,7 +184,11 @@ bool Ashmem::SetProtection(int protectionType) const
+ 
+ int Ashmem::GetProtection() const
+ {
++#ifdef LINUX_ASHMEM
+     return TEMP_FAILURE_RETRY(ioctl(memoryFd_, ASHMEM_GET_PROT_MASK));
++#else
++    return 0;
++#endif
+ }
+ 
+ int32_t Ashmem::GetAshmemSize() const
+diff --git a/base/src/file_ex.cpp b/base/src/file_ex.cpp
+index 5ef860d..851e561 100644
+--- a/base/src/file_ex.cpp
++++ b/base/src/file_ex.cpp
+@@ -181,8 +181,7 @@ bool LoadStringFromFd(int fd, string& content)
+         UTILS_LOGE("lseek file to begin failed!");
+         return false;
+     }
+-
+-    const ssize_t len = read(fd, content.data(), fileLength);
++    const ssize_t len = read(fd, (void *)(content.data()), fileLength);
+     if (len != fileLength) {
+         UTILS_LOGE("the length read from file is not equal to fileLength!len:%{public}zd,fileLen:%{public}jd",
+             len, static_cast<intmax_t>(fileLength));

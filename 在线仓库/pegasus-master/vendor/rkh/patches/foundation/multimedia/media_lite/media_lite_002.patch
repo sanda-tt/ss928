@@ -1,0 +1,1787 @@
+diff --git a/bundle.json b/bundle.json
+index c368a5a..d19ad4d 100755
+--- a/bundle.json
++++ b/bundle.json
+@@ -40,7 +40,8 @@
+                 "//foundation/multimedia/camera_lite/test:lite_camera_test",
+                 "//foundation/multimedia/media_lite/test/unittest:lite_medialite_test",
+                 "//foundation/multimedia/audio_lite/test:lite_audio_test",
+-                "//foundation/multimedia/media_lite/interfaces/kits/player_lite/js/builtin:audio_lite_api"
++                "//foundation/multimedia/media_lite/interfaces/kits/player_lite/js/builtin:audio_lite_api",
++                "//foundation/multimedia/media_lite/test/demo:demo_group"
+             ],
+             "inner_kits": [],
+             "test": []
+diff --git a/services/player_lite/impl/player_control/player/liteplayer.cpp b/services/player_lite/impl/player_control/player/liteplayer.cpp
+index bc12785..ef4273a 100644
+--- a/services/player_lite/impl/player_control/player/liteplayer.cpp
++++ b/services/player_lite/impl/player_control/player/liteplayer.cpp
+@@ -2089,5 +2089,13 @@ int32_t PlayerControl::DoSetAudioStreamType(int32_t type)
+     }
+     return 0;
+ }
++
++int32_t PlayerControl::SetLayerPriority(uint32_t priority)
++{
++    if (sinkManager_ != nullptr) {
++        sinkManager_->SetParam(LAYER_PRIORITYS, DATA_TYPE_U32, &priority);
++    }
++    return 0;
++}
+ }
+ }
+diff --git a/services/player_lite/impl/player_control/player/liteplayer.h b/services/player_lite/impl/player_control/player/liteplayer.h
+index 6b06218..13cba65 100644
+--- a/services/player_lite/impl/player_control/player/liteplayer.h
++++ b/services/player_lite/impl/player_control/player/liteplayer.h
+@@ -85,6 +85,7 @@ public:
+     void OnVideoEndOfStream(void);
+     void StateChangeCallback(PlayerStatus state) override;
+     int32_t SetAudioStreamType(int32_t type);
++    int32_t SetLayerPriority(uint32_t priority);
+ 
+ protected:
+     int32_t DoRegCallback(PlayerCtrlCallbackParam &observer) override;
+diff --git a/services/player_lite/impl/player_control/sink/player_audio_sink.cpp b/services/player_lite/impl/player_control/sink/player_audio_sink.cpp
+index b6a78f8..f1cf374 100644
+--- a/services/player_lite/impl/player_control/sink/player_audio_sink.cpp
++++ b/services/player_lite/impl/player_control/sink/player_audio_sink.cpp
+@@ -104,15 +104,20 @@ int32_t AudioSink::Init(SinkAttr &atrr)
+     }
+     for (int index = 0; index < size; index++) {
+         struct AudioAdapterDescriptor *desc = &descs[index];
+-        for (int port = 0; (desc != nullptr && port < static_cast<int>(desc->portNum)); port++) {
+-            if (desc->ports[port].dir == PORT_OUT &&
+-                (audioManager_->LoadAdapter(audioManager_, desc, &audioAdapter_)) == 0 && audioAdapter_ != nullptr) {
+-                (void)audioAdapter_->InitAllPorts(audioAdapter_);
+-                if (memcpy_s(&renderPort_, sizeof(struct AudioPort),
+-                    &desc->ports[port], sizeof(struct AudioPort)) != 0) {
+-                    MEDIA_ERR_LOG("memcpy_s failed");
++        MEDIA_ERR_LOG("index = %d, desc->adapterName = %s", index, desc->adapterName);
++        // if(strcmp(desc->adapterName, "USB") == 0) {
++        if(strcmp(desc->adapterName, "Primary") == 0) {
++            for (int port = 0; (desc != nullptr && port < static_cast<int>(desc->portNum)); port++) {
++                if (desc->ports[port].dir == PORT_OUT &&
++                    (audioManager_->LoadAdapter(audioManager_, desc, &audioAdapter_)) == 0 && audioAdapter_ != nullptr)
++                {
++                    (void)audioAdapter_->InitAllPorts(audioAdapter_);
++                    if (memcpy_s(&renderPort_, sizeof(struct AudioPort),
++                        &desc->ports[port], sizeof(struct AudioPort)) != 0) {
++                        MEDIA_ERR_LOG("memcpy_s failed");
++                    }
++                    break;
+                 }
+-                break;
+             }
+         }
+     }
+@@ -122,7 +127,7 @@ int32_t AudioSink::Init(SinkAttr &atrr)
+     }
+ 
+     struct AudioSampleAttributes param;
+-    param.sampleRate = attr_.audAttr.sampleRate;
++    param.sampleRate = attr_.audAttr.sampleRate;// USB 48000
+     param.format = AUDIO_FORMAT_TYPE_PCM_16_BIT;
+     param.channelCount = attr_.audAttr.channel;
+     param.interleaved = false;
+@@ -131,6 +136,8 @@ int32_t AudioSink::Init(SinkAttr &atrr)
+ 
+     struct AudioDeviceDescriptor deviceDesc;
+     deviceDesc.portId = 0;
++    // deviceDesc.pins = PIN_OUT_HDMI;
++    // deviceDesc.pins = PIN_OUT_USB;
+     deviceDesc.pins = PIN_OUT_SPEAKER;
+     deviceDesc.desc = nullptr;
+     ret = audioAdapter_->CreateRender(audioAdapter_, &deviceDesc, &param, &audioRender_);
+@@ -459,4 +466,4 @@ void AudioSink::SetAudioStreamType(int32_t &type)
+     audioStreamType_ = type;
+ }
+ }
+-}
+\ No newline at end of file
++}
+diff --git a/services/player_lite/impl/player_control/sink/player_sink_manager.cpp b/services/player_lite/impl/player_control/sink/player_sink_manager.cpp
+index effc3b8..bad03ab 100644
+--- a/services/player_lite/impl/player_control/sink/player_sink_manager.cpp
++++ b/services/player_lite/impl/player_control/sink/player_sink_manager.cpp
+@@ -405,6 +405,9 @@ int32_t SinkManager::GetStatus(PlayerStreamInfo &streamInfo)
+ 
+ int32_t SinkManager::SetParam(const char *key, dataType type, void* value)
+ {
++    if (videoSinkInfo_[0].sink != nullptr) {
++        videoSinkInfo_[0].sink->SetParam(key, type, value);
++    }
+     return 0;
+ }
+ 
+diff --git a/services/player_lite/impl/player_control/sink/player_sink_type.h b/services/player_lite/impl/player_control/sink/player_sink_type.h
+index 3edf9ef..f4c71ff 100644
+--- a/services/player_lite/impl/player_control/sink/player_sink_type.h
++++ b/services/player_lite/impl/player_control/sink/player_sink_type.h
+@@ -29,6 +29,7 @@ namespace Media {
+ #define MS_SCALE   1000
+ #define ENABLE_RENDER "enable-render"
+ #define MAX_PIPELINE_SINK_NUM  2
++#define LAYER_PRIORITYS "layer-priority"
+ 
+ typedef enum {
+     SINK_STATE_IDLE,
+diff --git a/services/player_lite/impl/player_control/sink/player_video_sink.cpp b/services/player_lite/impl/player_control/sink/player_video_sink.cpp
+index adbdb33..9ca11c7 100644
+--- a/services/player_lite/impl/player_control/sink/player_video_sink.cpp
++++ b/services/player_lite/impl/player_control/sink/player_video_sink.cpp
+@@ -442,5 +442,13 @@ void VideoSink::GetRenderPosition(int64_t &position)
+ {
+     position = lastRendPts_;
+ }
++
++int32_t VideoSink::SetParam(const char *key, dataType type, void* value)
++{
++    if (layerFuncs_ != nullptr && strcmp(key, LAYER_PRIORITYS) == 0) {
++        layerFuncs_->SetLayerPriority(*(uint32_t *)value);
++        return SINK_SUCCESS;
++    }
++}
+ }
+ }
+diff --git a/services/player_lite/impl/player_impl.cpp b/services/player_lite/impl/player_impl.cpp
+index e6d17b4..7614111 100644
+--- a/services/player_lite/impl/player_impl.cpp
++++ b/services/player_lite/impl/player_impl.cpp
+@@ -1249,6 +1249,10 @@ int32_t PlayerImpl::SetParameter(const Format &params)
+ {
+     int32_t value;
+     std::lock_guard<std::mutex> valueLock(lock_);
++    int32_t layerPriority = 0;
++    if (params.GetIntValue(LAYER_PRIORITY, layerPriority)) {
++        return player_->SetLayerPriority(layerPriority);
++    }
+ 
+     if (params.GetIntValue(PAUSE_AFTER_PLAY, value) != true) {
+         MEDIA_ERR_LOG("get pause after play failed");
+diff --git a/services/recorder_lite/impl/src/recorder_impl.cpp b/services/recorder_lite/impl/src/recorder_impl.cpp
+index 91c9431..2afa1cd 100644
+--- a/services/recorder_lite/impl/src/recorder_impl.cpp
++++ b/services/recorder_lite/impl/src/recorder_impl.cpp
+@@ -622,6 +622,9 @@ int32_t RecorderImpl::SetOutputFormat(OutputFormatType format)
+             outPutFormat = OUTPUT_FORMAT_MPEG_4;
+             MEDIA_WARNING_LOG("format: %d use default OUTPUT_FORMAT_MPEG_4", format);
+             break;
++        case FORMAT_M4A:
++            outPutFormat = OUTPUT_FORMAT_M4A;
++            break;
+         default:
+             MEDIA_ERR_LOG("invalid OutputFormatType: %d ", format);
+             return ERR_INVALID_PARAM;
+diff --git a/test/demo/BUILD.gn b/test/demo/BUILD.gn
+new file mode 100644
+index 0000000..7263a72
+--- /dev/null
++++ b/test/demo/BUILD.gn
+@@ -0,0 +1,87 @@
++# Copyright (C) 2025 RKH Corp.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++# http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++import("//build/lite/config/component/lite_component.gni")
++import("//foundation/multimedia/media_utils_lite/config.gni")
++
++executable("video_player_sample") {
++  sources = [ "video_player_sample.cpp" ]
++  cflags = [ "-Wall" ]
++  cflags_cc = cflags
++  include_dirs = [
++    "${aafwk_lite_path}/interfaces/kits/ability_lite",
++    "${appexecfwk_lite_path}/interfaces/kits/bundle_lite",
++    "${aafwk_lite_path}/interfaces/kits/want_lite",
++  ]
++  ldflags = [ "-lstdc++" ]
++  ldflags += [ "-lpthread" ]
++  ldflags += [ "-Wl,-rpath-link=$ohos_root_path/$root_out_dir" ]
++  deps = [
++    "//foundation/multimedia/media_lite/frameworks/player_lite:player_lite",
++    "//third_party/bounds_checking_function:libsec_shared",
++    "//foundation/graphic/graphic_utils_lite:utils_lite",
++    "//foundation/arkui/ui_lite:ui_lite",
++  ]
++  output_dir = "$root_out_dir/usr"
++}
++
++executable("aac_play_sample") {
++  sources = [ "aac_player_sample.cpp" ]
++  cflags = [ "-Wall" ]
++  cflags_cc = cflags
++  include_dirs = [
++    "${aafwk_lite_path}/interfaces/kits/ability_lite",
++    "${appexecfwk_lite_path}/interfaces/kits/bundle_lite",
++    "${aafwk_lite_path}/interfaces/kits/want_lite",
++  ]
++  ldflags = [ "-lstdc++" ]
++  ldflags += [ "-lpthread" ]
++  ldflags += [ "-Wl,-rpath-link=$ohos_root_path/$root_out_dir" ]
++  deps = [
++    "//foundation/multimedia/media_lite/frameworks/player_lite:player_lite",
++    "//third_party/bounds_checking_function:libsec_shared",
++    "//foundation/graphic/graphic_utils_lite:utils_lite",
++    "//foundation/arkui/ui_lite:ui_lite",
++  ]
++  output_dir = "$root_out_dir/usr"
++}
++
++executable("suface_demo") {
++  sources = [ "suface_demo.cpp" ]
++  cflags = [ "-Wall" ]
++  cflags_cc = cflags
++  include_dirs = [
++    "${aafwk_lite_path}/interfaces/kits/ability_lite",
++    "${appexecfwk_lite_path}/interfaces/kits/bundle_lite",
++    "${aafwk_lite_path}/interfaces/kits/want_lite",
++  ]
++  ldflags = [ "-lstdc++" ]
++  ldflags += [ "-lpthread" ]
++  ldflags += [ "-Wl,-rpath-link=$ohos_root_path/$root_out_dir" ]
++  deps = [
++    "//foundation/multimedia/media_lite/frameworks/player_lite:player_lite",
++    "//third_party/bounds_checking_function:libsec_shared",
++    "//foundation/graphic/graphic_utils_lite:utils_lite",
++    "//foundation/arkui/ui_lite:ui_lite",
++  ]
++  output_dir = "$root_out_dir/usr"
++}
++
++group("demo_group") {
++  deps = [
++      ":video_player_sample",
++      ":aac_play_sample",
++      ":suface_demo",
++      "plugin_sample:plugin_group",
++    ]
++}
+diff --git a/test/demo/aac_player_sample.cpp b/test/demo/aac_player_sample.cpp
+new file mode 100644
+index 0000000..cd45969
+--- /dev/null
++++ b/test/demo/aac_player_sample.cpp
+@@ -0,0 +1,286 @@
++ /*
++ * Copyright (c) 2025 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <stdio.h>
++#include <string.h>
++#include <limits.h>
++#include <stdlib.h>
++#include <signal.h>
++#include <unistd.h>
++#include <pthread.h>
++#include <sys/select.h>
++#include <sys/time.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <sys/prctl.h>
++#include <iostream>
++#include <string>
++#include <map>
++#include <functional>
++#include "securec.h"
++#include "source.h"
++#include "player.h"
++#include "format.h"
++#include "components/ui_image_view.h"
++#include "components/root_view.h"
++#include "components/ui_label.h"
++#include "components/ui_slider.h"
++#include "components/ui_surface_view.h"
++#include "components/ui_toggle_button.h"
++#include "window/window.h"
++#include "common/graphic_startup.h"
++
++using OHOS::Surface;
++
++using OHOS::Media::Player;
++using OHOS::Media::PlayerSeekMode;
++using OHOS::Media::Source;
++using OHOS::Media::Format;
++using OHOS::Media::StreamSource;
++using OHOS::Media::StreamCallback;
++using namespace std;
++using namespace OHOS;
++using namespace OHOS::Media;
++
++struct TestSample {
++    std::shared_ptr<StreamSource> streamSample;
++    std::shared_ptr<Player> adapter_;
++    std::string filepath_;
++    pthread_t streamThreadId_;
++};
++
++volatile sig_atomic_t g_terminate = 0;
++
++static void SignalHandler(int signum)
++{
++    printf("[%s, %d], recv signum:%d\n", __func__, __LINE__, signum);
++    switch(signum) {
++        case SIGINT:  // Ctrl+C
++            printf("Ctrl+C pressed, terminating program...\n");
++            g_terminate = 1;
++            break;
++        case SIGTSTP: // Ctrl+Z
++            printf("Ctrl+Z pressed, terminating program...\n");
++            g_terminate = 1;
++            break;
++        default:
++            break;
++    }
++}
++
++void* StreamProcessThreadFunc(void* arg)
++{
++    TestSample* sample = static_cast<TestSample*>(arg);
++    size_t bufferSize;
++    uint8_t *data = nullptr;
++    size_t readLen;
++    const int32_t STEAM_PROCESS_SLEEP_TIME_US = 20000;
++    FILE* pFile = fopen(sample->filepath_.c_str(), "rb");
++    if (pFile == nullptr) {
++        printf("Failed to open file: %s\n", sample->filepath_.c_str());
++        return nullptr;
++    }
++    printf("Stream processing thread started, processing file: %s\n", sample->filepath_.c_str());
++    while (true) {
++        if (g_terminate) {
++            printf("Stream processing thread terminating due to signal\n");
++            break;
++        }
++        data = sample->streamSample->GetSharedBuffer(bufferSize);
++        if (data == nullptr) {
++            printf("GetSharedBuffer failed, bufferSize = %zu\n", bufferSize);
++            usleep(STEAM_PROCESS_SLEEP_TIME_US);
++            continue;
++        }
++
++        printf("GetSharedBuffer success, bufferSize = %zu\n", bufferSize);
++        readLen = fread(data, 1, bufferSize, pFile);
++        if (readLen > 0) {
++            sample->streamSample->QueueSharedBuffer(data, readLen);
++        } else {
++            sample->streamSample->QueueSharedBuffer(data, 0);
++            break;
++        }
++    }
++    if (pFile != nullptr) {
++        fclose(pFile);
++        printf("Stream processing thread finished, file closed\n");
++    }
++    return nullptr;
++}
++
++
++void Play(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("Play\n");
++    testSample.adapter_->Play();
++}
++
++void Pause(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("Pause\n");
++    testSample.adapter_->Pause();
++}
++
++void Stop(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("Stop\n");
++    testSample.adapter_->Stop();
++    testSample.adapter_->Release();
++    testSample.adapter_.reset();
++    testSample.streamSample.reset();
++    testSample.adapter_ = std::make_shared<Player>();
++    testSample.streamSample = std::make_shared<StreamSource>();
++
++    int threadRet = pthread_create(&testSample.streamThreadId_, nullptr, StreamProcessThreadFunc, &testSample);
++    if (threadRet != 0) {
++        printf("Failed to create stream processing thread, error: %d\n", threadRet);
++    }
++    Format formats;
++    formats.PutStringValue(CODEC_MIME, MIME_AUDIO_AAC);
++    Source source(testSample.streamSample, formats);
++    testSample.adapter_->SetSource(source);
++    testSample.adapter_->Prepare();
++}
++
++void SetVolume(TestSample &testSample)
++{
++    float lvolume;
++    float rvolume;
++    printf("please input volume(0-100): ");
++    cin >> lvolume >> rvolume;
++    printf("try set volume %f %f\n", lvolume, rvolume);
++    int32_t playerState = 0;
++    testSample.adapter_->GetPlayerState(playerState);
++    if (playerState != PlayerStates::PLAYER_STARTED) {
++        if (playerState == PlayerStates::PLAYER_PAUSED) {
++            Play(testSample);
++        } else {
++            Stop(testSample);
++            Play(testSample);
++        }
++    }
++    int32_t ret = testSample.adapter_->SetVolume(lvolume, rvolume);
++    if (ret != 0) {
++        printf("[%s: %d] ret:%d\n", __func__, __LINE__, ret);
++    }
++}
++
++void Replay(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("Replay\n");
++    Stop(testSample);
++    Play(testSample);
++}
++
++std::map<std::string, std::function<void(TestSample&)>> g_mediaTypeMap = {
++    {"play", Play},
++    {"pause", Pause},
++    {"stop", Stop},
++    {"replay", Replay},
++    {"volume", SetVolume},
++    {"quit", [](TestSample&){printf("quit\n"); g_terminate = true;}}
++};
++
++int main(int argc, char *argv[])
++{
++    signal(SIGINT, SignalHandler);
++    signal(SIGTSTP, SignalHandler);
++    prctl(PR_SET_NAME, "mainProc", 0, 0, 0);
++    if (argc < 2) {
++        printf("Usage: %s <filepath>\n", argv[0]);
++        return -1;
++    }
++    std::string filepath = argv[1];
++    struct TestSample testSample;
++    testSample.adapter_ = std::make_shared<Player>();
++    testSample.filepath_ = filepath;
++
++    testSample.streamSample = std::make_shared<StreamSource>();
++
++    int threadRet = pthread_create(&testSample.streamThreadId_, nullptr, StreamProcessThreadFunc, &testSample);
++    if (threadRet != 0) {
++        printf("Failed to create stream processing thread, error: %d\n", threadRet);
++        return -1;
++    }
++    Format formats;
++    formats.PutStringValue(CODEC_MIME, MIME_AUDIO_AAC);
++    Source source(testSample.streamSample, formats);
++
++    testSample.adapter_->SetSource(source);
++    testSample.adapter_->Prepare();
++    testSample.adapter_->Play();
++
++    fd_set readfds;
++    struct timeval tv;
++    string input1;
++    while (!g_terminate) {
++        cout << "**********************"<< endl;
++        cout << "Please select operation:" << endl;
++        cout << "play" << endl;
++        cout << "pause" << endl;
++        cout << "stop" << endl;
++        cout << "replay" << endl;
++        cout << "volume" << endl;
++        cout << "quit" << endl;
++        cout << "**********************"<< endl;
++        FD_ZERO(&readfds);
++        FD_SET(STDIN_FILENO, &readfds);
++
++        tv.tv_sec = 10;
++        tv.tv_usec = 0;
++        int ret = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv);
++        if (ret == -1 && errno != EINTR) {
++            perror("select");
++            break;
++        }
++        if (ret > 0 && FD_ISSET(STDIN_FILENO, &readfds)) {
++            cin >> input1;
++            if (g_mediaTypeMap.find(input1) != g_mediaTypeMap.end()) {
++                g_mediaTypeMap[input1](testSample);
++                int32_t playerState = 0;
++                testSample.adapter_->GetPlayerState(playerState);
++                printf("playerState:%d\n", playerState);
++            } else {
++                cout << "Invalid input." << endl;
++            }
++        }
++    }
++    printf("Waiting for stream processing thread to finish...\n");
++    pthread_join(testSample.streamThreadId_, nullptr);
++    printf("Stream processing thread has finished\n");
++    testSample.adapter_->Stop();
++    testSample.adapter_->Release();
++    testSample.streamSample.reset();
++
++    return 0;
++}
+diff --git a/test/demo/plugin_sample/BUILD.gn b/test/demo/plugin_sample/BUILD.gn
+new file mode 100644
+index 0000000..38797e8
+--- /dev/null
++++ b/test/demo/plugin_sample/BUILD.gn
+@@ -0,0 +1,130 @@
++# Copyright (C) 2025 RKH Corp.
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++# http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++
++import("//build/lite/config/component/lite_component.gni")
++import("//build/lite/ndk/ndk.gni")
++import("//foundation/multimedia/media_lite/config.gni")
++import("//foundation/multimedia/media_utils_lite/config.gni")
++
++config("player_impl_external_library_config") {
++  include_dirs = [ "//foundation/multimedia/frameworks/player_lite/binder" ]
++  include_dirs +=
++      [ "//foundation/multimedia/media_lite/interfaces/kits/player_lite" ]
++  include_dirs += [ "//foundation/multimedia/media_lite/services/player_lite/impl/buffersource/include" ]
++  include_dirs += [ "//foundation/multimedia/media_lite/services/player_lite/impl/player_control/include" ]
++  include_dirs += [ "//foundation/multimedia/media_lite/services/player_lite/impl/player_control/player" ]
++  include_dirs += [ "//foundation/multimedia/media_utils_lite/interfaces/kits" ]
++  include_dirs += [ "//drivers/peripheral/format/interfaces/include" ]
++  include_dirs += [ "//foundation/multimedia/media_lite/services/player_lite/impl/player_control/player/fsm/src" ]
++  include_dirs += [ "//foundation/multimedia/media_lite/services/player_lite/impl/player_control/player/fsm/include" ]
++  include_dirs += [ "//foundation/multimedia/media_lite/services/player_lite/impl/player_control/source" ]
++  include_dirs += [ "//foundation/multimedia/media_lite/services/player_lite/impl/player_control/sink" ]
++  include_dirs += [ "//drivers/peripheral/codec/interfaces/include" ]
++  include_dirs += [ "//foundation/multimedia/media_lite/services/player_lite/impl/player_control/decoder" ]
++  include_dirs += [ "//drivers/peripheral/audio/interfaces/include" ]
++}
++
++executable("plugin_play") {
++  sources = [
++    "plugin_play.cpp",
++    "player_sample_common.cpp",
++    ]
++  cflags = [ "-Wall" ]
++  cflags_cc = cflags
++  include_dirs = [
++    "${aafwk_lite_path}/interfaces/kits/ability_lite",
++    "${appexecfwk_lite_path}/interfaces/kits/bundle_lite",
++    "${aafwk_lite_path}/interfaces/kits/want_lite",
++    "//drivers/peripheral/display/interfaces/include",
++    "//foundation/multimedia/camera_lite/services/server/include",
++    "//foundation/multimedia/camera_lite/services/impl/include",
++    "//foundation/multimedia/camera_lite/services/impl/include",
++  ]
++  public_configs = [
++    ":player_impl_external_library_config",
++    ]
++
++  ldflags = [ "-Wl,-Map=media_server.map" ]
++  ldflags += [
++    "-lstdc++",
++    "-lcodec",
++    "-laudio_hw",
++    "-lformat_hw",
++    "-lhdi_camera",
++    "-ldisplay_layer",
++    "-lpthread",
++    "-Wl,-rpath-link=$ohos_root_path/$root_out_dir",
++  ]
++  deps = [
++    "//foundation/multimedia/media_lite/services:camera_config",
++    "//foundation/multimedia/media_lite/services:codec_config",
++    "//foundation/multimedia/media_lite/services:media_config",
++    "//foundation/multimedia/media_lite/services/player_lite:player_impl",
++    "//foundation/multimedia/media_lite/services:media_server",
++    "//foundation/multimedia/camera_lite/services:camera_server",
++    "//foundation/multimedia/media_lite/services/recorder_lite:recorder_impl",
++    "//foundation/multimedia/media_lite/services/recorder_lite:recorder_server",
++  ]
++  output_dir = "$root_out_dir/usr"
++}
++
++executable("plugin_play_two_channe") {
++  sources = [
++    "plugin_play_two_channe.cpp",
++    "player_sample_common.cpp",
++    ]
++  cflags = [ "-Wall" ]
++  cflags_cc = cflags
++  include_dirs = [
++    "${aafwk_lite_path}/interfaces/kits/ability_lite",
++    "${appexecfwk_lite_path}/interfaces/kits/bundle_lite",
++    "${aafwk_lite_path}/interfaces/kits/want_lite",
++    "//drivers/peripheral/display/interfaces/include",
++    "//foundation/multimedia/camera_lite/services/server/include",
++    "//foundation/multimedia/camera_lite/services/impl/include",
++    "//foundation/multimedia/camera_lite/services/impl/include",
++  ]
++  public_configs = [
++    ":player_impl_external_library_config",
++    ]
++
++  ldflags = [ "-Wl,-Map=media_server.map" ]
++  ldflags += [
++    "-lstdc++",
++    "-lcodec",
++    "-laudio_hw",
++    "-lformat_hw",
++    "-lhdi_camera",
++    "-ldisplay_layer",
++    "-lpthread",
++    "-Wl,-rpath-link=$ohos_root_path/$root_out_dir",
++  ]
++  deps = [
++    "//foundation/multimedia/media_lite/services:camera_config",
++    "//foundation/multimedia/media_lite/services:codec_config",
++    "//foundation/multimedia/media_lite/services:media_config",
++    "//foundation/multimedia/media_lite/services/player_lite:player_impl",
++    "//foundation/multimedia/media_lite/services:media_server",
++    "//foundation/multimedia/camera_lite/services:camera_server",
++    "//foundation/multimedia/media_lite/services/recorder_lite:recorder_impl",
++    "//foundation/multimedia/media_lite/services/recorder_lite:recorder_server",
++  ]
++  output_dir = "$root_out_dir/usr"
++}
++
++group("plugin_group") {
++  deps = [
++    ":plugin_play",
++    ":plugin_play_two_channe",
++  ]
++}
+\ No newline at end of file
+diff --git a/test/demo/plugin_sample/player_sample_common.cpp b/test/demo/plugin_sample/player_sample_common.cpp
+new file mode 100644
+index 0000000..15dfc14
+--- /dev/null
++++ b/test/demo/plugin_sample/player_sample_common.cpp
+@@ -0,0 +1,272 @@
++ /*
++ * Copyright (c) 2025 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "player_sample_common.h"
++#include <pthread.h>
++#include <unistd.h>
++#include <time.h>
++#include <sys/time.h>
++
++using namespace OHOS;
++using namespace OHOS::Media;
++using OHOS::Media::PlayerSource;
++using OHOS::Media::Decoder;
++
++struct CodecFormatAndMimePair {
++    CodecFormat format;
++    AvCodecMime mime;
++};
++
++static CodecFormatAndMimePair g_avCodecFormatInfo[CODEC_BUT + 1] = {
++    {CODEC_H264, MEDIA_MIMETYPE_VIDEO_AVC},
++    {CODEC_H265, MEDIA_MIMETYPE_VIDEO_HEVC},
++    {CODEC_JPEG, MEDIA_MIMETYPE_IMAGE_JPEG},
++    {CODEC_AAC, MEDIA_MIMETYPE_AUDIO_AAC},
++    {CODEC_G711A, MEDIA_MIMETYPE_AUDIO_G711A},
++    {CODEC_G711U, MEDIA_MIMETYPE_AUDIO_G711U},
++    {CODEC_PCM, MEDIA_MIMETYPE_AUDIO_PCM},
++    {CODEC_MP3, MEDIA_MIMETYPE_AUDIO_MP3},
++    {CODEC_G726, MEDIA_MIMETYPE_AUDIO_G726},
++    {CODEC_BUT, MEDIA_MIMETYPE_INVALID},
++};
++
++void* sourceFunction(void* arg)
++{
++    CommonData* data = static_cast<CommonData*>(arg);
++    FormatFrame formatPacket_;
++    data->isEos_ = false;
++    data->isSourceStarted_ = false;
++    data->isSourceEnd_ = false;
++    while (true) {
++        int ret = data->playerSource_->ReadFrame(formatPacket_);
++        if (ret == HI_RET_FILE_EOF) {
++            printf("ReadFrame EOF\n");
++            memset_s(&formatPacket_, sizeof(formatPacket_), 0, sizeof(FormatFrame));
++            data->isSourceEnd_ = true;
++        }
++        if (formatPacket_.frameType == FRAME_TYPE_VIDEO || data->isSourceEnd_) {
++            while (true) {
++                InputInfo inputData;
++                CodecBufferInfo inBufInfo;
++                inputData.bufferCnt = 0;
++                inputData.buffers = nullptr;
++                inputData.pts = 0;
++                inputData.flag = 0;
++                ret = data->videoDecoder_->DequeInputBuffer(inputData, 0);
++                if (ret != 0) {
++                    printf("DequeInputBuffer failed ret %d\n", ret);
++                    usleep(1000);
++                    continue;
++                }
++                inBufInfo.addr = formatPacket_.data;
++                inBufInfo.length = formatPacket_.len;
++                inputData.bufferCnt = 1;
++                inputData.buffers = &inBufInfo;
++                inputData.pts = formatPacket_.timestampUs;
++                inputData.flag = 0;
++                ret = data->videoDecoder_->QueueInputBuffer(inputData, 0);
++                if (ret != 0) {
++                    printf("QueueInputBuffer failed ret %d\n", ret);
++                    usleep(1000);
++                    continue;
++                }
++                if (!data->isSourceStarted_) {
++                    data->isSourceStarted_ = true;
++                }
++                break;
++            }
++        }
++        if (formatPacket_.data != nullptr) {
++            data->playerSource_->FreeFrame(formatPacket_);
++            formatPacket_.data = nullptr;
++            formatPacket_.len = 0;
++            formatPacket_.trackId = -1;
++        }
++        if (data->isSourceEnd_) {
++            break;
++        }
++    }
++    printf("sourceFunction thread exit\n");
++    return nullptr;
++}
++
++void* decoderFunction(void* arg)
++{
++    CommonData* data = static_cast<CommonData*>(arg);
++    while (!data->isSourceStarted_) {
++        printf("decoderFunction wait source start\n");
++        usleep(1000);
++    }
++    while (true) {
++        OutputInfo outInfo;
++        int ret = data->videoDecoder_->DequeueOutputBuffer(outInfo, 0);
++        if (ret != 0) {
++            if (ret == CODEC_RECEIVE_EOS) {
++                printf("DequeueOutputBuffer receive EOS\n");
++                data->isEos_ = true;
++                break;
++            }
++            usleep(1000);
++        } else {
++            pthread_rwlock_wrlock(&data->queueLock_);
++            data->frameBufferQueue_.push(outInfo);
++            pthread_rwlock_unlock(&data->queueLock_);
++        }
++    }
++    printf("decoderFunction thread exit\n");
++    return NULL;
++}
++
++void* sinkFunction(void* arg)
++{
++    CommonData* data = static_cast<CommonData*>(arg);
++    struct timeval startTime;
++    int64_t startTimeMs = 0;
++    while (true) {
++        pthread_rwlock_wrlock(&data->queueLock_);
++        if (!data->frameBufferQueue_.empty()) {
++            OutputInfo outInfo = data->frameBufferQueue_.front();
++            if (outInfo.timeStamp == 0) {
++                gettimeofday(&startTime, NULL);
++                startTimeMs = startTime.tv_sec * 1000 + startTime.tv_usec / 1000;
++            }
++            struct timeval currentTime;
++            gettimeofday(&currentTime, NULL);
++            int64_t currentTimeMs = currentTime.tv_sec * 1000 + currentTime.tv_usec / 1000;
++            int64_t elapsedTimeMs = 0;
++            if (startTimeMs != 0) {
++                elapsedTimeMs = currentTimeMs - startTimeMs;
++            }
++            while (elapsedTimeMs < outInfo.timeStamp) {
++                usleep(100);
++                gettimeofday(&currentTime, NULL);
++                currentTimeMs = currentTime.tv_sec * 1000 + currentTime.tv_usec / 1000;
++                elapsedTimeMs = currentTimeMs - startTimeMs;
++            }
++            LayerBuffer layerBuf;
++            layerBuf.data.virAddr = outInfo.vendorPrivate;
++            data->layerFuncs_->Flush(0, data->layerId_, &layerBuf);
++            data->videoDecoder_->QueueOutputBuffer(outInfo, 0);
++            data->frameBufferQueue_.pop();
++            pthread_rwlock_unlock(&data->queueLock_);
++        } else {
++            pthread_rwlock_unlock(&data->queueLock_);
++            usleep(1000);
++            if (data->isEos_) {
++                break;
++            }
++        }
++    }
++    printf("sinkFunction thread exit\n");
++    return NULL;
++}
++int sinkInit(CommonData &data)
++{
++    int32_t devId = 0;
++    IRect attr;
++    attr.x = data.x_;
++    attr.y = data.y_;
++    attr.w = data.width_;
++    attr.h = data.height_;
++    LayerInfo lInfo;
++    lInfo.width = data.width_;
++    lInfo.height = data.height_;
++    lInfo.type = LAYER_TYPE_OVERLAY;
++    lInfo.bpp = 8;
++    lInfo.pixFormat = PIXEL_FMT_YCRCB_420_SP;
++    (void)LayerInitialize(&data.layerFuncs_);
++    data.layerFuncs_->CreateLayer(devId, &lInfo, &data.layerId_);
++    data.layerFuncs_->SetLayerSize(devId, data.layerId_, &attr);
++    data.layerFuncs_->SetLayerPriority(3);
++    return 0;
++}
++
++int initPlayer(CommonData &data)
++{
++    printf("initPlayer fileName %s\n", data.fileName_.c_str());
++    if (pthread_rwlock_init(&data.queueLock_, NULL) != 0) {
++        printf("Failed to initialize queue lock\n");
++        return -1;
++    }
++    data.playerSource_ = std::make_shared<PlayerSource>();
++    data.videoDecoder_ = std::make_shared<Decoder>();
++
++    data.playerSource_->Init();
++    data.playerSource_->SetSource(data.fileName_.c_str());
++    int32_t ret = data.playerSource_->Prepare();
++    FormatFileInfo fmtFileInfo;
++    ret = data.playerSource_->GetFileInfo(fmtFileInfo);
++    printf("used audiostream index %d\n", fmtFileInfo.s32UsedAudioStreamIndex);
++    printf("used videostream index %d\n", fmtFileInfo.s32UsedVideoStreamIndex);
++    uint32_t width = 0, height = 0;
++    for (uint32_t i = 0; i < HI_DEMUXER_RESOLUTION_CNT; i++) {
++        if (fmtFileInfo.stStreamResolution[i].s32VideoStreamIndex == fmtFileInfo.s32UsedVideoStreamIndex) {
++            printf("video enVideoType %d resolution %d %d\n", \
++                fmtFileInfo.stStreamResolution[i].enVideoType, \
++                fmtFileInfo.stStreamResolution[i].u32Width, \
++                fmtFileInfo.stStreamResolution[i].u32Height);
++            width = fmtFileInfo.stStreamResolution[i].u32Width;
++            height = fmtFileInfo.stStreamResolution[i].u32Height;
++        }
++    }
++    AvCodecMime mime = g_avCodecFormatInfo[fmtFileInfo.enVideoType].mime;
++    OHOS::Media::AvAttribute attr;
++    attr.type = VIDEO_DECODER;
++    attr.vdecAttr.mime = mime;
++    attr.vdecAttr.priv = nullptr;
++    attr.vdecAttr.bufSize = 0;
++    attr.vdecAttr.maxWidth = width;
++    attr.vdecAttr.maxHeight = height;
++    const std::string videoName = "codec.avc.soft.decoder";
++    ret = data.videoDecoder_->CreateHandle(videoName, attr);
++    ret = data.videoDecoder_->StartDec();
++    data.playerSource_->Start();
++    ret = sinkInit(data);
++
++    ret = pthread_create(&data.threadSource_, NULL, sourceFunction, &data);
++    if (ret != 0) {
++        printf("sourceFunction create failed\n");
++        return -1;
++    }
++    ret = pthread_create(&data.threadDecoder_, NULL, decoderFunction, &data);
++    if (ret != 0) {
++        printf("decoderFunction create failed\n");
++        return -1;
++    }
++    ret = pthread_create(&data.threadSink_, NULL, sinkFunction, &data);
++    if (ret != 0) {
++        printf("sinkFunction create failed\n");
++        return -1;
++    }
++    return 0;
++}
++
++int deinitPlayer(CommonData &data)
++{
++    pthread_join(data.threadSource_, NULL);
++    printf("sourceFunction thread join\n");
++    pthread_join(data.threadDecoder_, NULL);
++    printf("decoderFunction thread join\n");
++    pthread_join(data.threadSink_, NULL);
++    printf("sinkFunction thread join\n");
++    if (data.layerFuncs_ != nullptr) {
++        data.layerFuncs_->CloseLayer(0, data.layerId_);
++    }
++    data.playerSource_->Stop();
++    data.videoDecoder_->StopDec();
++    data.videoDecoder_->DestroyHandle();
++    pthread_rwlock_destroy(&data.queueLock_);
++    return 0;
++}
+\ No newline at end of file
+diff --git a/test/demo/plugin_sample/player_sample_common.h b/test/demo/plugin_sample/player_sample_common.h
+new file mode 100644
+index 0000000..9093c5b
+--- /dev/null
++++ b/test/demo/plugin_sample/player_sample_common.h
+@@ -0,0 +1,60 @@
++ /*
++ * Copyright (c) 2025 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef PLAYER_SAMPLE_COMMON_H
++#define PLAYER_SAMPLE_COMMON_H
++
++#include "player_sample_common.h"
++#include <pthread.h>
++#include <queue>
++
++#include "player_define.h"
++#include "player_source.h"
++#include "player_sink_manager.h"
++#include "hi_demuxer.h"
++#include "decoder.h"
++#include "codec_interface.h"
++#include "surface.h"
++
++using namespace OHOS;
++using namespace OHOS::Media;
++using OHOS::Media::PlayerSource;
++using OHOS::Media::Decoder;
++
++struct CommonData
++{
++    std::shared_ptr<PlayerSource> playerSource_;
++    std::shared_ptr<Decoder> videoDecoder_;
++    LayerFuncs *layerFuncs_;
++    uint32_t layerId_;
++    pthread_t threadSource_;
++    pthread_t threadDecoder_;
++    pthread_t threadSink_;
++    std::string fileName_;
++    std::queue<OutputInfo> frameBufferQueue_;
++    pthread_rwlock_t queueLock_;
++    int x_;
++    int y_;
++    int width_;
++    int height_;
++    bool isEos_;
++    bool isSourceStarted_;
++    bool isSourceEnd_;
++};
++
++int initPlayer(CommonData &data);
++int deinitPlayer(CommonData &data);
++
++#endif // PLAYER_SAMPLE_COMMON_H
+\ No newline at end of file
+diff --git a/test/demo/plugin_sample/plugin_play.cpp b/test/demo/plugin_sample/plugin_play.cpp
+new file mode 100644
+index 0000000..4d1d30b
+--- /dev/null
++++ b/test/demo/plugin_sample/plugin_play.cpp
+@@ -0,0 +1,41 @@
++
++ /*
++ * Copyright (c) 2025 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "hal_camera.h"
++#include "camera_server.h"
++#include "player_sample_common.h"
++
++int main(int argc, char *argv[])
++{
++    CameraServer::GetInstance()->InitCameraServer();
++    CodecInit();
++    sleep(3);
++    if (argc < 2) {
++        printf("Usage: %s <filepath>\n", argv[0]);
++        return -1;
++    }
++    std::string filepath = argv[1];
++    CommonData data;
++    data.fileName_ = filepath;
++    data.x_ = 0;
++    data.y_ = 0;
++    data.width_ = 640;
++    data.height_ = 480;
++
++    initPlayer(data);
++    deinitPlayer(data);
++    return 0;
++}
+\ No newline at end of file
+diff --git a/test/demo/plugin_sample/plugin_play_two_channe.cpp b/test/demo/plugin_sample/plugin_play_two_channe.cpp
+new file mode 100644
+index 0000000..704fbe8
+--- /dev/null
++++ b/test/demo/plugin_sample/plugin_play_two_channe.cpp
+@@ -0,0 +1,49 @@
++ /*
++ * Copyright (c) 2025 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include "hal_camera.h"
++#include "camera_server.h"
++#include "player_sample_common.h"
++
++int main(int argc, char *argv[])
++{
++    CameraServer::GetInstance()->InitCameraServer();
++    CodecInit();
++    sleep(3);
++    if (argc < 2) {
++        printf("Usage: %s <filepath>\n", argv[0]);
++        return -1;
++    }
++    std::string filepath = argv[1];
++    CommonData data;
++    data.fileName_ = filepath;
++    data.x_ = 0;
++    data.y_ = 0;
++    data.width_ = 640;
++    data.height_ = 480;
++
++    CommonData data1;
++    data1.fileName_ = filepath;
++    data1.x_ = 640;
++    data1.y_ = 0;
++    data1.width_ = 640;
++    data1.height_ = 480;
++
++    initPlayer(data);
++    initPlayer(data1);
++    deinitPlayer(data);
++    deinitPlayer(data1);
++    return 0;
++}
+\ No newline at end of file
+diff --git a/test/demo/suface_demo.cpp b/test/demo/suface_demo.cpp
+new file mode 100644
+index 0000000..643f485
+--- /dev/null
++++ b/test/demo/suface_demo.cpp
+@@ -0,0 +1,101 @@
++ /*
++ * Copyright (c) 2025 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <stdio.h>
++#include <string.h>
++#include <limits.h>
++#include <stdlib.h>
++#include <signal.h>
++#include <unistd.h>
++#include <pthread.h>
++#include <sys/select.h>
++#include <sys/time.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <sys/prctl.h>
++#include <iostream>
++#include <string>
++#include <map>
++#include <functional>
++#include "components/ui_image_view.h"
++#include "components/root_view.h"
++#include "components/ui_label.h"
++#include "components/ui_slider.h"
++#include "components/ui_surface_view.h"
++#include "components/ui_toggle_button.h"
++#include "window/window.h"
++#include "common/graphic_startup.h"
++#include "common/task_manager.h"
++
++using OHOS::Surface;
++
++using namespace std;
++using namespace OHOS;
++
++int main(int argc, char *argv[])
++{
++    int posX = 0;
++    int posY = 0;
++    int width = 640;
++    int height = 360;
++    RootView* rootView_;
++    UISurfaceView* surfaceView_;
++    GraphicStartUp::Init();
++    rootView_ = RootView::GetWindowRootView();
++    rootView_->SetWidth(width+100);
++    rootView_->SetHeight(height+100);
++    rootView_->SetPosition(posX, posY);
++    rootView_->SetStyle(STYLE_BACKGROUND_COLOR, Color::White().full);
++
++    surfaceView_ = new UISurfaceView();
++    surfaceView_->SetPosition(posX, posY);
++    surfaceView_->SetWidth(width);
++    surfaceView_->SetHeight(height);
++    rootView_->Add(surfaceView_);
++    rootView_->Invalidate();
++    Window* window = nullptr;
++    if (rootView_ != nullptr) {
++        printf("rootView_: %p\n", rootView_);
++        WindowConfig config = {};
++        config.rect = rootView_->GetRect();
++        config.rect.SetPosition(posX, posY);
++        window = Window::CreateWindow(config);
++          if (window != nullptr) {
++              window->BindRootView(rootView_);
++              window->Show();
++          } else {
++              printf("Create window false!\n");
++          }
++    }
++    sleep(5);
++    printf("delete surfaceView_: %p\n", surfaceView_);
++    rootView_->Remove(surfaceView_);
++
++    if (surfaceView_ != nullptr) {
++        delete surfaceView_;
++        surfaceView_ = nullptr;
++    }
++    rootView_->Invalidate();
++    OHOS::TaskManager::GetInstance()->TaskHandler();
++    sleep(5);
++    printf("delete rootView_: %p\n", rootView_);
++    if (rootView_ != nullptr) {
++        Window::DestroyWindow(rootView_->GetBoundWindow());
++        RootView::DestroyWindowRootView(rootView_);
++        rootView_ = nullptr;
++    }
++    return 0;
++}
+diff --git a/test/demo/video_player_sample.cpp b/test/demo/video_player_sample.cpp
+new file mode 100644
+index 0000000..5491246
+--- /dev/null
++++ b/test/demo/video_player_sample.cpp
+@@ -0,0 +1,527 @@
++ /*
++ * Copyright (c) 2025 RKH Corp.
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <stdio.h>
++#include <string.h>
++#include <limits.h>
++#include <stdlib.h>
++#include <signal.h>
++#include <unistd.h>
++#include <pthread.h>
++#include <sys/select.h>
++#include <sys/time.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <sys/prctl.h>
++#include <iostream>
++#include <string>
++#include <map>
++#include <functional>
++#include "securec.h"
++#include "source.h"
++#include "player.h"
++#include "format.h"
++#include "components/ui_image_view.h"
++#include "components/root_view.h"
++#include "components/ui_label.h"
++#include "components/ui_slider.h"
++#include "components/ui_surface_view.h"
++#include "components/ui_toggle_button.h"
++#include "window/window.h"
++#include "common/graphic_startup.h"
++#include "common/task_manager.h"
++
++using OHOS::Surface;
++
++using OHOS::Media::Player;
++using OHOS::Media::PlayerSeekMode;
++using OHOS::Media::Source;
++using OHOS::Media::Format;
++using OHOS::Media::StreamSource;
++using OHOS::Media::StreamCallback;
++using namespace std;
++using namespace OHOS;
++using namespace OHOS::Media;
++
++
++class PlayerCallbackImpl : public PlayerCallback {
++public:
++    PlayerCallbackImpl();
++    ~PlayerCallbackImpl();
++    void OnPlaybackComplete();
++    void OnError(int32_t errorType, int32_t errorCode);
++    void OnInfo(int type, int extra);
++    void OnVideoSizeChanged(int width, int height);
++    void OnRewindToComplete();
++};
++
++struct TestSample {
++    std::shared_ptr<Player> adapter_;
++    std::shared_ptr<PlayerCallbackImpl> cb_;
++    Surface *surface_;
++    std::string filepath_;
++    int64_t totalDuration;
++    int64_t currentPosition;
++
++};
++
++PlayerCallbackImpl::PlayerCallbackImpl()
++{
++    printf("ctor\n");
++}
++
++PlayerCallbackImpl::~PlayerCallbackImpl()
++{
++    printf("dtor\n");
++}
++
++void PlayerCallbackImpl::OnPlaybackComplete(void)
++{
++    printf("OnPlaybackComplete test\n");
++}
++
++void PlayerCallbackImpl::OnError(int32_t errorType, int32_t errorCode)
++{
++    printf("OnError test, errorType:%d, errorCode:%d\n", errorType, errorCode);
++}
++
++void PlayerCallbackImpl::OnInfo(int type, int extra)
++{
++    printf("OnInfo test, type:%d, extra:%d\n", type, extra);
++}
++
++void PlayerCallbackImpl::OnVideoSizeChanged(int width, int height)
++{
++    printf("OnVideoSizeChanged test width:%d, height:%d\n", width, height);
++}
++
++void PlayerCallbackImpl::OnRewindToComplete(void)
++{
++    printf("OnRewindToComplete test\n");
++}
++
++volatile sig_atomic_t g_terminate = 0;
++
++static void SignalHandler(int signum)
++{
++    printf("[%s, %d], recv signum:%d\n", __func__, __LINE__, signum);
++    switch(signum) {
++        case SIGINT:  // Ctrl+C
++            printf("Ctrl+C pressed, terminating program...\n");
++            g_terminate = 1;
++            break;
++        case SIGTSTP: // Ctrl+Z
++            printf("Ctrl+Z pressed, terminating program...\n");
++            g_terminate = 1;
++            break;
++        default:
++            break;
++    }
++}
++
++void VideoPlay(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("VideoPlay\n");
++    testSample.adapter_->Play();
++}
++
++void VideoPause(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("VideoPause\n");
++    testSample.adapter_->Pause();
++}
++
++void VideoStop(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("VideoStop\n");
++    testSample.adapter_->Stop();
++    testSample.adapter_->Release();
++    testSample.adapter_.reset();
++    testSample.adapter_ = std::make_shared<Player>();
++    std::map<std::string, std::string> header;
++    Source source(testSample.filepath_, header);
++    testSample.adapter_->SetSource(source);
++    testSample.adapter_->Prepare();
++    testSample.adapter_->SetPlayerCallback(testSample.cb_);
++    testSample.adapter_->SetVideoSurface(testSample.surface_);
++}
++
++void VideoSeek(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    int32_t playerState = 0;
++    testSample.adapter_->GetPlayerState(playerState);
++    if (playerState != PlayerStates::PLAYER_PAUSED || playerState != PlayerStates::PLAYER_STARTED) {
++        VideoStop(testSample);
++    }
++    printf("VideoSeek\n");
++    testSample.adapter_->GetDuration(testSample.totalDuration);
++    testSample.adapter_->GetCurrentTime(testSample.currentPosition);
++    printf("please input seek position(0-%lld): currentPosition:%lld\n", testSample.totalDuration, testSample.currentPosition);
++    int64_t seekPos = 0;
++    cin >> seekPos;
++    testSample.adapter_->Rewind(seekPos, PlayerSeekMode::PLAYER_SEEK_PREVIOUS_SYNC);
++    sleep(0x1);
++    testSample.adapter_->Play();
++}
++
++void VideoSpeed(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("VideoSpeed\n");
++    float speed = 1.0f;
++    cin >> speed;
++    if (speed > 1.1f) {
++        speed = 2.0f;
++    }
++    printf("speed:%f\n", speed);
++    int32_t playerState = 0;
++    testSample.adapter_->GetPlayerState(playerState);
++    if (playerState != PlayerStates::PLAYER_STARTED) {
++        if (playerState == PlayerStates::PLAYER_PAUSED) {
++            VideoPlay(testSample);
++        } else {
++            VideoStop(testSample);
++            VideoPlay(testSample);
++        }
++    }
++    testSample.adapter_->SetPlaybackSpeed(speed);
++}
++
++void videSetVolume(TestSample &testSample)
++{
++    float lvolume;
++    float rvolume;
++    printf("please input volume(0-100): ");
++    cin >> lvolume >> rvolume;
++    printf("try set volume %f %f\n", lvolume, rvolume);
++    int32_t playerState = 0;
++    testSample.adapter_->GetPlayerState(playerState);
++    if (playerState != PlayerStates::PLAYER_STARTED) {
++        if (playerState == PlayerStates::PLAYER_PAUSED) {
++            VideoPlay(testSample);
++        } else {
++            VideoStop(testSample);
++            VideoPlay(testSample);
++        }
++    }
++    int32_t ret = testSample.adapter_->SetVolume(lvolume, rvolume);
++    if (ret != 0) {
++        printf("[%s: %d] ret:%d\n", __func__, __LINE__, ret);
++    }
++}
++
++void VideoReplay(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("VideoReplay\n");
++    VideoStop(testSample);
++    VideoPlay(testSample);
++}
++
++void VideoShow(TestSample &testSample)
++{
++    printf("now show player info\n");
++
++    printf("player IsPlaying:%d IsSingleLooping:%d\n", testSample.adapter_->IsPlaying(),
++        testSample.adapter_->IsSingleLooping());
++
++    int64_t duration;
++    int32_t ret = testSample.adapter_->GetDuration(duration);
++    if (ret != 0) {
++        printf("[%s: %d] ret:%d\n", __func__, __LINE__, ret);
++    }
++
++    int64_t currentPosition;
++    ret = testSample.adapter_->GetCurrentTime(currentPosition);
++    if (ret != 0) {
++        printf("[%s: %d] ret:%d\n", __func__, __LINE__, ret);
++    }
++    printf("player duration:%lld GetCurrentTime:%lld\n", duration, currentPosition);
++
++    int32_t videoWidth;
++    int32_t videoHeight;
++    ret = testSample.adapter_->GetVideoWidth(videoWidth);
++    if (ret != 0) {
++        printf("[%s: %d] ret:%d\n", __func__, __LINE__, ret);
++    }
++    ret = testSample.adapter_->GetVideoHeight(videoHeight);
++    if (ret != 0) {
++        printf("[%s: %d] ret:%d\n", __func__, __LINE__, ret);
++    }
++    printf("player videoWidth:%d videoHeight:%d\n", videoWidth, videoHeight);
++    int32_t state;
++    ret = testSample.adapter_->GetPlayerState(state);
++    if (ret != 0) {
++        printf("[%s: %d] ret:%d\n", __func__, __LINE__, ret);
++    }
++    printf("player current state:%d\n", state);
++}
++
++void VideoLoop(TestSample &testSample)
++{
++    int32_t loop = 0;
++    printf("try set loop %d\n", loop);
++    cin >> loop;
++    int32_t playerState = 0;
++    testSample.adapter_->GetPlayerState(playerState);
++    if (playerState != PlayerStates::PLAYER_STARTED) {
++        if (playerState == PlayerStates::PLAYER_PAUSED) {
++            VideoPlay(testSample);
++        } else {
++            VideoStop(testSample);
++            VideoPlay(testSample);
++        }
++    }
++    int32_t ret = testSample.adapter_->EnableSingleLooping(loop == 1);
++    if (ret != 0) {
++        printf("[%s: %d] ret:%d\n", __func__, __LINE__, ret);
++    }
++    printf("Set loop %d\n", loop);
++}
++
++void VideoNext(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    printf("VideoNext\n");
++    VideoStop(testSample);
++    VideoPlay(testSample);
++}
++
++void VideoPressurePull(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    int32_t playerState = 0;
++    testSample.adapter_->GetPlayerState(playerState);
++    if (playerState != PlayerStates::PLAYER_STARTED) {
++        if (playerState == PlayerStates::PLAYER_PAUSED) {
++            VideoPlay(testSample);
++        } else {
++            VideoStop(testSample);
++            VideoPlay(testSample);
++        }
++    }
++    printf("VideoPressurePull\n");
++    for (int i = 0; i < 10; i++) {
++        VideoPause(testSample);
++        usleep(100000);
++        VideoPlay(testSample);
++        usleep(100000);
++    }
++}
++
++void VideoPressureSeek(TestSample &testSample)
++{
++    if (testSample.adapter_ == nullptr) {
++        printf("Player adapter is null, please check.\n");
++        return;
++    }
++    int32_t playerState = 0;
++    testSample.adapter_->GetPlayerState(playerState);
++    if (playerState != PlayerStates::PLAYER_STARTED || playerState != PlayerStates::PLAYER_PAUSED) {
++        VideoStop(testSample);
++        VideoPlay(testSample);
++    }
++    for (int i = 0; i < 10; i++) {
++        testSample.adapter_->Rewind(0, PlayerSeekMode::PLAYER_SEEK_PREVIOUS_SYNC);
++        sleep(1);
++    }
++}
++
++
++std::map<std::string, std::function<void(TestSample&)>> g_mediaTypeMap = {
++    {"play", VideoPlay},
++    {"pause", VideoPause},
++    {"stop", VideoStop},
++    {"replay", VideoReplay},
++    {"seek", VideoSeek},
++    {"speed", VideoSpeed},
++    {"volume", videSetVolume},
++    {"loop", VideoLoop},
++    {"show", VideoShow},
++    {"next", VideoNext},
++    {"pressure_pull", VideoPressurePull},
++    {"pressure_seek", VideoPressureSeek},
++    {"quit", [](TestSample&){printf("quit\n"); g_terminate = true;}}
++};
++
++int main(int argc, char *argv[])
++{
++    signal(SIGINT, SignalHandler);
++    signal(SIGTSTP, SignalHandler);
++    prctl(PR_SET_NAME, "mainProc", 0, 0, 0);
++    if (argc < 2) {
++        printf("Usage: %s <filepath>\n", argv[0]);
++        return -1;
++    }
++    std::string filepath = argv[1];
++    int posX = 0;
++    int posY = 0;
++    int width = 640;
++    int height = 360;
++    cout << "Please select preview resolution:" << endl;
++    cout << "1. 640x360" << endl;
++    cout << "2. 1920x1080" << endl;
++    char input;
++    cin >> input;
++    switch (input) {
++        case '1':
++            width = 640;
++            height = 360;
++            break;
++        case '2':
++            width = 1920;
++            height = 1080;
++            break;
++        default:
++            cout << "Invalid input." << endl;
++        }
++    RootView* rootView_;
++    UISurfaceView* surfaceView_;
++    GraphicStartUp::Init();
++    rootView_ = RootView::GetWindowRootView();
++    rootView_->SetWidth(width);
++    rootView_->SetHeight(height);
++    rootView_->SetPosition(posX, posY);
++    rootView_->SetStyle(STYLE_BACKGROUND_COLOR, Color::White().full);
++    surfaceView_ = new UISurfaceView();
++    surfaceView_->SetPosition(posX, posY);
++    surfaceView_->SetWidth(width);
++    surfaceView_->SetHeight(height);
++    rootView_->Add(surfaceView_);
++    rootView_->Invalidate();
++    struct TestSample testSample;
++    testSample.adapter_ = std::make_shared<Player>();
++    std::map<std::string, std::string> header;
++    testSample.filepath_ = filepath;
++    Source source(testSample.filepath_, header);
++    testSample.adapter_->SetSource(source);
++    testSample.adapter_->Prepare();
++    testSample.cb_ = std::make_shared<PlayerCallbackImpl>();
++    testSample.adapter_->SetPlayerCallback(testSample.cb_);
++    testSample.surface_ = surfaceView_->GetSurface();
++    int32_t ret = testSample.adapter_->SetVideoSurface(testSample.surface_);
++    if (ret != 0) {
++        printf("SetVideoSurface failed, ret = %d\n", ret);
++        return -1;
++    }
++    testSample.adapter_->Play();
++    if (rootView_ != nullptr) {
++        WindowConfig config = {};
++        config.rect = rootView_->GetRect();
++        config.rect.SetPosition(posX, posY);
++        Window* window = Window::CreateWindow(config);
++          if (window != nullptr) {
++              window->BindRootView(rootView_);
++              window->Show();
++          } else {
++              printf("Create window false!\n");
++          }
++    }
++
++    fd_set readfds;
++    struct timeval tv;
++    string input1;
++    while (!g_terminate) {
++        cout << "**********************"<< endl;
++        cout << "Please select operation:" << endl;
++        cout << "play" << endl;
++        cout << "pause" << endl;
++        cout << "stop" << endl;
++        cout << "seek" << endl;
++        cout << "speed" << endl;
++        cout << "volume" << endl;
++        cout << "loop" << endl;
++        cout << "show" << endl;
++        cout << "next" << endl;
++        cout << "pressure_pull" << endl;
++        cout << "pressure_seek" << endl;
++        cout << "quit" << endl;
++        cout << "**********************"<< endl;
++        FD_ZERO(&readfds);
++        FD_SET(STDIN_FILENO, &readfds);
++
++        tv.tv_sec = 10;
++        tv.tv_usec = 0;
++        int ret = select(STDIN_FILENO + 1, &readfds, NULL, NULL, &tv);
++        if (ret == -1 && errno != EINTR) {
++            perror("select");
++            break;
++        }
++        if (ret > 0 && FD_ISSET(STDIN_FILENO, &readfds)) {
++            cin >> input1;
++            if (g_mediaTypeMap.find(input1) != g_mediaTypeMap.end()) {
++                g_mediaTypeMap[input1](testSample);
++                int32_t playerState = 0;
++                testSample.adapter_->GetPlayerState(playerState);
++                printf("playerState:%d\n", playerState);
++            } else {
++                cout << "Invalid input." << endl;
++            }
++        }
++    }
++    rootView_->Remove(surfaceView_);
++    if (surfaceView_ != nullptr) {
++        delete surfaceView_;
++        surfaceView_ = nullptr;
++    }
++
++    rootView_->Invalidate();
++    OHOS::TaskManager::GetInstance()->TaskHandler();
++    printf("Stop\n");
++    testSample.adapter_->Stop();
++    printf("Release\n");
++    testSample.adapter_->Release();
++
++    if (rootView_ != nullptr) {
++        Window::DestroyWindow(rootView_->GetBoundWindow());
++        RootView::DestroyWindowRootView(rootView_);
++        rootView_ = nullptr;
++    }
++
++     if (testSample.cb_ != nullptr) {
++        testSample.cb_.reset();
++        testSample.cb_ = nullptr;
++    }
++    return 0;
++}

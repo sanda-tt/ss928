@@ -1,0 +1,12 @@
+diff --git a/services/init/lite/init_signal_handler.c b/services/init/lite/init_signal_handler.c
+index deb4a10..3085d84 100644
+--- a/services/init/lite/init_signal_handler.c
++++ b/services/init/lite/init_signal_handler.c
+@@ -62,6 +62,7 @@ static void SigHandler(int sig)
+         }
+         case SIGTERM: {
+             StopAllServices(0, NULL, 0, NULL);
++            RebootSystem();
+             break;
+         }
+         default:

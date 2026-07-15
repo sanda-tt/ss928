@@ -1,0 +1,24 @@
+diff --git a/interfaces/kits/format.h b/interfaces/kits/format.h
+index 8ff8f67..b7c1450 100644
+--- a/interfaces/kits/format.h
++++ b/interfaces/kits/format.h
+@@ -53,6 +53,7 @@ extern const char *MIME_AUDIO_AAC;
+ /** Indicates the codec for RAW audios (not supported yet), which is a value of the codec type key. */
+ extern const char *MIME_AUDIO_RAW;
+ extern const char *PAUSE_AFTER_PLAY;
++extern const char *LAYER_PRIORITY;
+ 
+ /**
+  * @brief Enumerates formats.
+diff --git a/src/format.cpp b/src/format.cpp
+index 330179b..50158b3 100644
+--- a/src/format.cpp
++++ b/src/format.cpp
+@@ -23,6 +23,7 @@ const char *CODEC_MIME = "mime";
+ const char *MIME_AUDIO_AAC = "audio/mp4a-latm";
+ const char *MIME_AUDIO_RAW = "audio/raw";
+ const char *PAUSE_AFTER_PLAY = "pause_after_play";
++const char *LAYER_PRIORITY = "layer_priority";
+ 
+ #define SET_INT32_FORMAT(type, func)   \
+ do { \

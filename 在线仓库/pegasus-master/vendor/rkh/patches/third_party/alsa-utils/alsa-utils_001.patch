@@ -1,0 +1,302 @@
+diff --git a/BUILD.gn b/BUILD.gn
+index e81aa8d..731705d 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -11,7 +11,12 @@
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+ 
+-import("//build/ohos.gni")
++if (defined(ohos_lite)) {
++  import("//build/lite/config/component/lite_component.gni")
++  import("//build/lite/ndk/ndk.gni")
++} else {
++  import("//build/ohos.gni")
++}
+ 
+ ASOUND_STATE_DIR = "/var/lib/alsa"
+ ASOUND_LOCK_DIR = "/var/lock"
+@@ -56,122 +61,191 @@ config("alsa_utils_config") {
+   }
+ }
+ 
+-ohos_executable("aconnect") {
+-  sources = [ "seq/aconnect/aconnect.c" ]
+-
+-  include_dirs = [
+-    "//third_party/alsa-utils/include",
+-    "//third_party/alsa-lib/include",
++alsa_utils_flags = [
++    "-Wno-sign-compare",
++    "-Wno-implicit-function-declaration",
++    "-Wno-parentheses",
++    "-Wno-string-conversion",
++    "-Wno-string-plus-int",
++    "-Wno-asm-operand-widths",
++    "-Wno-pointer-sign",
++    "-Wno-deprecated-declarations",
++    "-Wno-implicit-int",
++    "-Wno-switch",
++    "-Wno-incompatible-pointer-types-discards-qualifiers",
++    "-Wno-int-conversion",
++    "-Wno-absolute-value",
++    "-Wno-unused-function",
++    "-Wno-unused-label",
++    "-Wno-unused-const-variable",
++    "-Wno-visibility",
++    "-Wno-incompatible-pointer-types",
++    "-Wno-sometimes-uninitialized",
++    "-Wno-format",
++    "-Wno-tautological-constant-out-of-range-compare",
++    "-Wno-implicit-fallthrough",
++    "-Wno-error",
++    "-DHAVE_CONFIG_H",
++    "-D_GNU_SOURCE",
++    "-D__USE_GNU",
++    "-DCURSESINC=\"\"",
++    "-DSYS_ASOUNDRC=\"$ASOUND_STATE_DIR/asound.state\"",
++    "-DSYS_LOCKFILE=\"$ASOUND_LOCK_DIR/asound.state.lock\"",
++    "-DSYS_LOCKFILE=\"$ASOUND_LOCK_DIR/asound.state.lock\"",
+   ]
+ 
+-  configs = [ ":alsa_utils_config" ]
++if (defined(ohos_lite)) {
++  executable("amixer") {
++    sources = [
++      "amixer/amixer.c",
++      "amixer/volume_mapping.c",
++    ]
++
++    include_dirs = [
++      "//third_party/alsa-utils/amixer",
++      "//third_party/alsa-utils/include",
++      "//third_party/alsa-lib/include",
++    ]
++    deps = [ "../alsa-lib:libasound" ]
++
++    cflags = alsa_utils_flags
++  }
+ 
+-  deps = [ "../alsa-lib:libasound" ]
++  executable("aplay") {
++    sources = [ "aplay/aplay.c" ]
+ 
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-utils"
+-}
++    include_dirs = [
++      "//third_party/alsa-utils/aplay",
++      "//third_party/alsa-utils/include",
++      "//third_party/alsa-lib/include",
++    ]
++    deps = [ "../alsa-lib:libasound" ]
++    cflags = alsa_utils_flags
++  }
++  group("alsa_utils_lite") {
++    deps = [
++      ":aplay",
++      ":amixer"
++    ]
++  }
++} else {
++  ohos_executable("aconnect") {
++    sources = [ "seq/aconnect/aconnect.c" ]
+ 
+-ohos_executable("amixer") {
+-  sources = [
+-    "amixer/amixer.c",
+-    "amixer/volume_mapping.c",
+-  ]
++    include_dirs = [
++      "//third_party/alsa-utils/include",
++      "//third_party/alsa-lib/include",
++    ]
+ 
+-  include_dirs = [
+-    "//third_party/alsa-utils/amixer",
+-    "//third_party/alsa-utils/include",
+-    "//third_party/alsa-lib/include",
+-  ]
++    configs = [ ":alsa_utils_config" ]
+ 
+-  configs = [ ":alsa_utils_config" ]
++    deps = [ "../alsa-lib:libasound" ]
+ 
+-  deps = [ "../alsa-lib:libasound" ]
++    subsystem_name = "thirdparty"
++    part_name = "alsa-utils"
++  }
+ 
+-  install_enable = true
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-utils"
+-  install_images = [ "system" ]
+-}
++  ohos_executable("amixer") {
++    sources = [
++      "amixer/amixer.c",
++      "amixer/volume_mapping.c",
++    ]
+ 
+-ohos_executable("aplay") {
+-  sources = [ "aplay/aplay.c" ]
++    include_dirs = [
++      "//third_party/alsa-utils/amixer",
++      "//third_party/alsa-utils/include",
++      "//third_party/alsa-lib/include",
++    ]
+ 
+-  include_dirs = [
+-    "//third_party/alsa-utils/aplay",
+-    "//third_party/alsa-utils/include",
+-    "//third_party/alsa-lib/include",
+-  ]
++    configs = [ ":alsa_utils_config" ]
+ 
+-  configs = [ ":alsa_utils_config" ]
++    deps = [ "../alsa-lib:libasound" ]
+ 
+-  deps = [ "../alsa-lib:libasound" ]
++    install_enable = true
++    subsystem_name = "thirdparty"
++    part_name = "alsa-utils"
++    install_images = [ "system" ]
++  }
+ 
+-  symlink_target_name = [ "arecord" ]
++  ohos_executable("aplay") {
++    sources = [ "aplay/aplay.c" ]
+ 
+-  install_enable = true
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-utils"
+-  install_images = [ "system" ]
+-}
++    include_dirs = [
++      "//third_party/alsa-utils/aplay",
++      "//third_party/alsa-utils/include",
++      "//third_party/alsa-lib/include",
++    ]
+ 
+-ohos_executable("speaker-test") {
+-  sources = [
+-    "speaker-test/pink.c",
+-    "speaker-test/speaker-test.c",
+-    "speaker-test/st2095.c",
+-  ]
++    configs = [ ":alsa_utils_config" ]
+ 
+-  include_dirs = [
+-    "//third_party/alsa-utils/speaker-test",
+-    "//third_party/alsa-utils/include",
+-    "//third_party/alsa-lib/include",
+-  ]
++    deps = [ "../alsa-lib:libasound" ]
+ 
+-  configs = [ ":alsa_utils_config" ]
++    symlink_target_name = [ "arecord" ]
+ 
+-  deps = [ "../alsa-lib:libasound" ]
++    install_enable = true
++    subsystem_name = "thirdparty"
++    part_name = "alsa-utils"
++    install_images = [ "system" ]
++  }
+ 
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-utils"
+-}
++  ohos_executable("speaker-test") {
++    sources = [
++      "speaker-test/pink.c",
++      "speaker-test/speaker-test.c",
++      "speaker-test/st2095.c",
++    ]
+ 
+-ohos_executable("alsactl") {
+-  sources = [
+-    "alsactl/alsactl.c",
+-    "alsactl/clean.c",
+-    "alsactl/daemon.c",
+-    "alsactl/info.c",
+-    "alsactl/init_parse.c",
+-    "alsactl/init_ucm.c",
+-    "alsactl/lock.c",
+-    "alsactl/monitor.c",
+-    "alsactl/state.c",
+-    "alsactl/utils.c",
+-  ]
++    include_dirs = [
++      "//third_party/alsa-utils/speaker-test",
++      "//third_party/alsa-utils/include",
++      "//third_party/alsa-lib/include",
++    ]
+ 
+-  include_dirs = [
+-    "//third_party/alsa-utils/alsactl",
+-    "//third_party/alsa-utils/include",
+-    "//third_party/alsa-lib/include",
+-  ]
++    configs = [ ":alsa_utils_config" ]
+ 
+-  configs = [ ":alsa_utils_config" ]
++    deps = [ "../alsa-lib:libasound" ]
+ 
+-  deps = [ "../alsa-lib:libasound" ]
++    subsystem_name = "thirdparty"
++    part_name = "alsa-utils"
++  }
+ 
+-  install_enable = true
+-  subsystem_name = "thirdparty"
+-  part_name = "alsa-utils"
+-  install_images = [ "system" ]
+-}
++  ohos_executable("alsactl") {
++    sources = [
++      "alsactl/alsactl.c",
++      "alsactl/clean.c",
++      "alsactl/daemon.c",
++      "alsactl/info.c",
++      "alsactl/init_parse.c",
++      "alsactl/init_ucm.c",
++      "alsactl/lock.c",
++      "alsactl/monitor.c",
++      "alsactl/state.c",
++      "alsactl/utils.c",
++    ]
++
++    include_dirs = [
++      "//third_party/alsa-utils/alsactl",
++      "//third_party/alsa-utils/include",
++      "//third_party/alsa-lib/include",
++    ]
++
++    configs = [ ":alsa_utils_config" ]
++
++    deps = [ "../alsa-lib:libasound" ]
++
++    install_enable = true
++    subsystem_name = "thirdparty"
++    part_name = "alsa-utils"
++    install_images = [ "system" ]
++  }
+ 
+-group("alsa-utils") {
+-  deps = [
+-    ":aconnect",
+-    ":alsactl",
+-    ":amixer",
+-    ":aplay",
+-    ":speaker-test",
+-  ]
++  group("alsa-utils") {
++    deps = [
++      ":aconnect",
++      ":alsactl",
++      ":amixer",
++      ":aplay",
++      ":speaker-test",
++    ]
++  }
+ }

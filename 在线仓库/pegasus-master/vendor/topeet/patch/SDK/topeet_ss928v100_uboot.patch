@@ -1,0 +1,40 @@
+diff -Nura a/configs/ss928v100_emmc_defconfig b/configs/ss928v100_emmc_defconfig
+--- a/configs/ss928v100_emmc_defconfig	2025-09-27 16:09:14.207845685 +0800
++++ b/configs/ss928v100_emmc_defconfig	2025-09-27 16:06:31.383147663 +0800
+@@ -257,7 +257,7 @@
+ # CONFIG_BSP_DISABLE_CONSOLE is not set
+ # CONFIG_BSP_DISABLE_DOWNLOAD is not set
+ # CONFIG_DELAY_ENVIRONMENT is not set
+-# CONFIG_USE_BOOTARGS is not set
++CONFIG_USE_BOOTARGS=y
+ # CONFIG_USE_BOOTCOMMAND is not set
+ # CONFIG_USE_PREBOOT is not set
+ 
+diff -Nura a/include/configs/ss928v100.h b/include/configs/ss928v100.h
+--- a/include/configs/ss928v100.h	2025-09-27 16:09:14.231845790 +0800
++++ b/include/configs/ss928v100.h	2025-09-27 16:06:34.779161968 +0800
+@@ -189,7 +189,7 @@
+  */
+ 
+ /* Assume we boot with root on the seventh partition of eMMC */
+-#define CONFIG_BOOTCOMMAND "bootm 0x42000000"
++#define CONFIG_BOOTCOMMAND "mmc read 0 0x42000000 0x800 0x6000; bootm 0x42000000"
+ #define CONFIG_SYS_USB_XHCI_MAX_ROOT_PORTS 2
+ #define CONFIG_USB_MAX_CONTROLLER_COUNT 2
+ #define BOOT_TARGET_DEVICES(func) \
+diff -Nura a/include/env_default.h b/include/env_default.h
+--- a/include/env_default.h	2020-01-07 04:56:31.000000000 +0800
++++ b/include/env_default.h	2025-09-27 16:06:34.939162642 +0800
+@@ -29,10 +29,10 @@
+ 	ENV_FLAGS_VAR "=" CONFIG_ENV_FLAGS_LIST_DEFAULT "\0"
+ #endif
+ #ifdef	CONFIG_USE_BOOTARGS
+-	"bootargs="	CONFIG_BOOTARGS			"\0"
++	"bootargs=mem=2048M console=ttyAMA0,115200 clk_ignore_unused rw rootwait root=/dev/mmcblk0p3 rootfstype=ext4 blkdevparts=mmcblk0:1M(u-boot.bin),16M(kernel),-(rootfs.ext4)\0"
+ #endif
+ #ifdef	CONFIG_BOOTCOMMAND
+-	"bootcmd="	CONFIG_BOOTCOMMAND		"\0"
++	"bootcmd=mmc read 0 0x42000000 0x800 0x8000; bootm 0x42000000\0"
+ #endif
+ #ifdef	CONFIG_RAMBOOTCOMMAND
+ 	"ramboot="	CONFIG_RAMBOOTCOMMAND		"\0"

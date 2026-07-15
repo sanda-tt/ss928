@@ -1,0 +1,82 @@
+diff --git a/adapter/BUILD.gn b/adapter/BUILD.gn
+index 0422193..a687e8a 100644
+--- a/adapter/BUILD.gn
++++ b/adapter/BUILD.gn
+@@ -23,6 +23,13 @@ if (defined(ohos_lite)) {
+       "$hdf_adapter_path/uhdf/posix/old:hdf_posix",
+       "$hdf_adapter_path/uhdf2/hdi:libhdi",
+     ]
++
++    if (board_name == "hispark_aiflylite" ||
++        board_name == "hispark_aifly") {
++      deps += [
++        "$hdf_adapter_path/uhdf2/utils:libhdf_utils",
++      ]
++    }
+   }
+   group("uhdf_test_entry") {
+     deps = [
+diff --git a/adapter/khdf/linux/manager/Makefile b/adapter/khdf/linux/manager/Makefile
+index 9e9555e..0f02ff0 100644
+--- a/adapter/khdf/linux/manager/Makefile
++++ b/adapter/khdf/linux/manager/Makefile
+@@ -65,8 +65,10 @@ obj-y += \
+         ./src/devmgr_load.o \
+         ./src/devmgr_pm_reg.o \
+         ./src/sym_export.o \
+-        ./src/hdf_kevent.o \
+-        $(SEC_FUNCTION_OBJECTS)
++        ./src/hdf_kevent.o
++
++CFLAGS_REMOVE_$(HDF_FRAMEWORK_SRC_DIR)/framework/utils/src/hdf_sbuf.o += -mgeneral-regs-only
++KBUILD_CFLAGS += -mno-outline-atomics
+ 
+ ccflags-y += \
+        -I$(srctree)/drivers/hdf/framework/include \
+diff --git a/adapter/khdf/linux/model/audio/Makefile b/adapter/khdf/linux/model/audio/Makefile
+index 745c698..a35b2d9 100644
+--- a/adapter/khdf/linux/model/audio/Makefile
++++ b/adapter/khdf/linux/model/audio/Makefile
+@@ -50,17 +50,17 @@ obj-$(CONFIG_DRIVERS_HDF_AUDIO_USB) += \
+           $(KHDF_AUDIO_ROOT_DIR)/usb/src/audio_usb_validate_desc.o \
+           $(KHDF_AUDIO_ROOT_DIR)/usb/src/audio_usb_mixer.o
+ 
+-obj-$(CONFIG_DRIVERS_HDF_AUDIO_HI3516CODEC) += \
+-          $(KHDF_AUDIO_BASE_ROOT_DIR)/device/board/hisilicon/hispark_taurus/audio_drivers/
++# obj-$(CONFIG_DRIVERS_HDF_AUDIO_HI3516CODEC) += \
++#           $(KHDF_AUDIO_BASE_ROOT_DIR)/device/board/hisilicon/hispark_taurus/audio_drivers/
+ 
+-obj-$(CONFIG_DRIVERS_HDF_AUDIO_RK3568) += \
+-          $(KHDF_AUDIO_BASE_ROOT_DIR)/device/board/hihope/rk3568/audio_drivers/
++# obj-$(CONFIG_DRIVERS_HDF_AUDIO_RK3568) += \
++#           $(KHDF_AUDIO_BASE_ROOT_DIR)/device/board/hihope/rk3568/audio_drivers/
+ 
+-obj-$(CONFIG_DRIVERS_HDF_AUDIO_RK3588) += \
+-          $(KHDF_AUDIO_BASE_ROOT_DIR)/device/board/hihope/dayu210/audio_drivers/
++# obj-$(CONFIG_DRIVERS_HDF_AUDIO_RK3588) += \
++#           $(KHDF_AUDIO_BASE_ROOT_DIR)/device/board/hihope/dayu210/audio_drivers/
+ 
+-obj-$(CONFIG_DRIVERS_HDF_AUDIO_RK3566) += \
+-          $(KHDF_AUDIO_BASE_ROOT_DIR)/device/board/kaihong/khdvk_3566b/kernel/audio/
++# obj-$(CONFIG_DRIVERS_HDF_AUDIO_RK3566) += \
++#           $(KHDF_AUDIO_BASE_ROOT_DIR)/device/board/kaihong/khdvk_3566b/kernel/audio/
+ 
+ obj-$(CONFIG_DRIVERS_HDF_AUDIO_A311D) += \
+           $(KHDF_AUDIO_A311D_DIR)/codec/soc_codec/a311d_codec_adapter.o \
+diff --git a/adapter/khdf/linux/model/input/Makefile b/adapter/khdf/linux/model/input/Makefile
+index 7901b25..3e7350b 100644
+--- a/adapter/khdf/linux/model/input/Makefile
++++ b/adapter/khdf/linux/model/input/Makefile
+@@ -15,12 +15,8 @@
+ INPUT_ROOT_DIR = ../../../../../framework/model/input/driver
+ 
+ obj-$(CONFIG_DRIVERS_HDF_INPUT) += \
+-               $(INPUT_ROOT_DIR)/input_bus_ops/input_i2c_ops.o \
+                $(INPUT_ROOT_DIR)/hdf_input_device_manager.o \
+-               $(INPUT_ROOT_DIR)/input_config_parser.o \
+                $(INPUT_ROOT_DIR)/event_hub.o \
+-               $(INPUT_ROOT_DIR)/hdf_touch.o \
+-               $(INPUT_ROOT_DIR)/hdf_key.o \
+                $(INPUT_ROOT_DIR)/hdf_hid_adapter.o
+ 
+ obj-$(CONFIG_DRIVERS_HDF_TP_5P5_GT911) += \
