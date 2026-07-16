@@ -1,0 +1,3 @@
+interface:
+  display_name: "WeChat CloudBase IoT"
+  short_description: "Build secure SS928-to-CloudBase Mini Program data flows."

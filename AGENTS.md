@@ -39,6 +39,7 @@
 - MT5710 / MT571X 5G RedCap 验证：`skills/ss928-mt5710-5g-validation/SKILL.md`
 - 微信小程序开发、调试、预览或发布：`skills/miniprogram-development/SKILL.md`
 - 原生 JavaScript 微信小程序实现：`skills/wechat-miniprogram-native/SKILL.md`
+- 微信小程序云开发（CloudBase / 云函数 / 云数据库 / 云存储 / IoT）：必须调用 `skills/wechat-cloudbase-iot/SKILL.md`
 
 若用户点名某个 skill，优先使用它。新建或更新 skill 后，同步更新 `docs/agent/skills-routing.md`。详细触发条件见该文件。
 
