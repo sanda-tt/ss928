@@ -9,6 +9,7 @@
 - `imu_fall_detector.md`：纯 Python 摔倒/撞击状态机、测试与调参注意事项。
 - `ss928-max98357-audio-playback.md`：MAX98357 I2S、音频转换、pinmux 和 MPP Sample 播放。
 - `dx_gp21_tracker-and-tracks.md`：DX-GP21-A GNSS、UART4、轨迹保存、BLE 与小程序地图。
+- `mr20-udp-pc-validation.md`：MR20 Windows UDP 接收、0x60B 目标帧解析与 CSV 日志验证。
 
 ## 新增历史记录格式
 
