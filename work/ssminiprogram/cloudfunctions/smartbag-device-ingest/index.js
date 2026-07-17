@@ -8,8 +8,8 @@ const MAX_BODY_BYTES = 64 * 1024;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Device-Id, X-Timestamp, X-Nonce, X-Signature"
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, X-Upload-Token"
 };
 
 const sendJson = (res, statusCode, body) => {
@@ -41,31 +41,7 @@ const readRawBody = (req) => new Promise((resolve, reject) => {
   req.on("error", reject);
 });
 
-const loadDeviceSecrets = () => {
-  const raw = process.env.SMARTBAG_DEVICE_SECRETS_JSON;
-  if (!raw) {
-    return {};
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch (error) {
-    return {};
-  }
-};
-
 const createCloudStore = (database) => ({
-  async getDevice(deviceId) {
-    try {
-      const result = await database.collection("devices").doc(deviceId).get();
-      return result && result.data ? result.data : null;
-    } catch (error) {
-      return null;
-    }
-  },
-  async updateDevice(deviceId, patch) {
-    await database.collection("devices").doc(deviceId).update({ data: patch });
-  },
   async setStatus(document) {
     await database.collection("device_status").doc(document._id).set({ data: document });
   },
@@ -74,9 +50,6 @@ const createCloudStore = (database) => ({
   },
   async insertAlarm(document) {
     await database.collection("alarm_history").add({ data: document });
-  },
-  log(entry) {
-    console.log(JSON.stringify(entry));
   }
 });
 
@@ -87,10 +60,6 @@ const createServer = ({ processor }) => http.createServer(async (req, res) => {
     return;
   }
   const url = new URL(req.url || "/", "http://127.0.0.1");
-  if (req.method === "GET" && url.pathname === "/health") {
-    sendJson(res, 200, { ok: true, data: { service: "smartbag-device-ingest" } });
-    return;
-  }
   if (url.pathname !== "/v1/device/telemetry") {
     sendJson(res, 404, { ok: false, error: { code: "NOT_FOUND", message: "NOT_FOUND" } });
     return;
@@ -102,18 +71,17 @@ const createServer = ({ processor }) => http.createServer(async (req, res) => {
   try {
     const rawBody = await readRawBody(req);
     const result = await processor.process({ headers: req.headers, rawBody });
-    sendJson(res, result.ok ? 202 : result.statusCode || 400, result.ok ? result : { ok: false, error: result.error });
+    sendJson(res, result.success ? 200 : result.statusCode || 400, result.success ? result : { success: false, error: result.error });
   } catch (error) {
     const statusCode = error && error.statusCode ? error.statusCode : 500;
     const code = error && error.code ? error.code : "INTERNAL_ERROR";
-    sendJson(res, statusCode, { ok: false, error: { code, message: code } });
+    sendJson(res, statusCode, { success: false, error: { code } });
   }
 });
 
-const secrets = loadDeviceSecrets();
 const processor = telemetry.createTelemetryProcessor({
   store: createCloudStore(db),
-  resolveSecret: (deviceId) => secrets[deviceId] || ""
+  uploadToken: process.env.SMARTBAG_UPLOAD_TOKEN || ""
 });
 
 if (require.main === module) {

@@ -40,6 +40,8 @@
 - 微信小程序开发、调试、预览或发布：`skills/miniprogram-development/SKILL.md`
 - 原生 JavaScript 微信小程序实现：`skills/wechat-miniprogram-native/SKILL.md`
 - 微信小程序云开发（CloudBase / 云函数 / 云数据库 / 云存储 / IoT）：必须调用 `skills/wechat-cloudbase-iot/SKILL.md`
+- 智能安全书包小程序页面读取 CloudBase 最新状态、GNSS 轨迹或告警历史：必须调用 `skills/smartbag-cloud-read/SKILL.md`
+- SS928 检测模块、传感器或模拟器向 CloudBase 上传状态、轨迹点或跌倒/碰撞告警：必须调用 `skills/smartbag-cloud-upload/SKILL.md`
 
 若用户点名某个 skill，优先使用它。新建或更新 skill 后，同步更新 `docs/agent/skills-routing.md`。详细触发条件见该文件。
 

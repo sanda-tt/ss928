@@ -12,16 +12,12 @@ const call = (action, data) => wx.cloud.callFunction({
   return result.data;
 });
 
-const whoami = () => call("whoami");
-const bindDevice = (deviceId, pairingToken) => call("bindDevice", { deviceId, pairingToken });
-const getLatestStatus = (deviceId) => call("getLatestStatus", { deviceId });
-const getTrackPoints = (deviceId, cursor, pageSize) => call("getTrackPoints", { deviceId, cursor, pageSize });
-const getAlarmHistory = (deviceId, cursor, pageSize) => call("getAlarmHistory", { deviceId, cursor, pageSize });
+const getLatestStatus = () => call("getLatestStatus");
+const getTrackPoints = () => call("getTrackPoints");
+const getAlarmHistory = () => call("getAlarmHistory");
 
 module.exports = {
-  bindDevice,
   getAlarmHistory,
   getLatestStatus,
-  getTrackPoints,
-  whoami
+  getTrackPoints
 };

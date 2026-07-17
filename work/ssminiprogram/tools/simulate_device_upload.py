@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
-"""Local SS928 telemetry uploader simulator. It never embeds device credentials."""
+"""Upload one fixed competition-demo telemetry record for bag001."""
 
-import argparse
-import hashlib
-import hmac
 import json
 import os
 import sys
 import time
 import urllib.error
 import urllib.request
-import uuid
 
 
 def require_env(name):
@@ -20,57 +16,35 @@ def require_env(name):
     return value
 
 
-def build_payload(device_id, timestamp):
-    reported_at = timestamp * 1000
+def build_payload():
+    reported_at = int(time.time() * 1000)
+    location = {"latitude": 30.65736, "longitude": 104.0832}
     return {
-        "version": 1,
-        "deviceId": device_id,
-        "requestId": "sim-" + uuid.uuid4().hex,
-        "reportedAt": reported_at,
         "status": {
-            "location": {"latitude": 30.65736, "longitude": 104.0832, "accuracyM": 6.5, "valid": True},
+            "reportedAt": reported_at,
+            "location": location,
             "attitude": {"rollDeg": 1.2, "pitchDeg": -3.4, "yawDeg": 92.1},
             "risk": {"level": 1, "type": "rear_vehicle", "direction": "left_rear"},
             "battery": {"percent": 82},
             "network": {"type": "5g-redcap", "rssiDbm": -81},
             "firmwareVersion": "sim-v1"
         },
-        "trackPoints": [],
-        "alarms": []
+        "trackPoints": [{"reportedAt": reported_at, "location": location, "speed": 1.2, "heading": 92}],
+        "alarms": [{"reportedAt": reported_at, "alarmType": "rear_vehicle", "riskLevel": 2, "direction": "left_rear", "message": "vehicle approaching", "location": location}]
     }
 
 
-def make_signature(device_id, timestamp, nonce, raw_body, device_secret):
-    body_hash = hashlib.sha256(raw_body).hexdigest()
-    signing_string = "\n".join([device_id, str(timestamp), nonce, body_hash])
-    return hmac.new(device_secret.encode("utf-8"), signing_string.encode("utf-8"), hashlib.sha256).hexdigest()
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Simulate one signed SS928 telemetry upload")
-    parser.add_argument("--bad-signature", action="store_true", help="Send an intentionally invalid signature")
-    args = parser.parse_args()
-
     try:
-        device_id = require_env("DEVICE_ID")
-        device_secret = require_env("DEVICE_SECRET")
         upload_url = require_env("UPLOAD_URL")
+        upload_token = require_env("UPLOAD_TOKEN")
     except RuntimeError as error:
         print(str(error), file=sys.stderr)
         return 2
-
-    timestamp = int(time.time())
-    nonce = "sim-" + uuid.uuid4().hex
-    raw_body = json.dumps(build_payload(device_id, timestamp), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    signature = make_signature(device_id, timestamp, nonce, raw_body, device_secret)
-    if args.bad_signature:
-        signature = "0" * 64
+    raw_body = json.dumps(build_payload(), separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(upload_url, data=raw_body, method="POST")
     request.add_header("Content-Type", "application/json")
-    request.add_header("X-Device-Id", device_id)
-    request.add_header("X-Timestamp", str(timestamp))
-    request.add_header("X-Nonce", nonce)
-    request.add_header("X-Signature", signature)
+    request.add_header("X-Upload-Token", upload_token)
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             print("HTTP " + str(response.status))

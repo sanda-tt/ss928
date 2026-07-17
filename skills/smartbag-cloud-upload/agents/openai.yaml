@@ -1,0 +1,3 @@
+interface:
+  display_name: "Smartbag Cloud Upload"
+  short_description: "Upload SS928 status, tracks, and alarms to CloudBase"

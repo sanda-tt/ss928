@@ -1,0 +1,3 @@
+interface:
+  display_name: "Smartbag Cloud Read"
+  short_description: "Read CloudBase status, tracks, and alarms in the mini program"
