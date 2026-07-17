@@ -19,5 +19,5 @@
 - `skills/ss928-mt5710-5g-validation/SKILL.md`：测试或排查 TD Tech `MT5710/MT571X` 5G RedCap 模组时使用。包括 USB 枚举、`/dev/ttyUSB1` PCUI AT 指令、SIM/APN、蜂窝拨号、互联网连通、语音呼叫、GNSS/定位状态和 MT5710 专属问题。
 - `skills/miniprogram-development/SKILL.md`：开发、修改、调试、预览、发布微信小程序时使用。包括页面、组件、`tabBar`、路由、图标资源、`project.config.json`、`appid`、真机预览、WeChat Developer Tools、`miniprogram-ci`、CloudBase/云开发相关流程。
 - `skills/wechat-miniprogram-native/SKILL.md`：原生 JavaScript 微信小程序实现细节时使用，尤其是性能、包体、`setData` 数据路径、WXML/WXSS、原生组件兼容和避免 TypeScript/Taro/Uni-app 等跨端框架。
-- `skills/smartbag-cloud-read/SKILL.md`：为智能安全书包微信小程序页面接入 CloudBase 已有数据时使用，包括展示最新设备状态、GNSS 历史轨迹、告警或跌倒记录。必须经由 `miniprogram/services/cloud-data-source.js` 调用已部署的 `smartbag-app-api`，不得在页面直接访问业务集合或破坏现有 BLE 实时链路。
-- `skills/smartbag-cloud-upload/SKILL.md`：SS928 传感器、检测模块或模拟器需要上传状态、GNSS、姿态、风险、轨迹点及跌倒/碰撞告警到 CloudBase 时使用。必须复用已部署 `smartbag-device-ingest` 的既有遥测协议和 `X-Upload-Token`，上传失败不得中断本地检测、BLE 或本地告警流程。
+- `skills/smartbag-cloud-read/SKILL.md`：为智能安全书包微信小程序页面接入 CloudBase 已有数据时使用，包括展示最新设备状态、GNSS 历史轨迹、告警或跌倒记录。必须经由 `miniprogram/services/cloud-data-source.js` 调用已部署的 `smartbag-app-api`，不得在页面直接访问业务集合或破坏现有 BLE 实时链路；历史轨迹需按 `reportedAt` 正序映射为地图点，并以 MCP 的“上传记录 -> Event Function 返回 -> 页面”链路定位空数据问题。
+- `skills/smartbag-cloud-upload/SKILL.md`：SS928 传感器、检测模块或模拟器需要上传状态、GNSS、姿态、风险、轨迹点及跌倒/碰撞告警到 CloudBase 时使用。必须复用已部署 `smartbag-device-ingest` 的既有遥测协议和 `X-Upload-Token`；HTTP 函数使用 `@cloudbase/node-sdk`，每个轨迹点必须带唯一 `requestId`，并在 MCP 审计后从 `cloudfunctions` 父目录部署。上传失败不得中断本地检测、BLE 或本地告警流程。

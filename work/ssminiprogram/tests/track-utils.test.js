@@ -47,6 +47,21 @@ test("normalizeTrackPoint accepts compact BLE arrays and rejects invalid fixes",
   assert.strictEqual(track.normalizeTrackPoint({ t: 1, lat: 31, lon: 121, fix: 0 }), null);
 });
 
+test("normalizeCloudTrackPoint maps CloudBase history records for the map", () => {
+  const point = track.normalizeCloudTrackPoint({
+    reportedAt: 1784160000000,
+    location: { latitude: 30.65736, longitude: 104.0832, accuracyM: 8, valid: true },
+    speed: 1.2,
+    heading: 92
+  });
+  assert.strictEqual(point.time, 1784160000000);
+  assert.strictEqual(point.source, "cloud");
+  assert.strictEqual(point.accuracy, 8);
+  assert.strictEqual(point.speed, 1.2);
+  assert.strictEqual(point.course, 92);
+  assert.strictEqual(track.normalizeCloudTrackPoint({ location: { latitude: 30, longitude: 104, valid: false } }), null);
+});
+
 test("mergeTrackChunk appends valid points, deduplicates, and exposes next offset", () => {
   const first = track.mergeTrackChunk([], {
     typ: "trk",

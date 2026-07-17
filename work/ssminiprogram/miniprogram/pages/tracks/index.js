@@ -1,4 +1,5 @@
 const trackUtils = require("../../utils/track-utils");
+const cloudDataSource = require("../../services/cloud-data-source");
 
 const NUS_SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
 const NUS_RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E";
@@ -40,6 +41,9 @@ Page({
     markers: [],
     polyline: [],
     liveEnabled: false,
+    cloudTrackLoading: false,
+    cloudTrackStatus: "等待云端历史轨迹",
+    cloudTrackStatusLevel: "idle",
     commandResponse: "等待连接",
     logs: []
   },
@@ -63,6 +67,10 @@ Page({
         this.setData({ adapterReady: false, scanning: false, scanButtonText: "扫描", statusLevel: "warn" });
       }
     });
+  },
+
+  onShow() {
+    this.loadCloudTrack();
   },
 
   onUnload() {
@@ -418,6 +426,52 @@ Page({
       patch.polyline = [];
     }
     this.setData(patch);
+  },
+
+  loadCloudTrack() {
+    this.setData({
+      cloudTrackLoading: true,
+      cloudTrackStatus: "正在加载云端历史轨迹",
+      cloudTrackStatusLevel: "busy"
+    });
+    cloudDataSource.getTrackPoints().then((result) => {
+      const items = result && Array.isArray(result.items) ? result.items : [];
+      const points = [];
+      for (let i = 0; i < items.length; i += 1) {
+        const point = trackUtils.normalizeCloudTrackPoint(items[i]);
+        if (point) {
+          points.push(point);
+        }
+      }
+      points.sort((left, right) => left.time - right.time);
+      const merged = trackUtils.mergeTrackChunk([], { pts: points.map((point) => ({
+        t: point.time,
+        lat: point.rawLatitude,
+        lon: point.rawLongitude,
+        acc: point.accuracy,
+        spd: point.speed,
+        course: point.course,
+        fix: point.fix,
+        cs: point.sourceCoordSystem,
+        src: "cloud"
+      })), done: true });
+      this.trackPoints = merged.points;
+      this.renderTrack(false);
+      this.setData({
+        cloudTrackLoading: false,
+        cloudTrackStatus: merged.points.length ? "已加载 " + merged.points.length + " 个云端轨迹点" : "云端暂无历史轨迹",
+        cloudTrackStatusLevel: merged.points.length ? "success" : "idle",
+        currentTrackLabel: merged.points.length ? "云端历史轨迹" : "未选择轨迹",
+        commandResponse: merged.points.length ? "云端历史轨迹已显示" : "云端未返回轨迹点"
+      });
+    }).catch(() => {
+      this.setData({
+        cloudTrackLoading: false,
+        cloudTrackStatus: "云端轨迹加载失败，请稍后重试",
+        cloudTrackStatusLevel: "error",
+        commandResponse: "云端轨迹暂不可用"
+      });
+    });
   },
 
   requestTrackList() {

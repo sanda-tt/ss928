@@ -18,6 +18,7 @@
 
     <cover-view class="map-toolbar">
       <cover-view class="map-toolbar__button map-toolbar__button--primary" bindtap="startScan">{{scanButtonText}}</cover-view>
+      <cover-view class="map-toolbar__button" bindtap="loadCloudTrack">云端刷新</cover-view>
       <cover-view class="map-toolbar__button" wx:if="{{scanning}}" bindtap="stopScan">停止</cover-view>
       <cover-view class="map-toolbar__button" wx:if="{{connected}}" bindtap="requestTrackList">列表</cover-view>
       <cover-view class="map-toolbar__button" wx:if="{{connected}}" bindtap="requestStatus">状态</cover-view>
@@ -25,6 +26,11 @@
       <cover-view class="map-toolbar__button" wx:if="{{hasTrack}}" bindtap="centerMap">居中</cover-view>
       <cover-view class="map-toolbar__button map-toolbar__button--danger" wx:if="{{hasTrack}}" bindtap="clearTrack">清空</cover-view>
     </cover-view>
+  </view>
+
+  <view class="panel cloud-track-panel">
+    <view class="panel__title">云端历史轨迹</view>
+    <view class="cloud-track-panel__status cloud-track-panel__status--{{cloudTrackStatusLevel}}">{{cloudTrackStatus}}</view>
   </view>
 
   <view class="summary-panel">

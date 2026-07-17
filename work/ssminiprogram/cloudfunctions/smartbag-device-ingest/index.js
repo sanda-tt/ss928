@@ -1,9 +1,11 @@
 const http = require("http");
-const cloud = require("wx-server-sdk");
+const tcb = require("@cloudbase/node-sdk");
 const telemetry = require("./lib/telemetry-core");
 
-cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
-const db = cloud.database();
+const CLOUDBASE_ENV_ID = "cloud1-d7gdmg27139f4fbf2";
+
+const app = tcb.init({ env: process.env.CLOUDBASE_ENV_ID || CLOUDBASE_ENV_ID });
+const db = app.database();
 const MAX_BODY_BYTES = 64 * 1024;
 
 const corsHeaders = {
@@ -43,13 +45,16 @@ const readRawBody = (req) => new Promise((resolve, reject) => {
 
 const createCloudStore = (database) => ({
   async setStatus(document) {
-    await database.collection("device_status").doc(document._id).set({ data: document });
+    const documentId = document._id;
+    const data = Object.assign({}, document);
+    delete data._id;
+    await database.collection("device_status").doc(documentId).set(data);
   },
   async insertTrackPoint(document) {
-    await database.collection("track_points").add({ data: document });
+    await database.collection("track_points").add(document);
   },
   async insertAlarm(document) {
-    await database.collection("alarm_history").add({ data: document });
+    await database.collection("alarm_history").add(document);
   }
 });
 
@@ -75,6 +80,11 @@ const createServer = ({ processor }) => http.createServer(async (req, res) => {
   } catch (error) {
     const statusCode = error && error.statusCode ? error.statusCode : 500;
     const code = error && error.code ? error.code : "INTERNAL_ERROR";
+    console.error("Telemetry request failed", {
+      code,
+      message: error && error.message ? error.message : "",
+      stack: error && error.stack ? error.stack : ""
+    });
     sendJson(res, statusCode, { success: false, error: { code } });
   }
 });

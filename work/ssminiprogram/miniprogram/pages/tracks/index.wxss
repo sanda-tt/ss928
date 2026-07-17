@@ -273,6 +273,24 @@ page {
   line-height: 38rpx;
 }
 
+.cloud-track-panel__status {
+  color: #66717d;
+  font-size: 24rpx;
+  line-height: 38rpx;
+}
+
+.cloud-track-panel__status--busy {
+  color: #a66b11;
+}
+
+.cloud-track-panel__status--success {
+  color: #16824b;
+}
+
+.cloud-track-panel__status--error {
+  color: #d64545;
+}
+
 .log-panel {
   font-size: 22rpx;
   line-height: 34rpx;

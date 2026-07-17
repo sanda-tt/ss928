@@ -28,6 +28,17 @@
 
 小程序会把 WGS84 坐标转换为微信地图使用的 GCJ-02 坐标。
 
+## 云端轨迹测试
+
+在 Windows PowerShell 中设置上传令牌后，可一次上传多条测试轨迹，供小程序“轨迹跟踪”页的“云端刷新”读取：
+
+```powershell
+$env:SMARTBAG_UPLOAD_TOKEN = "<比赛上传令牌>"
+python .\tools\upload_track_test_points.py --count 5
+```
+
+脚本默认上传 `bag001` 的 5 个点；可用 `--latitude`、`--longitude`、`--step` 和 `--interval-seconds` 调整路线。先检查数据而不发送时，使用 `--dry-run`。若没有环境变量，脚本会读取 Git 忽略的 `.local/device-access.md` 中的 `SMARTBAG_UPLOAD_TOKEN`、`UPLOAD_TOKEN` 或“上传令牌”字段；令牌不会写入项目文件或脚本输出。
+
 ## 使用方式
 
 1. 在 SS928 上按 `work/dx_gp21_tracker/README.md` 接好 DX-GP21-A 到 40Pin UART4。
