@@ -10,6 +10,7 @@
 - `ss928-max98357-audio-playback.md`：MAX98357 I2S、音频转换、pinmux 和 MPP Sample 播放。
 - `dx_gp21_tracker-and-tracks.md`：DX-GP21-A GNSS、UART4、轨迹保存、BLE 与小程序地图。
 - `ssminiprogram-cloud-track-display.md`：小程序经 CloudBase Event Function 读取并显示云端 GNSS 历史轨迹。
+- `ssminiprogram-cloud-fall-alarm-display.md`：小程序经 CloudBase Event Function 读取并显示摔倒报警历史。
 - `mr20-udp-pc-validation.md`：MR20 Windows UDP 接收、0x60B 目标帧解析与 CSV 日志验证。
 
 ## 新增历史记录格式

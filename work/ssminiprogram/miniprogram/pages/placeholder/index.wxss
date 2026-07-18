@@ -32,6 +32,21 @@ page {
   height: calc(100vh - 150rpx);
 }
 
+.alarm-state {
+  margin-top: 36rpx;
+  padding: 36rpx 28rpx;
+  border-radius: 8rpx;
+  background: #ffffff;
+  color: #667487;
+  font-size: 27rpx;
+  line-height: 40rpx;
+  text-align: center;
+}
+
+.alarm-state--error {
+  color: #c93434;
+}
+
 .alarm-card {
   display: flex;
   align-items: center;
@@ -67,11 +82,17 @@ page {
 }
 
 .alarm-card__time,
-.alarm-card__location {
+.alarm-card__location,
+.alarm-card__message,
+.alarm-card__risk {
   margin-top: 6rpx;
   color: #667487;
   font-size: 24rpx;
   line-height: 34rpx;
+}
+
+.alarm-card__risk {
+  color: #c93434;
 }
 
 .alarm-card__arrow {

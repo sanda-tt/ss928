@@ -15,6 +15,16 @@ const createAppApi = ({ repository }) => {
         if (action === "getLatestStatus") {
           return success({ status: await repository.getStatus(DEVICE_ID) });
         }
+        if (action === "getRealtimePosture") {
+          return success({ posture: await repository.getStatus(DEVICE_ID) });
+        }
+        if (action === "getDailyPosture") {
+          const date = event && event.date;
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "")) {
+            return failure("INVALID_DATE");
+          }
+          return success({ posture: await repository.getDailyPosture(DEVICE_ID, date) });
+        }
         if (action === "getTrackPoints") {
           return success({ items: await repository.listTrackPoints(DEVICE_ID, HISTORY_LIMIT) });
         }

@@ -13,6 +13,14 @@ const repository = {
       return null;
     }
   },
+  async getDailyPosture(deviceId, date) {
+    try {
+      const result = await db.collection("posture_daily_stats").where({ device_id: deviceId, date }).limit(1).get();
+      return result && result.data && result.data[0] ? result.data[0] : null;
+    } catch (error) {
+      return null;
+    }
+  },
   async listTrackPoints(deviceId, limit) {
     const result = await db.collection("track_points").where({ deviceId }).orderBy("receivedAt", "desc").limit(limit).get();
     return result && result.data ? result.data : [];

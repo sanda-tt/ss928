@@ -13,11 +13,15 @@ const call = (action, data) => wx.cloud.callFunction({
 });
 
 const getLatestStatus = () => call("getLatestStatus");
+const getRealtimePosture = () => call("getRealtimePosture");
+const getDailyPosture = (date) => call("getDailyPosture", { date });
 const getTrackPoints = () => call("getTrackPoints");
 const getAlarmHistory = () => call("getAlarmHistory");
 
 module.exports = {
   getAlarmHistory,
+  getDailyPosture,
   getLatestStatus,
+  getRealtimePosture,
   getTrackPoints
 };

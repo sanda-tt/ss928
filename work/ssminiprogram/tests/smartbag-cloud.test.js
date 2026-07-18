@@ -74,6 +74,21 @@ test("returns latest status without user binding", async () => {
   assert.deepStrictEqual(result, { ok: true, data: { status: { deviceId: "bag001", battery: { percent: 82 } } } });
 });
 
+test("returns daily posture for the requested local date", async () => {
+  const api = appApi.createAppApi({
+    repository: {
+      async getDailyPosture(deviceId, date) {
+        return { device_id: deviceId, date, wearing_seconds: 3600 };
+      }
+    }
+  });
+  const result = await api.handle({ action: "getDailyPosture", date: "2026-07-18" });
+  assert.deepStrictEqual(result, {
+    ok: true,
+    data: { posture: { device_id: "bag001", date: "2026-07-18", wearing_seconds: 3600 } }
+  });
+});
+
 test("limits history reads to 100 records", async () => {
   const api = appApi.createAppApi({
     repository: { async listTrackPoints(deviceId, limit) { return Array.from({ length: limit }, (_, index) => ({ deviceId, sequence: index })); } }
