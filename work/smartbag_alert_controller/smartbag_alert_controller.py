@@ -14,16 +14,16 @@ from pathlib import Path
 from typing import Iterable
 
 from alert_core import (
-    DEFAULT_PWM_PERIOD_NS,
-    MOTOR_PWM_PINS,
     AlertEvent,
     AlertOutput,
     AlertState,
-    MOTOR_BY_KEY,
     parse_alert_command,
     parse_vision_alert_jsonl,
 )
 from ble_nus import BleNusServer
+from mr20_radar import MR20RadarWorker, load_radar_configs
+from pwm_lights import LinuxSysfsPwm, PwmLights
+from tm6605_haptics import LinuxI2cBus, Tm6605Haptics
 
 
 AUDIO_ROOT = Path("/root/smartbag_alert/audio")
@@ -38,95 +38,6 @@ I2S_PINMUX = (
 
 def eprint(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
-
-
-class PwmController:
-    def __init__(
-        self,
-        pwm_root: Path,
-        period_ns: int = DEFAULT_PWM_PERIOD_NS,
-        dry_run: bool = False,
-        skip_pinmux: bool = False,
-    ) -> None:
-        self.pwm_root = pwm_root
-        self.period_ns = period_ns
-        self.dry_run = dry_run
-        self.skip_pinmux = skip_pinmux
-
-    def setup(self) -> None:
-        if not self.skip_pinmux:
-            for pin in MOTOR_PWM_PINS:
-                self._run(["bspmm", pin.pinmux_addr, pin.pinmux_value], f"{pin.key} pinmux")
-        for pin in MOTOR_PWM_PINS:
-            self._ensure_channel(pin.key)
-
-    def preflight(self) -> None:
-        chip_path = self.pwm_root / "pwmchip0"
-        npwm_path = chip_path / "npwm"
-        if self.dry_run:
-            eprint(f"DRY preflight read {npwm_path}")
-            return
-        if not npwm_path.exists():
-            raise RuntimeError(f"{npwm_path} not found")
-        npwm = int(npwm_path.read_text(encoding="ascii").strip())
-        required = max(pin.pwm_channel for pin in MOTOR_PWM_PINS) + 1
-        if npwm < required:
-            raise RuntimeError(f"pwmchip0 npwm={npwm}, need at least {required}")
-        eprint(f"pwmchip0 npwm={npwm}; channels 1/10/14/15 are in range")
-
-    def apply(self, duties_ns: dict[str, int]) -> None:
-        for key, duty_ns in duties_ns.items():
-            self.set_duty(key, duty_ns)
-
-    def stop_all(self) -> None:
-        for pin in MOTOR_PWM_PINS:
-            self.set_duty(pin.key, 0)
-
-    def set_duty(self, key: str, duty_ns: int) -> None:
-        pin = MOTOR_BY_KEY[key]
-        duty_ns = max(0, min(int(duty_ns), self.period_ns))
-        if self.dry_run:
-            eprint(
-                f"DRY pwm {key}: chip={pin.pwm_chip} channel={pin.pwm_channel} "
-                f"period={self.period_ns} duty={duty_ns}"
-            )
-            return
-        pwm_path = self._ensure_channel(key)
-        if self._read(pwm_path / "enable") == "1":
-            self._write(pwm_path / "enable", "0")
-        self._write(pwm_path / "period", str(self.period_ns))
-        self._write(pwm_path / "duty_cycle", str(duty_ns))
-        self._write(pwm_path / "enable", "1" if duty_ns > 0 else "0")
-
-    def _ensure_channel(self, key: str) -> Path:
-        pin = MOTOR_BY_KEY[key]
-        chip_path = self.pwm_root / f"pwmchip{pin.pwm_chip}"
-        pwm_path = chip_path / f"pwm{pin.pwm_channel}"
-        if self.dry_run:
-            return pwm_path
-        if not chip_path.exists():
-            raise RuntimeError(f"{chip_path} not found")
-        if not pwm_path.exists():
-            self._write(chip_path / "export", str(pin.pwm_channel))
-            for _ in range(20):
-                if pwm_path.exists():
-                    break
-                time.sleep(0.05)
-        if not pwm_path.exists():
-            raise RuntimeError(f"{pwm_path} did not appear after export")
-        return pwm_path
-
-    def _write(self, path: Path, value: str) -> None:
-        path.write_text(value + "\n", encoding="ascii")
-
-    def _read(self, path: Path) -> str:
-        return path.read_text(encoding="ascii", errors="ignore").strip()
-
-    def _run(self, command: list[str], label: str) -> None:
-        if self.dry_run:
-            eprint("DRY " + " ".join(command) + f"  # {label}")
-            return
-        subprocess.run(command, check=True)
 
 
 class AudioPlayer:
@@ -348,8 +259,9 @@ def start_stdin_reader(
     return thread
 
 
-def apply_output(output: AlertOutput, pwm: PwmController, audio: AudioPlayer) -> None:
-    pwm.apply(output.duties_ns)
+def apply_output(output: AlertOutput, haptics: Tm6605Haptics, lights: PwmLights, audio: AudioPlayer) -> None:
+    haptics.set_levels(output.levels or {})
+    lights.set_levels(output.levels or {})
     audio.request(output.audio_clip)
 
 
@@ -358,12 +270,13 @@ def run_controller(args: argparse.Namespace) -> int:
     command_queue: "queue.Queue[str]" = queue.Queue()
     stop_event = threading.Event()
     state = AlertState(event_timeout_s=args.event_timeout)
-    pwm = PwmController(
-        Path(args.pwm_root),
-        period_ns=args.pwm_period_ns,
-        dry_run=args.dry_run,
-        skip_pinmux=args.skip_pinmux,
+    haptics = Tm6605Haptics(
+        LinuxI2cBus(Path(args.i2c_dev), dry_run=args.dry_run),
+        mux_address=args.tm6605_mux_addr if args.tm6605_use_mux else None,
+        channels={"left": args.left_tm6605_channel, "right": args.right_tm6605_channel},
+        connected_sides=("left", "right") if args.enable_right_tm6605 else ("left",),
     )
+    lights = PwmLights(LinuxSysfsPwm(dry_run=args.dry_run))
     audio = AudioPlayer(
         Path(args.audio_root),
         sample_audio=args.sample_audio,
@@ -374,6 +287,7 @@ def run_controller(args: argparse.Namespace) -> int:
         skip_pinmux=args.skip_pinmux,
     )
     detectors: list[DetectorProcess] = []
+    radars: list[MR20RadarWorker] = []
     ble: BleNusServer | None = None
 
     def _stop(_signum: int | None = None, _frame: object | None = None) -> None:
@@ -383,13 +297,15 @@ def run_controller(args: argparse.Namespace) -> int:
     signal.signal(signal.SIGTERM, _stop)
 
     try:
-        pwm.preflight()
+        haptics.preflight()
         if args.preflight_only:
             return 0
         audio.setup()
-        pwm.setup()
+        haptics.setup(skip_pinmux=args.skip_pinmux)
+        lights.setup(skip_pinmux=args.skip_pinmux)
         audio.start()
-        pwm.stop_all()
+        haptics.stop_all()
+        lights.stop_all()
 
         if not args.no_ble:
             try:
@@ -407,6 +323,20 @@ def run_controller(args: argparse.Namespace) -> int:
             detector.start()
             detectors.append(detector)
 
+        if args.mr20_config:
+            try:
+                radar_configs, radar_risk = load_radar_configs(args.mr20_config)
+                for radar_config in radar_configs:
+                    radar = MR20RadarWorker(radar_config, radar_risk, event_queue.put)
+                    radar.start()
+                    radars.append(radar)
+                    eprint(
+                        f"started MR20 {radar_config.name}: {radar_config.bind_host}:{radar_config.port} "
+                        f"<- {radar_config.radar_ip} ({radar_config.side})"
+                    )
+            except Exception as exc:
+                raise RuntimeError(f"failed to start MR20 radar: {exc}") from exc
+
         if args.stdin_jsonl:
             start_stdin_reader(
                 event_queue,
@@ -422,7 +352,7 @@ def run_controller(args: argparse.Namespace) -> int:
                 except queue.Empty:
                     break
                 output = state.apply_event(event)
-                apply_output(output, pwm, audio)
+                apply_output(output, haptics, lights, audio)
 
             while True:
                 try:
@@ -434,7 +364,7 @@ def run_controller(args: argparse.Namespace) -> int:
                     if command.kind == "clear":
                         audio.clear()
                     output = state.apply_command(command)
-                    apply_output(output, pwm, audio)
+                    apply_output(output, haptics, lights, audio)
                     if ble is not None:
                         ble.send_line("OK " + command_text.strip())
                 except Exception as exc:
@@ -444,16 +374,22 @@ def run_controller(args: argparse.Namespace) -> int:
 
             expired = state.expire()
             if expired.expired_sides:
-                pwm.apply(expired.duties_ns)
+                haptics.set_levels(expired.levels or {})
+                lights.set_levels(expired.levels or {})
+            haptics.tick()
+            lights.tick()
             time.sleep(args.poll_interval)
     finally:
         stop_event.set()
         for detector in detectors:
             detector.stop()
+        for radar in radars:
+            radar.stop()
         if ble is not None:
             ble.stop()
         audio.stop()
-        pwm.stop_all()
+        haptics.stop_all()
+        lights.stop_all()
     return 0
 
 
@@ -463,8 +399,13 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--right-detector", default="", help="Base command for the right vision detector.")
     parser.add_argument("--detector-cwd", default="", help="Working directory for detector commands.")
     parser.add_argument("--stdin-jsonl", action="store_true", help="Also read vision JSONL or AL commands from stdin.")
-    parser.add_argument("--pwm-root", default="/sys/class/pwm", help="Linux PWM sysfs root.")
-    parser.add_argument("--pwm-period-ns", type=int, default=DEFAULT_PWM_PERIOD_NS, help="PWM period in ns.")
+    parser.add_argument("--mr20-config", default="", help="Path to MR20 radar JSON configuration.")
+    parser.add_argument("--i2c-dev", default="/dev/i2c-0", help="Linux I2C device for the TM6605 mux.")
+    parser.add_argument("--tm6605-mux-addr", type=lambda value: int(value, 0), default=0x70, help="TCA9548A 7-bit I2C address.")
+    parser.add_argument("--tm6605-use-mux", action="store_true", help="Route TM6605 traffic through the configured TCA9548A.")
+    parser.add_argument("--left-tm6605-channel", type=int, default=0, help="TCA9548A channel for the left TM6605.")
+    parser.add_argument("--right-tm6605-channel", type=int, default=1, help="TCA9548A channel for the right TM6605.")
+    parser.add_argument("--enable-right-tm6605", action="store_true", help="Enable the right TM6605; requires a mux when both modules are connected.")
     parser.add_argument("--event-timeout", type=float, default=1.0, help="Seconds before stale side vibration is stopped.")
     parser.add_argument("--poll-interval", type=float, default=0.05, help="Controller loop sleep interval in seconds.")
     parser.add_argument("--audio-root", default=str(AUDIO_ROOT), help="Root containing L1..R4 audio folders.")
@@ -475,8 +416,8 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--no-ble", action="store_true", help="Disable BLE debug command server.")
     parser.add_argument("--no-audio", action="store_true", help="Disable audio playback.")
     parser.add_argument("--skip-pinmux", action="store_true", help="Skip bspmm pinmux setup.")
-    parser.add_argument("--dry-run", action="store_true", help="Print PWM/audio actions without touching hardware.")
-    parser.add_argument("--preflight-only", action="store_true", help="Only check pwmchip0 capacity.")
+    parser.add_argument("--dry-run", action="store_true", help="Print light PWM, haptic, and audio actions without touching hardware.")
+    parser.add_argument("--preflight-only", action="store_true", help="Only check that the configured I2C device exists.")
     return parser.parse_args(argv)
 
 

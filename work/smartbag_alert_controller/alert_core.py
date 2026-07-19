@@ -6,43 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 
-DEFAULT_PWM_PERIOD_NS = 1_000_000
 VALID_SIDES = ("left", "right")
-
-
-@dataclass(frozen=True)
-class PwmPin:
-    key: str
-    side: str
-    stage: int
-    header_pin: int
-    signal: str
-    pwm_chip: int
-    pwm_channel: int
-    pinmux_addr: str
-    pinmux_value: str
-
-
-MOTOR_PWM_PINS: tuple[PwmPin, ...] = (
-    PwmPin("left_1", "left", 1, 7, "PWM0_OUT10_0_P", 0, 10, "0x102F0110", "0x1205"),
-    PwmPin("left_2", "left", 2, 32, "PWM0_OUT1_0_P", 0, 1, "0x102F01EC", "0x1201"),
-    PwmPin("right_1", "right", 1, 35, "PWM0_OUT14_0_P", 0, 14, "0x102F0100", "0x1205"),
-    PwmPin("right_2", "right", 2, 37, "PWM0_OUT15_0_P", 0, 15, "0x102F00DC", "0x1205"),
-)
-
-MOTOR_BY_KEY = {pin.key: pin for pin in MOTOR_PWM_PINS}
-MOTORS_BY_SIDE = {
-    "left": tuple(pin for pin in MOTOR_PWM_PINS if pin.side == "left"),
-    "right": tuple(pin for pin in MOTOR_PWM_PINS if pin.side == "right"),
-}
-
-LEVEL_DUTY_PERCENT = {
-    0: (0, 0),
-    1: (60, 0),
-    2: (60, 60),
-    3: (100, 60),
-    4: (100, 100),
-}
 
 SIDE_ALIASES = {
     "l": "left",
@@ -65,6 +29,7 @@ class AlertCommand:
 class AlertEvent:
     side: str
     level: int
+    source: str = "vision"
     score: float | None = None
     track_id: int | None = None
     ts: float | None = None
@@ -72,7 +37,6 @@ class AlertEvent:
 
 @dataclass(frozen=True)
 class AlertOutput:
-    duties_ns: dict[str, int]
     audio_clip: str | None = None
     levels: dict[str, int] | None = None
     expired_sides: tuple[str, ...] = ()
@@ -94,30 +58,6 @@ def normalize_level(level: Any, *, allow_zero: bool = True) -> int:
     if value < low or value > 4:
         raise ValueError(f"alert level must be {low}..4, got {value}")
     return value
-
-
-def duty_ns_for_percent(percent: int, period_ns: int = DEFAULT_PWM_PERIOD_NS) -> int:
-    if percent <= 0:
-        return 0
-    if percent >= 100:
-        return period_ns
-    return int(round(period_ns * (percent / 100.0)))
-
-
-def duties_for_levels(
-    levels_by_side: Mapping[str, int],
-    period_ns: int = DEFAULT_PWM_PERIOD_NS,
-) -> dict[str, int]:
-    normalized_levels = {"left": 0, "right": 0}
-    for side, level in levels_by_side.items():
-        normalized_levels[normalize_side(side)] = normalize_level(level)
-
-    duties: dict[str, int] = {}
-    for side in VALID_SIDES:
-        stage_percents = LEVEL_DUTY_PERCENT[normalized_levels[side]]
-        for pin, percent in zip(MOTORS_BY_SIDE[side], stage_percents):
-            duties[pin.key] = duty_ns_for_percent(percent, period_ns)
-    return duties
 
 
 def audio_clip_for(side: str, level: int) -> str | None:
@@ -179,23 +119,27 @@ class AlertState:
     ) -> None:
         self.event_timeout_s = max(0.05, float(event_timeout_s))
         self.min_audio_interval_s = max(0.0, float(min_audio_interval_s))
-        self.levels_by_side = {"left": 0, "right": 0}
-        self.last_event_mono_by_side: dict[str, float] = {}
+        self.levels_by_source_side: dict[tuple[str, str], int] = {}
+        self.last_event_mono_by_source_side: dict[tuple[str, str], float] = {}
         self.last_audio_mono_by_clip: dict[str, float] = {}
 
     def apply_event(self, event: AlertEvent, now: float | None = None) -> AlertOutput:
         now = time.monotonic() if now is None else now
         side = normalize_side(event.side)
         level = normalize_level(event.level)
-        previous_level = self.levels_by_side[side]
-        self.levels_by_side[side] = level
+        source = self._normalize_source(event.source)
+        key = (source, side)
+        previous_level = self._effective_level(side)
         if level > 0:
-            self.last_event_mono_by_side[side] = now
+            self.levels_by_source_side[key] = level
+            self.last_event_mono_by_source_side[key] = now
         else:
-            self.last_event_mono_by_side.pop(side, None)
+            self.levels_by_source_side.pop(key, None)
+            self.last_event_mono_by_source_side.pop(key, None)
 
-        clip = audio_clip_for(side, level)
-        if clip is not None and not self._should_emit_audio(clip, previous_level, level, now):
+        effective_level = self._effective_level(side)
+        clip = audio_clip_for(side, effective_level)
+        if clip is not None and not self._should_emit_audio(clip, previous_level, effective_level, now):
             clip = None
         return self._output(audio_clip=clip)
 
@@ -208,29 +152,33 @@ class AlertState:
             raise ValueError(f"unsupported alert command kind: {command.kind!r}")
         side = normalize_side(command.side)
         level = normalize_level(command.level)
-        self.levels_by_side[side] = level
+        key = ("manual", side)
         if level > 0:
-            self.last_event_mono_by_side[side] = now
+            self.levels_by_source_side[key] = level
+            self.last_event_mono_by_source_side[key] = now
         else:
-            self.last_event_mono_by_side.pop(side, None)
-        clip = audio_clip_for(side, level)
+            self.levels_by_source_side.pop(key, None)
+            self.last_event_mono_by_source_side.pop(key, None)
+        clip = audio_clip_for(side, self._effective_level(side))
         if clip:
             self.last_audio_mono_by_clip[clip] = now
         return self._output(audio_clip=clip)
 
     def clear(self) -> None:
-        self.levels_by_side = {"left": 0, "right": 0}
-        self.last_event_mono_by_side.clear()
+        self.levels_by_source_side.clear()
+        self.last_event_mono_by_source_side.clear()
         self.last_audio_mono_by_clip.clear()
 
     def expire(self, now: float | None = None) -> AlertOutput:
         now = time.monotonic() if now is None else now
         expired: list[str] = []
-        for side, last_event_mono in list(self.last_event_mono_by_side.items()):
+        for key, last_event_mono in list(self.last_event_mono_by_source_side.items()):
             if now - last_event_mono > self.event_timeout_s:
-                self.levels_by_side[side] = 0
-                del self.last_event_mono_by_side[side]
-                expired.append(side)
+                _source, side = key
+                self.levels_by_source_side.pop(key, None)
+                del self.last_event_mono_by_source_side[key]
+                if side not in expired:
+                    expired.append(side)
         return self._output(expired_sides=tuple(expired))
 
     def _should_emit_audio(self, clip: str, previous_level: int, level: int, now: float) -> bool:
@@ -249,8 +197,20 @@ class AlertState:
         expired_sides: tuple[str, ...] = (),
     ) -> AlertOutput:
         return AlertOutput(
-            duties_ns=duties_for_levels(self.levels_by_side),
             audio_clip=audio_clip,
-            levels=dict(self.levels_by_side),
+            levels={side: self._effective_level(side) for side in VALID_SIDES},
             expired_sides=expired_sides,
         )
+
+    def _effective_level(self, side: str) -> int:
+        return max(
+            (level for (_source, event_side), level in self.levels_by_source_side.items() if event_side == side),
+            default=0,
+        )
+
+    @staticmethod
+    def _normalize_source(source: str) -> str:
+        normalized = str(source or "").strip().lower()
+        if not normalized:
+            raise ValueError("alert source must not be empty")
+        return normalized

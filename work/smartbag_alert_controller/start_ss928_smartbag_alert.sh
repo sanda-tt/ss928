@@ -15,8 +15,10 @@ MODEL_PATH="${SMARTBAG_OM_MODEL:-$BASE_DIR/intelligent_bag/models/yolo11s.om}"
 AUDIO_ROOT="${SMARTBAG_AUDIO_ROOT:-$BASE_DIR/audio}"
 BLE_NAME="${SMARTBAG_BLE_NAME:-SS928-SmartBag}"
 EVENT_TIMEOUT="${SMARTBAG_EVENT_TIMEOUT:-1.0}"
+I2C_DEV="${SMARTBAG_I2C_DEV:-/dev/i2c-0}"
 LEFT_DETECTOR="${SMARTBAG_LEFT_DETECTOR:-}"
 RIGHT_DETECTOR="${SMARTBAG_RIGHT_DETECTOR:-}"
+MR20_CONFIG="${SMARTBAG_MR20_CONFIG:-$BASE_DIR/config/mr20_radar.json}"
 
 if [ "${SMARTBAG_ENABLE_OM_BRIDGE:-0}" = "1" ]; then
   LEFT_RUNNER="${SMARTBAG_LEFT_RUNNER:-}"
@@ -35,9 +37,18 @@ fi
 
 mkdir -p "$BASE_DIR/runtime" "$BASE_DIR/logs"
 cd "$BASE_DIR/controller"
-exec python3 main.py \
+set -- python3 main.py \
   --audio-root "$AUDIO_ROOT" \
   --ble-name "$BLE_NAME" \
   --event-timeout "$EVENT_TIMEOUT" \
+  --i2c-dev "$I2C_DEV" \
   --left-detector "$LEFT_DETECTOR" \
   --right-detector "$RIGHT_DETECTOR"
+
+if [ -f "$MR20_CONFIG" ]; then
+  set -- "$@" --mr20-config "$MR20_CONFIG"
+else
+  echo "INFO: MR20 disabled; config not found: $MR20_CONFIG" >&2
+fi
+
+exec "$@"

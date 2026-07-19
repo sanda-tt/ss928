@@ -12,6 +12,9 @@
 - `ssminiprogram-cloud-track-display.md`：小程序经 CloudBase Event Function 读取并显示云端 GNSS 历史轨迹。
 - `ssminiprogram-cloud-fall-alarm-display.md`：小程序经 CloudBase Event Function 读取并显示摔倒报警历史。
 - `mr20-udp-pc-validation.md`：MR20 Windows UDP 接收、0x60B 目标帧解析与 CSV 日志验证。
+- `mr20-smartbag-alert-integration.md`：MR20 网口雷达接入 SmartBag 四级右后预警、配置和板端网络验证。
+- `tm6605-lra-haptic-alert.md`：TM6605 双 LRA 触觉驱动、I2C 复用与四级预警时序。
+- `smartbag-pwm-light-modules.md`：双侧小信号光模块的 PWM 引脚分配及三级/四级光效时序。
 
 ## 新增历史记录格式
 

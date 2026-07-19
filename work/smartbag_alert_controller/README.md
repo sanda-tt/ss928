@@ -1,7 +1,7 @@
 # SS928 SmartBag Alert Controller
 
 Board-side controller for the two-camera dangerous-obstacle warning flow. It reads
-vision JSONL events, drives four PWM vibration inputs, and plays MAX98357 audio
+vision JSONL events, drives two TM6605/LRA haptic modules over I2C, and plays MAX98357 audio
 clips through the existing `/opt/sample/audio/sample_audio 2` path.
 
 ## Board Paths
@@ -36,19 +36,53 @@ Put audio files here:
 `play_hint.txt` is optional in each audio folder. If present, the controller uses
 its `sleep_seconds` and `timeout_seconds`; otherwise it uses 5s and 13s.
 
-## 40Pin PWM Wiring
+## TM6605 / LRA Wiring
 
-The four vibration modules must share GND with the SS928 board. The modules have
-their own power supply; connect only the PWM control inputs to these 40Pin pins.
+Current hardware uses **only the left TM6605 and left LRA**. Connect the LRA
+only to the driver's motor connector; never connect an LRA directly to an SS928
+GPIO. The right TM6605 is not connected and the controller does not send it any
+I2C commands.
 
-| Side | Motor | 40Pin | PWM signal | pwmchip/channel | Pinmux |
-|---|---|---:|---|---|---|
-| Left | 1 | Pin7 | PWM0_OUT10_0_P | pwmchip0/pwm10 | `bspmm 0x102F0110 0x1205` |
-| Left | 2 | Pin32 | PWM0_OUT1_0_P | pwmchip0/pwm1 | `bspmm 0x102F01EC 0x1201` |
-| Right | 1 | Pin35 | PWM0_OUT14_0_P | pwmchip0/pwm14 | `bspmm 0x102F0100 0x1205` |
-| Right | 2 | Pin37 | PWM0_OUT15_0_P | pwmchip0/pwm15 | `bspmm 0x102F00DC 0x1205` |
+BMI270 already shares I2C0, which is correct: its address is `0x68`, whereas
+TM6605 uses fixed address `0x2D` (the datasheet write byte is `0x5A`). I2C
+devices with different addresses can share the same SDA/SCL pair.
 
-PWM period is `1000000 ns`; 60% is `600000`, 100% is `1000000`.
+| SS928 40Pin | Left TM6605 | Notes |
+|---:|---|---|
+| Pin2 or Pin4 5V | VCC | Module supply. |
+| Any GND | GND | Must share ground with the board and BMI270. |
+| Pin3 `I2C0_SDA` | SDA | Direct 3.3 V I2C signal; board pinmux: `bspmm 0x102F013c 0x2031`. |
+| Pin5 `I2C0_SCL` | SCL | Direct 3.3 V I2C signal; board pinmux: `bspmm 0x102F0140 0x2031`. |
+
+This direct wiring uses the module's confirmed 3.3 V-compatible SDA/SCL. When
+adding the right module later, do not connect it in parallel: both drivers are
+address `0x2D`, so add a TCA9548A then.
+
+The old PWM signals on Pin7, Pin32, Pin35, and Pin37 are no longer used for
+vibration. Pin7 remains free for its former PWM/I2S alternate function.
+
+## Two-side light-module PWM outputs
+
+Each light module takes only a small-signal PWM input; power the module from
+its own rated supply and connect its ground to SS928 ground.  Do not drive a
+lamp load directly from a 40Pin signal pin.
+
+| Side | SS928 40Pin | Signal | Pinmux | Behaviour |
+|---|---:|---|---|---|
+| Left light | Pin7 | `PWM0_OUT10_0_P` (PWM chip 0, channel 10) | `bspmm 0x102F0110 0x1205` | Level 3: 50% PWM for 1 s; level 4: three 80% PWM pulses. |
+| Right light | Pin32 | `PWM0_OUT1_0_P` (PWM chip 0, channel 1) | `bspmm 0x102F01EC 0x1201` | Level 3: 50% PWM for 1 s; level 4: three 80% PWM pulses. |
+
+Level-4 pulses use a 200 ms on / 200 ms off rhythm. Levels 1/2, `AL CLEAR`,
+and source timeout turn the corresponding light off immediately.
+
+The TM6605 controls LRA resonance internally, so its intensity is selected by
+pre-programmed effects rather than a GPIO PWM duty cycle:
+
+| Risk level | Haptic behaviour |
+|---:|---|
+| 1 / 2 | No vibration. |
+| 3 | Medium built-in alert (effect 15) repeated three times, about 2 s total; this is the 80% class. |
+| 4 | Strong built-in alert (effect 14) pulsed three times; this is the 100% class. |
 
 MAX98357 audio keeps only the three needed I2S pins:
 
@@ -56,8 +90,7 @@ MAX98357 audio keeps only the three needed I2S pins:
 Pin12 I2S_BCLK, Pin38 I2S_WS, Pin40 I2S_SD_TX
 ```
 
-Pin7 is not used as I2S MCLK because MAX98357 does not require MCLK and Pin7 is
-reserved here for the left-1 vibration PWM signal.
+Pin7 is not used as I2S MCLK because MAX98357 does not require MCLK.
 
 ## Run
 
@@ -73,6 +106,28 @@ python3 smartbag_alert_controller.py \
 
 The controller appends `--side left|right --emit-alert-jsonl` to each detector
 command if those options are not already present.
+
+## MR20 Ethernet Radar
+
+Copy `mr20_radar.example.json` to `/root/smartbag_alert/config/mr20_radar.json`.
+The provided configuration enables the first right-rear radar only. It receives
+`192.168.1.200:2369` traffic on board address `192.168.1.102:2368`; configure
+that address only on the radar-direct Ethernet interface, with no gateway or
+default-route change. The controller combines active camera and radar events by
+side and always drives the highest current level. MR20 records are appended as
+JSONL under `/root/smartbag_alert/logs/`.
+
+After connecting the radar cable to the board's currently-down `eth1`, verify the
+link before changing its temporary address. On the board, use:
+
+```sh
+ip -br link show eth1
+ip addr add 192.168.1.102/24 dev eth1
+ip -br addr show eth1
+```
+
+Do not add a gateway or modify `eth0`; remove the temporary address after a
+test with `ip addr del 192.168.1.102/24 dev eth1`.
 
 For the deployed OM package, use `om_alert_bridge.py` when the detector runner
 emits JSONL or simple `level=1..4` text:
@@ -102,11 +157,15 @@ systemctl restart smartbag-alert.service
 
 Runtime configuration lives in `/root/smartbag_alert/config/smartbag.env`.
 
-For a hardware precheck only:
+For an I2C-device precheck only:
 
 ```sh
 python3 smartbag_alert_controller.py --preflight-only
 ```
+
+The default controller uses only the left TM6605 directly on `/dev/i2c-0`.
+The right side is deliberately idle. A future two-side setup needs
+`--tm6605-use-mux --enable-right-tm6605` plus a TCA9548A.
 
 For dry-run integration testing from stdin:
 
@@ -131,4 +190,6 @@ AL R4
 AL CLEAR
 ```
 
-These commands use the same alert state and PWM/audio path as real vision events.
+These commands use the same alert state and haptic/light/audio path as real
+vision events; until the right TM6605 is installed, `AL R1` through `AL R4` do
+not vibrate.

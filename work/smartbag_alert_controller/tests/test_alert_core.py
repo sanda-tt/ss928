@@ -9,22 +9,103 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_DIR))
 
 from alert_core import (  # noqa: E402
-    DEFAULT_PWM_PERIOD_NS,
     AlertEvent,
     AlertState,
-    duties_for_levels,
     parse_alert_command,
+)
+from tm6605_haptics import (  # noqa: E402
+    TM6605_EFFECT_REGISTER,
+    TM6605_MEDIUM_DURATION_ALERT,
+    TM6605_PLAY_REGISTER,
+    TM6605_STRONG_ALERT,
+    Tm6605Haptics,
+)
+from pwm_lights import (  # noqa: E402
+    LEVEL3_DUTY_PERCENT,
+    LEVEL4_DUTY_PERCENT,
+    LinuxSysfsPwm,
+    PwmLights,
 )
 
 
-class AlertCoreTest(unittest.TestCase):
-    def test_level_to_pwm_duty_table(self) -> None:
-        duties = duties_for_levels({"left": 1, "right": 4})
+class FakeI2cBus:
+    dry_run = False
 
-        self.assertEqual(duties["left_1"], int(DEFAULT_PWM_PERIOD_NS * 0.60))
-        self.assertEqual(duties["left_2"], 0)
-        self.assertEqual(duties["right_1"], DEFAULT_PWM_PERIOD_NS)
-        self.assertEqual(duties["right_2"], DEFAULT_PWM_PERIOD_NS)
+    def __init__(self) -> None:
+        self.writes: list[tuple[int, bytes, str]] = []
+
+    def write_to(self, address: int, data: bytes, label: str) -> None:
+        self.writes.append((address, data, label))
+
+
+class FakePwm(LinuxSysfsPwm):
+    def __init__(self) -> None:
+        super().__init__(dry_run=False)
+        self.outputs: list[tuple[int, int, int, int, bool]] = []
+
+    def setup_channel(self, chip: int, channel: int, period_ns: int) -> None:
+        return
+
+    def set_output(self, chip: int, channel: int, period_ns: int, duty_percent: int, enabled: bool) -> None:
+        self.outputs.append((chip, channel, period_ns, duty_percent, enabled))
+
+
+class AlertCoreTest(unittest.TestCase):
+    def test_levels_one_and_two_do_not_schedule_haptics(self) -> None:
+        bus = FakeI2cBus()
+        haptics = Tm6605Haptics(bus)
+        haptics.set_levels({"left": 1, "right": 2}, now=10.0)
+        self.assertEqual(bus.writes, [])
+
+    def test_level_three_is_three_medium_effects_over_two_seconds(self) -> None:
+        bus = FakeI2cBus()
+        haptics = Tm6605Haptics(bus)
+        haptics.set_levels({"left": 3}, now=10.0)
+        haptics.tick(now=10.75)
+        haptics.tick(now=11.50)
+
+        effect_writes = [data for address, data, _label in bus.writes if address == 0x2D and data[0] == TM6605_EFFECT_REGISTER]
+        self.assertEqual(effect_writes, [bytes((TM6605_EFFECT_REGISTER, TM6605_MEDIUM_DURATION_ALERT))] * 3)
+
+    def test_left_level_four_is_three_strong_pulses(self) -> None:
+        bus = FakeI2cBus()
+        haptics = Tm6605Haptics(bus)
+        haptics.set_levels({"left": 4}, now=10.0)
+        haptics.tick(now=10.30)
+        haptics.tick(now=10.60)
+
+        effect_writes = [data for address, data, _label in bus.writes if address == 0x2D and data[0] == TM6605_EFFECT_REGISTER]
+        self.assertEqual(effect_writes, [bytes((TM6605_EFFECT_REGISTER, TM6605_STRONG_ALERT))] * 3)
+        self.assertTrue(any(data == bytes((TM6605_PLAY_REGISTER, 1)) for _address, data, _label in bus.writes))
+
+    def test_right_haptics_are_idle_until_explicitly_enabled(self) -> None:
+        bus = FakeI2cBus()
+        haptics = Tm6605Haptics(bus)
+        haptics.set_levels({"right": 4}, now=10.0)
+        haptics.tick(now=11.0)
+        self.assertEqual(bus.writes, [])
+
+    def test_level_three_light_is_50_percent_for_one_second(self) -> None:
+        pwm = FakePwm()
+        lights = PwmLights(pwm)
+        lights.set_levels({"left": 3}, now=10.0)
+        lights.tick(now=11.0)
+        enabled = [entry for entry in pwm.outputs if entry[-1]]
+        self.assertEqual(enabled[-1][0:2], (0, 10))
+        self.assertEqual(enabled[-1][3], LEVEL3_DUTY_PERCENT)
+        self.assertFalse(pwm.outputs[-1][-1])
+
+    def test_level_four_light_flashes_three_80_percent_pulses(self) -> None:
+        pwm = FakePwm()
+        lights = PwmLights(pwm)
+        lights.set_levels({"right": 4}, now=10.0)
+        lights.tick(now=10.2)
+        lights.tick(now=10.4)
+        lights.tick(now=10.6)
+        lights.tick(now=10.8)
+        lights.tick(now=11.0)
+        enabled = [entry for entry in pwm.outputs if entry[-1]]
+        self.assertEqual([(entry[0], entry[1], entry[3]) for entry in enabled], [(0, 1, LEVEL4_DUTY_PERCENT)] * 3)
 
     def test_parse_ble_alert_commands(self) -> None:
         left = parse_alert_command("AL L1")
@@ -47,12 +128,11 @@ class AlertCoreTest(unittest.TestCase):
 
         active = state.apply_command(parse_alert_command("AL R4"), now=10.0)
         self.assertEqual(active.audio_clip, "R4")
-        self.assertEqual(active.duties_ns["right_1"], DEFAULT_PWM_PERIOD_NS)
-        self.assertEqual(active.duties_ns["right_2"], DEFAULT_PWM_PERIOD_NS)
+        self.assertEqual(active.levels, {"left": 0, "right": 4})
 
         cleared = state.apply_command(parse_alert_command("AL CLEAR"), now=10.1)
         self.assertIsNone(cleared.audio_clip)
-        self.assertTrue(all(value == 0 for value in cleared.duties_ns.values()))
+        self.assertEqual(cleared.levels, {"left": 0, "right": 0})
 
     def test_event_timeout_closes_stale_side_only(self) -> None:
         state = AlertState(event_timeout_s=1.0)
@@ -60,14 +140,22 @@ class AlertCoreTest(unittest.TestCase):
         state.apply_event(AlertEvent(side="right", level=3, score=0.72, track_id=8, ts=1.3), now=100.8)
 
         still_active = state.expire(now=100.95)
-        self.assertEqual(still_active.duties_ns["left_1"], int(DEFAULT_PWM_PERIOD_NS * 0.60))
-        self.assertEqual(still_active.duties_ns["right_1"], DEFAULT_PWM_PERIOD_NS)
+        self.assertEqual(still_active.levels, {"left": 2, "right": 3})
 
         expired = state.expire(now=101.05)
-        self.assertEqual(expired.duties_ns["left_1"], 0)
-        self.assertEqual(expired.duties_ns["left_2"], 0)
-        self.assertEqual(expired.duties_ns["right_1"], DEFAULT_PWM_PERIOD_NS)
-        self.assertEqual(expired.duties_ns["right_2"], int(DEFAULT_PWM_PERIOD_NS * 0.60))
+        self.assertEqual(expired.levels, {"left": 0, "right": 3})
+
+    def test_sources_fuse_by_highest_level_and_expire_independently(self) -> None:
+        state = AlertState(event_timeout_s=1.0)
+        state.apply_event(AlertEvent(side="right", level=2, source="vision"), now=10.0)
+        fused = state.apply_event(AlertEvent(side="right", level=4, source="radar:right_rear"), now=10.1)
+        self.assertEqual(fused.levels["right"], 4)
+
+        radar_cleared = state.apply_event(AlertEvent(side="right", level=0, source="radar:right_rear"), now=10.2)
+        self.assertEqual(radar_cleared.levels["right"], 2)
+
+        expired = state.expire(now=11.1)
+        self.assertEqual(expired.levels["right"], 0)
 
 
 if __name__ == "__main__":

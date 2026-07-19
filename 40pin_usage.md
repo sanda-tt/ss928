@@ -13,10 +13,8 @@
 | Pin12 | `I2S` | `I2S_BCLK` | MAX98357 I2S 功放 | `BCLK` | I2S 位时钟 | 用户提供的 MAX98357 接线表 |
 | Pin38 | `I2S` | `I2S_WS` | MAX98357 I2S 功放 | `LRC` | I2S 左右声道时钟，也叫 `LRCLK`/`WS` | 用户提供的 MAX98357 接线表 |
 | Pin40 | `I2S` | `I2S_SD_TX` | MAX98357 I2S 功放 | `DIN` | SS928 音频数据输出，注意不是 `SD_RX` | 用户提供的 MAX98357 接线表 |
-| Pin7 | `PWM0` | `PWM0_OUT10_0_P` | SmartBag 左一震动模块 | `PWM` | 60%/100% PWM 控制，pinmux `0x102F0110=0x1205`；MAX98357 不使用 MCLK | `work/smartbag_alert_controller/README.md` |
-| Pin32 | `PWM0` | `PWM0_OUT1_0_P` | SmartBag 左二震动模块 | `PWM` | 60%/100% PWM 控制，pinmux `0x102F01EC=0x1201` | `work/smartbag_alert_controller/README.md` |
-| Pin35 | `PWM0` | `PWM0_OUT14_0_P` | SmartBag 右一震动模块 | `PWM` | 60%/100% PWM 控制，pinmux `0x102F0100=0x1205` | `work/smartbag_alert_controller/README.md` |
-| Pin37 | `PWM0` | `PWM0_OUT15_0_P` | SmartBag 右二震动模块 | `PWM` | 60%/100% PWM 控制，pinmux `0x102F00DC=0x1205` | `work/smartbag_alert_controller/README.md` |
+| Pin7 | `PWM0` | `PWM0_OUT10_0_P` | SmartBag 左侧光模块 | `PWM` | 小信号 PWM 输入；三级 50% 亮 1 s，四级 80% 脉冲闪烁三次；pinmux `0x102F0110=0x1205` | `work/smartbag_alert_controller/README.md` |
+| Pin32 | `PWM0` | `PWM0_OUT1_0_P` | SmartBag 右侧光模块 | `PWM` | 小信号 PWM 输入；三级 50% 亮 1 s，四级 80% 脉冲闪烁三次；pinmux `0x102F01EC=0x1201` | `work/smartbag_alert_controller/README.md` |
 
 ## 未计入但容易误会的连接
 
