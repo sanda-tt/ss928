@@ -9,6 +9,8 @@ DX-GP21-A 轨迹、BMI270 处理后姿态/每日统计和最终摔倒告警。
 
 - `work/mt5710_5g_cloud_upload/mt5710_5g_cloud_upload.py` 使用标准库完成 AT、APN、拨号、NCM、DHCP、路由验证和采集进程监督。
 - `start_ss928_5g_upload.sh` 从 `/root/config/smartbag-upload.env` 加载 Git 外令牌并提供一个命令入口。
+- `smartbag-5g-upload.service` 以非阻塞 `Type=simple` 方式开机启动，失败后每 5 秒重试。
+- `install_autostart.sh` 安装该 unit，并禁用旧 BMI270 unit 以避免重复占用传感器。
 - 运营商/APN 自动映射：移动 `cmnet`、电信 `ctnet`、联通 `3gnet`；专网卡可用 `--apn` 覆盖。
 - NCM 网口按 `cdc_ncm` 驱动动态发现，不固定写死 `usb0` 或某个 `enx...` 名称。
 - 如果以太网仍抢占 CloudBase 路由，只临时增加 CloudBase IPv4 `/32` NCM 路由并在退出时清理；不替换全局默认路由，不写永久网络配置。
@@ -43,6 +45,7 @@ DX-GP21-A 轨迹、BMI270 处理后姿态/每日统计和最终摔倒告警。
 - 不要用 `eth0` 连通性冒充 5G 上传，必须检查 CloudBase 目标 `ip route get` 的 `dev`。
 - 不要固定 NCM 网口名称；本次名称与历史验证不同。
 - 已存在数据会话时重复拨号会返回 `ERROR: DUPLICATED`；应复用该会话并继续验证 DHCP/路由。
+- 不要用 `oneshot` 或 `network-online.target` 无限等待外设；后台服务失败重试即可。
 - APN 属于 SIM/运营商；本次电信卡用 `ctnet`，不能继续照抄历史移动卡的 `cmnet`。
 - 不要把 MT5710 当定位源；轨迹只来自 DX-GP21-A。
 - 不要把令牌写入代码、仓库文档或命令日志。

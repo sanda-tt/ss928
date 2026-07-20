@@ -1,0 +1,4 @@
+distance_m,measured_distance_m,absolute_error_m,status,note
+2,,,BLOCKED_STAGE_G,"Real target was not detected; no calibration claim made"
+4,,,BLOCKED_STAGE_G,"Real target was not detected; no calibration claim made"
+6,,,BLOCKED_STAGE_G,"Real target was not detected; no calibration claim made"

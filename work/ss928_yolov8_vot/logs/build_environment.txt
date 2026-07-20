@@ -1,0 +1,45 @@
+Captured: 2026-07-20 Asia/Shanghai
+Target: BOARD-LINUX SS928V100, Ubuntu 22.04.1, Linux 4.19.90, AArch64
+Build host: WSL2 Ubuntu, x86_64
+
+Authoritative SDK:
+  C:/Users/ASUS/Desktop/ss928/在线仓库/SS928V100_SDK_V2.0.2.2_MPP_Sample-master
+
+SDK Makefile.param facts:
+  OS_TYPE=linux
+  CROSS_COMPILE=aarch64-mix210-linux-
+  CC=aarch64-mix210-linux-gcc
+  CXX=aarch64-mix210-linux-g++
+  NPU headers=include/hisilicon/npu
+  ACL link stub=lib/linux/hisilicon/npu/stub/libascendcl.so
+
+WSL2 verified tools:
+  /opt/linux/x86-arm/aarch64-mix210-linux/bin/aarch64-mix210-linux-gcc
+  /opt/linux/x86-arm/aarch64-mix210-linux/bin/aarch64-mix210-linux-g++
+  gcc/g++ version: HC&C V1R3C00SPC200B042_20221123, GCC 7.3.0
+  sysroot: /opt/linux/x86-arm/aarch64-mix210-linux/target
+  make: /usr/bin/make
+
+ACL compile/runtime mapping:
+  compile include: SDK/include/hisilicon/npu/acl.h
+  compile library: SDK/lib/linux/hisilicon/npu/stub/libascendcl.so
+  stub ELF: ELF64 ARM AArch64, SONAME libascendcl.so
+  board runtime: /opt/lib/npu/libascendcl.so
+  board launch LD_LIBRARY_PATH: /opt/lib:/opt/lib/npu
+
+Link policy:
+  -lascendcl -lpthread -lm -ldl
+  no NCNN, no OpenMP, no -fopenmp, no libgomp
+
+Native-board-build decision:
+  Inventory found no gcc, g++, cmake, or make on the board. The board is run-only.
+  The unique final build method is WSL2 cross-compilation with the matching SDK toolchain.
+
+Existing probe search:
+  No reusable source or binary for the previously reported 100-execution ACL probe was found under /root or /tmp.
+  The prior result remains a baseline fact from the user instruction; this project will create fresh 1-run and 100-run logs using its own reusable-buffer ACL implementation.
+
+Board evidence:
+  /root/smartbag_alert/runtime/yolov8_vot/logs/00_inventory.txt
+  factory OM SHA-256: 7010d928c2ce9675ea38b6ee353f1c4fcd4ec648a335d3735d85f2e0313d030b
+

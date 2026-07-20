@@ -18,6 +18,7 @@
 - `ss928-new-board-migration-2026-07-20.md`: clean-board project restore, organized `/root` workspace, WS73 BlueZ startup, boot services, and persistent MR20 `eth1` network configuration.
 - `smartbag-board-cloud-upload.md`：DX-GP21-A 轨迹、BMI270 处理后姿态/每日统计、最终摔倒信号的统一 CloudBase 上传和小程序回读闭环。
 - `mt5710-smartbag-cloud-upload.md`：MT5710 电信 `ctnet` NCM 建链、5G 路由确认、完整 telemetry 上传和小程序服务层回读。
+- `ss928-factory-yolov8-vot.md`：工厂 `yolov8n.om` 的真实 ACL/AIPP 契约、WSL2 AArch64 工程、VOT 复用、离线稳定性结果，以及真实检测未过时禁止进入 USB 的阶段门禁。
 
 ## 新增历史记录格式
 

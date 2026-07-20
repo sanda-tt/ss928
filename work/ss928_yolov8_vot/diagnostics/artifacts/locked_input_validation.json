@@ -1,0 +1,45 @@
+{
+  "input": "work\\ss928_yolov8_vot\\data\\test_input.nv12",
+  "sha256": "76314d959c8e4dcd6a1d2893c9fad3013f31805caadcdcbc58caeda220a76e0a",
+  "bytes": 614400,
+  "format": "NV12 YUV420SP UV, BT.601 wide/full range",
+  "width": 640,
+  "height": 640,
+  "stride_y": 640,
+  "stride_uv": 640,
+  "planes": {
+    "y": {
+      "offset": 0,
+      "bytes": 409600,
+      "min": 0,
+      "max": 255,
+      "mean": 136.95224853515626
+    },
+    "uv": {
+      "offset": 409600,
+      "bytes": 204800,
+      "min": 85,
+      "max": 225,
+      "mean": 130.6928369140625
+    }
+  },
+  "letterbox_border": {
+    "top_y_all_114": true,
+    "bottom_y_all_114": true,
+    "top_uv_all_128": true,
+    "bottom_uv_all_128": true
+  },
+  "aipp_csc_reconstruction_vs_letterbox_rgb": {
+    "reference": "work\\ss928_yolov8_vot\\data\\test_letterbox.ppm",
+    "mean_absolute_error": 0.70179443359375,
+    "channel_mean_absolute_error_rgb": [
+      0.90961181640625,
+      0.5015771484375,
+      0.6941943359375
+    ],
+    "max_absolute_error": 31,
+    "mse": 2.31396240234375,
+    "psnr_db": 44.487240626857556
+  },
+  "verdict": "locked bytes are a dense 640x640 full-range NV12 representation of the fixed letterboxed bus image"
+}

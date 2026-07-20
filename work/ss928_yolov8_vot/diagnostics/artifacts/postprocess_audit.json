@@ -1,0 +1,829 @@
+{
+  "raw_path": "reference.output0.bin",
+  "descriptor_layout": [
+    1,
+    84,
+    8400
+  ],
+  "channel_contract": "4 xywh channels + 80 class probabilities; no objectness channel",
+  "layout_a_channel_first": {
+    "coordinate_stats": {
+      "cx": {
+        "min": 2.3046875,
+        "max": 637.5,
+        "mean": 319.40203287760414,
+        "negative": 0,
+        "above_one": 8400,
+        "nonfinite": 0
+      },
+      "cy": {
+        "min": 2.591796875,
+        "max": 637.0,
+        "mean": 320.36944498697915,
+        "negative": 0,
+        "above_one": 8400,
+        "nonfinite": 0
+      },
+      "width": {
+        "min": 4.6796875,
+        "max": 630.0,
+        "mean": 81.51960890997024,
+        "negative": 0,
+        "above_one": 8400,
+        "nonfinite": 0
+      },
+      "height": {
+        "min": 4.0,
+        "max": 437.75,
+        "mean": 53.22704287574405,
+        "negative": 0,
+        "above_one": 8400,
+        "nonfinite": 0
+      }
+    },
+    "class_score_stats": {
+      "min": 1.52587890625e-05,
+      "max": 0.035400390625,
+      "mean": 1.597213035538083e-05,
+      "negative": 0,
+      "above_one": 0,
+      "nonfinite": 0
+    },
+    "class_elements_at_or_above_threshold": {
+      "0.001": 54,
+      "0.01": 6,
+      "0.05": 0,
+      "0.1": 0,
+      "0.25": 0,
+      "0.45": 0
+    },
+    "anchors_with_best_class_at_or_above_threshold": {
+      "0.001": 53,
+      "0.01": 6,
+      "0.05": 0,
+      "0.1": 0,
+      "0.25": 0,
+      "0.45": 0
+    },
+    "top_16_anchors": [
+      {
+        "anchor": 7629,
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "score": 0.035400390625,
+        "xywh": [
+          477.0,
+          482.75,
+          174.25,
+          93.5
+        ]
+      },
+      {
+        "anchor": 7668,
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "score": 0.01861572265625,
+        "xywh": [
+          476.5,
+          482.75,
+          174.25,
+          94.5
+        ]
+      },
+      {
+        "anchor": 7669,
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "score": 0.017913818359375,
+        "xywh": [
+          477.5,
+          483.0,
+          178.0,
+          94.25
+        ]
+      },
+      {
+        "anchor": 7628,
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "score": 0.0174407958984375,
+        "xywh": [
+          476.75,
+          483.0,
+          173.5,
+          93.0
+        ]
+      },
+      {
+        "anchor": 7588,
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "score": 0.010772705078125,
+        "xywh": [
+          467.75,
+          483.0,
+          154.5,
+          93.75
+        ]
+      },
+      {
+        "anchor": 7627,
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "score": 0.0107421875,
+        "xywh": [
+          480.25,
+          483.25,
+          179.5,
+          93.5
+        ]
+      },
+      {
+        "anchor": 7667,
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "score": 0.009124755859375,
+        "xywh": [
+          482.5,
+          483.0,
+          183.25,
+          94.25
+        ]
+      },
+      {
+        "anchor": 7587,
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "score": 0.0068511962890625,
+        "xywh": [
+          465.0,
+          484.0,
+          149.0,
+          94.25
+        ]
+      },
+      {
+        "anchor": 7597,
+        "class_id": 2,
+        "class_name": "car",
+        "score": 0.006717681884765625,
+        "xywh": [
+          592.0,
+          491.75,
+          96.5,
+          87.5
+        ]
+      },
+      {
+        "anchor": 7403,
+        "class_id": 9,
+        "class_name": "traffic light",
+        "score": 0.005512237548828125,
+        "xywh": [
+          49.6875,
+          393.0,
+          39.03125,
+          52.0
+        ]
+      },
+      {
+        "anchor": 7596,
+        "class_id": 2,
+        "class_name": "car",
+        "score": 0.004150390625,
+        "xywh": [
+          591.5,
+          492.0,
+          99.0,
+          87.25
+        ]
+      },
+      {
+        "anchor": 7626,
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "score": 0.004150390625,
+        "xywh": [
+          470.25,
+          483.75,
+          158.5,
+          93.5
+        ]
+      },
+      {
+        "anchor": 7636,
+        "class_id": 2,
+        "class_name": "car",
+        "score": 0.00388336181640625,
+        "xywh": [
+          592.0,
+          492.25,
+          98.5,
+          85.5
+        ]
+      },
+      {
+        "anchor": 7637,
+        "class_id": 2,
+        "class_name": "car",
+        "score": 0.003509521484375,
+        "xywh": [
+          592.0,
+          492.0,
+          96.0,
+          86.0
+        ]
+      },
+      {
+        "anchor": 2273,
+        "class_id": 0,
+        "class_name": "person",
+        "score": 0.003147125244140625,
+        "xywh": [
+          265.75,
+          220.25,
+          12.0,
+          28.0
+        ]
+      },
+      {
+        "anchor": 2116,
+        "class_id": 14,
+        "class_name": "bird",
+        "score": 0.002899169921875,
+        "xywh": [
+          295.0,
+          219.75,
+          12.25,
+          24.375
+        ]
+      }
+    ],
+    "class_maxima_descending": [
+      {
+        "class_id": 79,
+        "class_name": "toothbrush",
+        "max_score": 0.035400390625,
+        "anchor": 7629
+      },
+      {
+        "class_id": 2,
+        "class_name": "car",
+        "max_score": 0.006717681884765625,
+        "anchor": 7597
+      },
+      {
+        "class_id": 9,
+        "class_name": "traffic light",
+        "max_score": 0.005512237548828125,
+        "anchor": 7403
+      },
+      {
+        "class_id": 0,
+        "class_name": "person",
+        "max_score": 0.003147125244140625,
+        "anchor": 2273
+      },
+      {
+        "class_id": 14,
+        "class_name": "bird",
+        "max_score": 0.002899169921875,
+        "anchor": 2116
+      },
+      {
+        "class_id": 74,
+        "class_name": "clock",
+        "max_score": 0.001903533935546875,
+        "anchor": 6884
+      },
+      {
+        "class_id": 11,
+        "class_name": "stop sign",
+        "max_score": 0.0005636215209960938,
+        "anchor": 7666
+      },
+      {
+        "class_id": 12,
+        "class_name": "parking meter",
+        "max_score": 0.0004439353942871094,
+        "anchor": 7597
+      },
+      {
+        "class_id": 7,
+        "class_name": "truck",
+        "max_score": 0.00038433074951171875,
+        "anchor": 7636
+      },
+      {
+        "class_id": 47,
+        "class_name": "apple",
+        "max_score": 0.0003743171691894531,
+        "anchor": 7588
+      },
+      {
+        "class_id": 62,
+        "class_name": "tv",
+        "max_score": 0.00034046173095703125,
+        "anchor": 8031
+      },
+      {
+        "class_id": 8,
+        "class_name": "boat",
+        "max_score": 0.0003376007080078125,
+        "anchor": 8209
+      },
+      {
+        "class_id": 25,
+        "class_name": "umbrella",
+        "max_score": 0.0003364086151123047,
+        "anchor": 7669
+      },
+      {
+        "class_id": 3,
+        "class_name": "motorcycle",
+        "max_score": 0.0003275871276855469,
+        "anchor": 7440
+      },
+      {
+        "class_id": 69,
+        "class_name": "oven",
+        "max_score": 0.00031757354736328125,
+        "anchor": 8029
+      },
+      {
+        "class_id": 1,
+        "class_name": "bicycle",
+        "max_score": 0.000293731689453125,
+        "anchor": 6971
+      },
+      {
+        "class_id": 60,
+        "class_name": "dining table",
+        "max_score": 0.0002865791320800781,
+        "anchor": 8038
+      },
+      {
+        "class_id": 39,
+        "class_name": "bottle",
+        "max_score": 0.00023794174194335938,
+        "anchor": 7669
+      },
+      {
+        "class_id": 6,
+        "class_name": "train",
+        "max_score": 0.00019860267639160156,
+        "anchor": 8209
+      },
+      {
+        "class_id": 67,
+        "class_name": "cell phone",
+        "max_score": 0.00019109249114990234,
+        "anchor": 5038
+      },
+      {
+        "class_id": 4,
+        "class_name": "airplane",
+        "max_score": 0.00017964839935302734,
+        "anchor": 7676
+      },
+      {
+        "class_id": 59,
+        "class_name": "bed",
+        "max_score": 0.00015723705291748047,
+        "anchor": 8209
+      },
+      {
+        "class_id": 5,
+        "class_name": "bus",
+        "max_score": 0.00014317035675048828,
+        "anchor": 8209
+      },
+      {
+        "class_id": 54,
+        "class_name": "donut",
+        "max_score": 0.00012731552124023438,
+        "anchor": 3607
+      },
+      {
+        "class_id": 20,
+        "class_name": "elephant",
+        "max_score": 0.00012636184692382812,
+        "anchor": 8231
+      },
+      {
+        "class_id": 13,
+        "class_name": "bench",
+        "max_score": 0.0001214742660522461,
+        "anchor": 8032
+      },
+      {
+        "class_id": 56,
+        "class_name": "chair",
+        "max_score": 0.00010478496551513672,
+        "anchor": 8038
+      },
+      {
+        "class_id": 17,
+        "class_name": "horse",
+        "max_score": 9.989738464355469e-05,
+        "anchor": 2272
+      },
+      {
+        "class_id": 32,
+        "class_name": "sports ball",
+        "max_score": 9.608268737792969e-05,
+        "anchor": 7669
+      },
+      {
+        "class_id": 57,
+        "class_name": "couch",
+        "max_score": 9.5367431640625e-05,
+        "anchor": 8229
+      },
+      {
+        "class_id": 44,
+        "class_name": "spoon",
+        "max_score": 7.963180541992188e-05,
+        "anchor": 7588
+      },
+      {
+        "class_id": 10,
+        "class_name": "fire hydrant",
+        "max_score": 7.909536361694336e-05,
+        "anchor": 7669
+      },
+      {
+        "class_id": 33,
+        "class_name": "kite",
+        "max_score": 7.605552673339844e-05,
+        "anchor": 7669
+      },
+      {
+        "class_id": 61,
+        "class_name": "toilet",
+        "max_score": 7.140636444091797e-05,
+        "anchor": 7596
+      },
+      {
+        "class_id": 19,
+        "class_name": "cow",
+        "max_score": 7.033348083496094e-05,
+        "anchor": 2112
+      },
+      {
+        "class_id": 78,
+        "class_name": "hair drier",
+        "max_score": 6.759166717529297e-05,
+        "anchor": 2276
+      },
+      {
+        "class_id": 24,
+        "class_name": "backpack",
+        "max_score": 6.711483001708984e-05,
+        "anchor": 4098
+      },
+      {
+        "class_id": 34,
+        "class_name": "baseball bat",
+        "max_score": 6.711483001708984e-05,
+        "anchor": 4410
+      },
+      {
+        "class_id": 63,
+        "class_name": "laptop",
+        "max_score": 6.556510925292969e-05,
+        "anchor": 8029
+      },
+      {
+        "class_id": 68,
+        "class_name": "microwave",
+        "max_score": 6.014108657836914e-05,
+        "anchor": 8031
+      },
+      {
+        "class_id": 58,
+        "class_name": "potted plant",
+        "max_score": 5.829334259033203e-05,
+        "anchor": 2584
+      },
+      {
+        "class_id": 30,
+        "class_name": "skis",
+        "max_score": 5.692243576049805e-05,
+        "anchor": 7960
+      },
+      {
+        "class_id": 65,
+        "class_name": "remote",
+        "max_score": 5.435943603515625e-05,
+        "anchor": 4309
+      },
+      {
+        "class_id": 29,
+        "class_name": "frisbee",
+        "max_score": 5.227327346801758e-05,
+        "anchor": 7669
+      },
+      {
+        "class_id": 49,
+        "class_name": "orange",
+        "max_score": 5.1856040954589844e-05,
+        "anchor": 7588
+      },
+      {
+        "class_id": 64,
+        "class_name": "mouse",
+        "max_score": 5.066394805908203e-05,
+        "anchor": 7476
+      },
+      {
+        "class_id": 76,
+        "class_name": "scissors",
+        "max_score": 5.02467155456543e-05,
+        "anchor": 6439
+      },
+      {
+        "class_id": 18,
+        "class_name": "sheep",
+        "max_score": 4.947185516357422e-05,
+        "anchor": 2111
+      },
+      {
+        "class_id": 51,
+        "class_name": "carrot",
+        "max_score": 4.83393669128418e-05,
+        "anchor": 7545
+      },
+      {
+        "class_id": 28,
+        "class_name": "suitcase",
+        "max_score": 4.756450653076172e-05,
+        "anchor": 8209
+      },
+      {
+        "class_id": 37,
+        "class_name": "surfboard",
+        "max_score": 4.398822784423828e-05,
+        "anchor": 8209
+      },
+      {
+        "class_id": 73,
+        "class_name": "book",
+        "max_score": 4.07099723815918e-05,
+        "anchor": 8032
+      },
+      {
+        "class_id": 46,
+        "class_name": "banana",
+        "max_score": 3.9458274841308594e-05,
+        "anchor": 7588
+      },
+      {
+        "class_id": 45,
+        "class_name": "bowl",
+        "max_score": 3.707408905029297e-05,
+        "anchor": 7483
+      },
+      {
+        "class_id": 53,
+        "class_name": "pizza",
+        "max_score": 3.707408905029297e-05,
+        "anchor": 8103
+      },
+      {
+        "class_id": 43,
+        "class_name": "knife",
+        "max_score": 3.6776065826416016e-05,
+        "anchor": 8038
+      },
+      {
+        "class_id": 71,
+        "class_name": "sink",
+        "max_score": 3.6776065826416016e-05,
+        "anchor": 7596
+      },
+      {
+        "class_id": 23,
+        "class_name": "giraffe",
+        "max_score": 3.647804260253906e-05,
+        "anchor": 7960
+      },
+      {
+        "class_id": 72,
+        "class_name": "refrigerator",
+        "max_score": 3.618001937866211e-05,
+        "anchor": 8029
+      },
+      {
+        "class_id": 26,
+        "class_name": "handbag",
+        "max_score": 3.5881996154785156e-05,
+        "anchor": 4065
+      },
+      {
+        "class_id": 75,
+        "class_name": "vase",
+        "max_score": 3.5881996154785156e-05,
+        "anchor": 7669
+      },
+      {
+        "class_id": 21,
+        "class_name": "bear",
+        "max_score": 3.427267074584961e-05,
+        "anchor": 2110
+      },
+      {
+        "class_id": 40,
+        "class_name": "wine glass",
+        "max_score": 3.349781036376953e-05,
+        "anchor": 6843
+      },
+      {
+        "class_id": 36,
+        "class_name": "skateboard",
+        "max_score": 3.1948089599609375e-05,
+        "anchor": 6439
+      },
+      {
+        "class_id": 38,
+        "class_name": "tennis racket",
+        "max_score": 3.045797348022461e-05,
+        "anchor": 6400
+      },
+      {
+        "class_id": 22,
+        "class_name": "zebra",
+        "max_score": 2.7954578399658203e-05,
+        "anchor": 6935
+      },
+      {
+        "class_id": 77,
+        "class_name": "teddy bear",
+        "max_score": 2.7954578399658203e-05,
+        "anchor": 7669
+      },
+      {
+        "class_id": 31,
+        "class_name": "snowboard",
+        "max_score": 2.753734588623047e-05,
+        "anchor": 8032
+      },
+      {
+        "class_id": 66,
+        "class_name": "keyboard",
+        "max_score": 2.6702880859375e-05,
+        "anchor": 8032
+      },
+      {
+        "class_id": 27,
+        "class_name": "tie",
+        "max_score": 2.5272369384765625e-05,
+        "anchor": 8038
+      },
+      {
+        "class_id": 16,
+        "class_name": "dog",
+        "max_score": 1.9550323486328125e-05,
+        "anchor": 2266
+      },
+      {
+        "class_id": 50,
+        "class_name": "broccoli",
+        "max_score": 1.8358230590820312e-05,
+        "anchor": 8314
+      },
+      {
+        "class_id": 42,
+        "class_name": "fork",
+        "max_score": 1.817941665649414e-05,
+        "anchor": 6439
+      },
+      {
+        "class_id": 41,
+        "class_name": "cup",
+        "max_score": 1.710653305053711e-05,
+        "anchor": 6516
+      },
+      {
+        "class_id": 15,
+        "class_name": "cat",
+        "max_score": 1.6689300537109375e-05,
+        "anchor": 2276
+      },
+      {
+        "class_id": 52,
+        "class_name": "hot dog",
+        "max_score": 1.6450881958007812e-05,
+        "anchor": 7669
+      },
+      {
+        "class_id": 55,
+        "class_name": "cake",
+        "max_score": 1.6033649444580078e-05,
+        "anchor": 8085
+      },
+      {
+        "class_id": 35,
+        "class_name": "baseball glove",
+        "max_score": 1.52587890625e-05,
+        "anchor": 0
+      },
+      {
+        "class_id": 48,
+        "class_name": "sandwich",
+        "max_score": 1.52587890625e-05,
+        "anchor": 0
+      },
+      {
+        "class_id": 70,
+        "class_name": "toaster",
+        "max_score": 1.52587890625e-05,
+        "anchor": 0
+      }
+    ],
+    "configured_target_class_maxima": [
+      {
+        "class_id": 1,
+        "class_name": "bicycle",
+        "max_score": 0.000293731689453125,
+        "anchor": 6971
+      },
+      {
+        "class_id": 2,
+        "class_name": "car",
+        "max_score": 0.006717681884765625,
+        "anchor": 7597
+      },
+      {
+        "class_id": 3,
+        "class_name": "motorcycle",
+        "max_score": 0.0003275871276855469,
+        "anchor": 7440
+      },
+      {
+        "class_id": 5,
+        "class_name": "bus",
+        "max_score": 0.00014317035675048828,
+        "anchor": 8209
+      },
+      {
+        "class_id": 7,
+        "class_name": "truck",
+        "max_score": 0.00038433074951171875,
+        "anchor": 7636
+      }
+    ]
+  },
+  "layout_b_channel_last_hypothesis": {
+    "interpreted_class_score_stats": {
+      "min": 1.52587890625e-05,
+      "max": 637.5,
+      "mean": 9.225705831116864,
+      "negative": 0,
+      "above_one": 32000,
+      "nonfinite": 0
+    },
+    "verdict": "invalid: interpreted class scores contain coordinate-sized values above 1"
+  },
+  "sigmoid_check": {
+    "raw_class_scores_are_bounded_0_to_1": true,
+    "if_sigmoid_were_applied_min": 0.5000038146972655,
+    "if_sigmoid_were_applied_max": 0.5088491735359644,
+    "official_v2_0_2_2_decoder_applies_sigmoid": false,
+    "verdict": "already activated; applying sigmoid again would move every score to about 0.5"
+  },
+  "confidence_check": {
+    "configured_threshold": 0.25,
+    "maximum_class_score": 0.035400390625,
+    "proposals_before_target_filter_at_configured_threshold": 0,
+    "verdict": "zero proposals at confidence filtering, before target-class filtering and NMS"
+  },
+  "coordinate_check": {
+    "encoding": "xywh center coordinates in the 640x640 model canvas",
+    "xyxy_conversion": "x1=cx-w/2, y1=cy-h/2, x2=cx+w/2, y2=cy+h/2",
+    "letterbox": {
+      "source": [
+        546,
+        413
+      ],
+      "resized": [
+        640,
+        484
+      ],
+      "model": [
+        640,
+        640
+      ],
+      "scale": 1.1721611721611722,
+      "pad_x": 0.0,
+      "pad_y": 78.0,
+      "restore": "subtract pad_x/pad_y, divide by scale, then clip to source bounds"
+    },
+    "verdict": "coordinate conversion/restoration occurs only after confidence filtering and cannot cause the observed zero proposals"
+  },
+  "nms_check": {
+    "configured_iou": 0.45,
+    "input_proposals": 0,
+    "verdict": "NMS is not reached with any proposal and cannot cause the observed zero"
+  }
+}

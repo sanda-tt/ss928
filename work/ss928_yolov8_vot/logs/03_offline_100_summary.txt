@@ -1,0 +1,8 @@
+run_rc=0
+elapsed_ms=4863
+stdout_lines=0
+dmesg_new_lines=0
+leftover_process=none
+binary_sha256=a95d53a42f7a7c4a7c5f69c3d5368292e6e3d161538dcb240dbbb13d6f44e001
+input_sha256=76314d959c8e4dcd6a1d2893c9fad3013f31805caadcdcbc58caeda220a76e0a
+model_sha256=7010d928c2ce9675ea38b6ee353f1c4fcd4ec648a335d3735d85f2e0313d030b

@@ -1,0 +1,19 @@
+{
+  "model_path":"/opt/sample/yolov8/yolov8n.om",
+  "model_mem_size":29883904,
+  "model_weight_size":6381568,
+  "query_ret":0,
+  "load_ret":0,
+  "desc_ret":0,
+  "unload_ret":0,
+  "run_mode":0,
+  "inputs":[
+    {"index":0,"name":"images","dtype":"UINT8","dtype_code":4,"format":"NHWC","format_code":1,"dims":[1,960,640,1],"bytes":614400}
+  ],
+  "input_aipp":[
+    {"index":0,"query_ret":0,"type":"STATIC_AIPP","type_code":1,"info_ret":0,"input_format":"YUV420SP_U8","input_format_code":1,"src_width":640,"src_height":640,"csc_switch":1,"rbuv_swap_switch":0,"csc_matrix":[256,0,359,256,-88,-183,256,454,0],"input_bias":[0,128,128],"output_bias":[16,128,128],"mean":[0,0,0,0],"var_reci":[0.00392157,0.00392157,0.00392157,1]}
+  ],
+  "outputs":[
+    {"index":0,"name":"Concat_254:0:output0","dtype":"FLOAT32","dtype_code":0,"format":"ND","format_code":2,"dims":[1,84,8400],"bytes":2822400}
+  ]
+}

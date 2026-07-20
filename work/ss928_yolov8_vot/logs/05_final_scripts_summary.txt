@@ -1,0 +1,6 @@
+offline_rc=0
+offline_stdout_lines=0
+camera_gate_rc=3
+camera_gate_message=camera stage is locked: offline real-detection acceptance (stage G) has not passed
+binary_sha256=a95d53a42f7a7c4a7c5f69c3d5368292e6e3d161538dcb240dbbb13d6f44e001
+om_inspect_sha256=5c03abeace8923b4f54fa5518d2a664d4cfdc0af76e26bd00b6ee5a8055bd048

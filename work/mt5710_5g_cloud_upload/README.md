@@ -44,6 +44,32 @@ cd /root/work/mt5710_5g_cloud_upload
 ./start_ss928_5g_upload.sh
 ```
 
+## 开机自启动
+
+只需安装一次：
+
+```sh
+# BOARD-LINUX，root 用户
+cd /root/work/mt5710_5g_cloud_upload
+./install_autostart.sh
+```
+
+安装器会启用 `smartbag-5g-upload.service`，并禁用旧的
+`bmi270-backpack.service`，避免两个进程同时读取 BMI270。BMI270 仍通过现有
+`start_ss928_ble.sh` 启动，因此保留 BLE 和 CloudBase 上传。
+
+该服务是后台 `Type=simple` 服务，不等待 `network-online.target`，不会阻塞
+系统启动。MT5710 或传感器尚未就绪时，本次执行按有界超时退出，5 秒后自动重试。
+
+```sh
+# BOARD-LINUX：查看状态和日志
+systemctl status smartbag-5g-upload.service --no-pager -l
+journalctl -u smartbag-5g-upload.service -b --no-pager -n 100
+
+# 如需取消自启动
+systemctl disable --now smartbag-5g-upload.service
+```
+
 仅验证 MT5710、DHCP 和 CloudBase 5G 路由，不启动传感器：
 
 ```sh
@@ -79,4 +105,5 @@ Started pid=...: bmi270_backpack.py
 - 已有数据会话时可重复执行，模块返回 `ERROR: DUPLICATED` 会被识别为已连接并继续验证路由。
 - 本次只有 MT5710 已连接；DX-GP21-A、BMI270 实物采集仍需接线后运行上述一个命令验证。
 
-`udhcpc` 可能临时改变板端默认路由和 DNS；脚本不写 systemd、启动项或永久网络配置。
+`udhcpc` 可能临时改变板端默认路由和 DNS；拨号程序不写永久网络配置，只有明确运行
+`install_autostart.sh` 时才安装上述 systemd 自启动项。

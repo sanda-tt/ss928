@@ -1,0 +1,16 @@
+file=diagnostic_output.bin elements=705600
+  target class_id=0 name=person max=0.002050400
+  target class_id=1 name=bicycle max=0.001008987
+  target class_id=2 name=car max=0.000435352
+  target class_id=3 name=motorcycle max=0.001335144
+  target class_id=5 name=bus max=0.000024140
+  target class_id=7 name=truck max=0.000085533
+  global_top=79:0.125976562,0:0.002050400,13:0.001624107,3:0.001335144,74:0.001094818
+file=diag_ultralytics_output.bin elements=705600
+  target class_id=0 name=person max=0.001911163
+  target class_id=1 name=bicycle max=0.001712799
+  target class_id=2 name=car max=0.000904083
+  target class_id=3 name=motorcycle max=0.000943184
+  target class_id=5 name=bus max=0.000052273
+  target class_id=7 name=truck max=0.000288963
+  global_top=79:0.054626465,9:0.017379761,74:0.003883362,0:0.001911163,1:0.001712799
