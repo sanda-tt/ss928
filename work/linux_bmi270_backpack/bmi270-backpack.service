@@ -1,6 +1,7 @@
 [Unit]
 Description=BMI270 backpack posture monitor
-After=bluetooth.service dbus.service
+Requires=ws73-bluetooth-module.service
+After=ws73-bluetooth-module.service bluetooth.service dbus.service
 Wants=bluetooth.service dbus.service
 
 [Service]

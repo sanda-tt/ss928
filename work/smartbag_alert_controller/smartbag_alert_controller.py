@@ -19,6 +19,7 @@ from alert_core import (
     AlertState,
     parse_alert_command,
     parse_vision_alert_jsonl,
+    record_high_warning_marker,
 )
 from ble_nus import BleNusServer
 from mr20_radar import MR20RadarWorker, load_radar_configs
@@ -351,6 +352,10 @@ def run_controller(args: argparse.Namespace) -> int:
                     event = event_queue.get_nowait()
                 except queue.Empty:
                     break
+                try:
+                    record_high_warning_marker(event, args.fall_warning_marker)
+                except Exception as exc:
+                    eprint(f"WARN fall warning marker failed: {exc}")
                 output = state.apply_event(event)
                 apply_output(output, haptics, lights, audio)
 
@@ -407,6 +412,11 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--right-tm6605-channel", type=int, default=1, help="TCA9548A channel for the right TM6605.")
     parser.add_argument("--enable-right-tm6605", action="store_true", help="Enable the right TM6605; requires a mux when both modules are connected.")
     parser.add_argument("--event-timeout", type=float, default=1.0, help="Seconds before stale side vibration is stopped.")
+    parser.add_argument(
+        "--fall-warning-marker",
+        default="/tmp/smartbag_last_high_warning.json",
+        help="Marker refreshed by camera/radar level-3 or level-4 warnings.",
+    )
     parser.add_argument("--poll-interval", type=float, default=0.05, help="Controller loop sleep interval in seconds.")
     parser.add_argument("--audio-root", default=str(AUDIO_ROOT), help="Root containing L1..R4 audio folders.")
     parser.add_argument("--sample-audio", default=SAMPLE_AUDIO, help="Path to sample_audio player.")

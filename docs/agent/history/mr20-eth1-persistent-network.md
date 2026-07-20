@@ -45,3 +45,16 @@ Do not change `eth1` to a normal `192.168.1.102/24` while `eth0` remains on `192
 
 - The local and board copies of `start_ss928_smartbag_alert.sh` were converted to LF and board `sh -n` validation passed. `.gitattributes` now pins `work/smartbag_alert_controller/*.sh` to LF so a future Windows checkout does not reintroduce CRLF.
 - Restarting `smartbag-alert.service` passed the former shell error but exposed a separate pre-existing hardware blocker: PWM setup returned `EINVAL`, then TM6605 mux I2C writes returned `EIO`. The controller exits before it creates the MR20 UDP listener, so actual radar alert output remains unverified until the PWM/TM6605 initialization path is repaired or explicitly configured for the hardware present.
+
+## 2026-07-20 final live state and follow-up
+
+- `smartbag-alert.service` is enabled for boot and active at runtime. It owns UDP `192.168.1.102:2368`; the persistent `/32` eth1 address and host route to `192.168.1.200` remain in effect.
+- With the repaired PWM startup sequence and the TCA9548A configuration enabled, the service stays active while BLE, MR20 receiver, dual haptics, and PWM lights are initialized.
+- Live MR20 status frames continue to arrive at about 25 Hz from `192.168.1.200`, and are logged as zero-target scans. A moving target inside the configured field is still required to produce a live `0x60B` object frame and prove the end-to-end physical radar alarm.
+- Keep eth0 untouched. Do not change eth1 to `/24`, add a gateway, or use the same 192.168.1.0/24 route on both board Ethernet ports.
+
+## 2026-07-20 live moving-target alarm proof
+
+- A real moving target produced MR20 target ID `12` on the right-rear radar. Logged samples were about `0.8–1.1 m` longitudinal, `-0.1–0.1 m` lateral, and `-1.25–-1.5 m/s` longitudinal velocity (`oncoming`).
+- After the configured two-frame confirmation, the controller recorded 35 level-1 radar alerts from this target. This proves the live chain `MR20 0x60B target -> UDP receiver -> parser -> risk evaluator -> smartbag alert event`.
+- The level is correctly 1: the measured closing speed is below the level-2 minimum of `2 m/s`, even though the target is close and has a short TTC. The current threshold design intentionally requires both the per-level minimum speed and either the per-level TTC or distance condition.

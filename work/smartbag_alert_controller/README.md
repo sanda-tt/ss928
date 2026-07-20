@@ -114,6 +114,11 @@ default-route change. The controller combines active camera and radar events by
 side and always drives the highest current level. MR20 records are appended as
 JSONL under `/root/smartbag_alert/logs/`.
 
+For the competition-stage fall fusion, camera and radar level-3/level-4 events
+also refresh `/tmp/smartbag_last_high_warning.json`. Levels 1/2 and manual BLE
+commands do not count. The BMI270 process checks this marker when its IMU state
+machine confirms a fall; normal light, haptic, and audio behavior is unchanged.
+
 After connecting the radar cable to the board's currently-down `eth1`, verify the
 link before changing its temporary address. On the board, use:
 

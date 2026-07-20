@@ -8,6 +8,10 @@ const test = (name, fn) => tests.push({ name, fn });
 const UPLOAD_TOKEN = "competition-upload-token";
 
 const makePayload = () => ({
+  version: 1,
+  deviceId: "bag001",
+  requestId: "batch-1784160000000",
+  reportedAt: 1784160000000,
   status: {
     location: { latitude: 30.65736, longitude: 104.0832 },
     attitude: { rollDeg: 1.2, pitchDeg: -3.4, yawDeg: 92.1 },
@@ -17,28 +21,31 @@ const makePayload = () => ({
     firmwareVersion: "sim-v1"
   },
   trackPoints: [{
+    requestId: "track-1784160000000",
     reportedAt: 1784160000000,
     location: { latitude: 30.65736, longitude: 104.0832 },
     speed: 1.2,
     heading: 92
   }],
   alarms: [{
+    requestId: "fall-1784160000000",
+    alarmId: "fall-1784160000000",
     reportedAt: 1784160000000,
-    alarmType: "rear_vehicle",
-    riskLevel: 2,
-    direction: "left_rear",
-    message: "vehicle approaching",
+    alarmType: "fall_detected",
+    riskLevel: 3,
+    message: "fall detected",
     location: { latitude: 30.65736, longitude: 104.0832 }
   }]
 });
 
-const makeStore = () => {
-  const state = { status: null, tracks: [], alarms: [] };
+const makeStore = (initialStatus) => {
+  const state = { status: Object.assign({}, initialStatus || {}), tracks: [], alarms: [], daily: null };
   return {
     state,
-    async setStatus(document) { state.status = document; },
+    async mergeStatus(document) { state.status = Object.assign({}, state.status, document); },
     async insertTrackPoint(document) { state.tracks.push(document); },
-    async insertAlarm(document) { state.alarms.push(document); }
+    async insertAlarm(document) { state.alarms.push(document); },
+    async setPostureDaily(document) { state.daily = document; }
   };
 };
 
@@ -54,6 +61,69 @@ test("accepts the upload token and writes all records as bag001", async () => {
   assert.strictEqual(store.state.status.deviceId, "bag001");
   assert.strictEqual(store.state.tracks[0].deviceId, "bag001");
   assert.strictEqual(store.state.alarms[0].deviceId, "bag001");
+});
+
+test("merges partial posture without deleting the latest GNSS location and writes daily totals", async () => {
+  const store = makeStore({ location: { latitude: 30.1, longitude: 104.1, valid: true } });
+  const processor = telemetry.createTelemetryProcessor({ store, uploadToken: UPLOAD_TOKEN, now: () => "2026-07-20T00:00:00.000Z" });
+  const payload = {
+    version: 1,
+    deviceId: "bag001",
+    requestId: "posture-1",
+    reportedAt: 1784505600000,
+    status: {
+      reportedAt: 1784505600000,
+      posture_status: "bad",
+      is_wearing: true,
+      reminder_active: true,
+      attitude: { rollDeg: 1.2, pitchDeg: -18.4, yawDeg: 92.1 }
+    },
+    postureDaily: {
+      device_id: "bag001",
+      date: "2026-07-20",
+      wearing_seconds: 20,
+      good_seconds: 15,
+      bad_seconds: 5,
+      updated_at: 1784505600000
+    },
+    trackPoints: [],
+    alarms: []
+  };
+
+  const result = await processor.process({
+    headers: { "x-upload-token": UPLOAD_TOKEN },
+    rawBody: Buffer.from(JSON.stringify(payload))
+  });
+
+  assert.deepStrictEqual(result, { success: true });
+  assert.strictEqual(store.state.status.location.latitude, 30.1);
+  assert.strictEqual(store.state.status.posture_status, "bad");
+  assert.strictEqual(store.state.daily._id, "bag001_2026-07-20");
+  assert.strictEqual(store.state.daily.bad_seconds, 5);
+});
+
+test("rejects invalid posture and missing append request ids before writing", async () => {
+  const invalidPayloads = [
+    Object.assign(makePayload(), { status: { posture_status: "hunch" } }),
+    Object.assign(makePayload(), { trackPoints: [{ reportedAt: 1784160000000, location: { latitude: 30, longitude: 104 } }] }),
+    Object.assign(makePayload(), { alarms: [{ reportedAt: 1784160000000, alarmType: "fall_detected", riskLevel: 3 }] }),
+    Object.assign(makePayload(), { status: { location: { latitude: 91, longitude: 104 } } }),
+    Object.assign(makePayload(), { postureDaily: { device_id: "bag001", date: "2026-07-20", wearing_seconds: 5, good_seconds: 4, bad_seconds: 2, updated_at: 1784160000000 } })
+  ];
+
+  for (let index = 0; index < invalidPayloads.length; index += 1) {
+    const store = makeStore();
+    const processor = telemetry.createTelemetryProcessor({ store, uploadToken: UPLOAD_TOKEN });
+    const result = await processor.process({
+      headers: { "x-upload-token": UPLOAD_TOKEN },
+      rawBody: Buffer.from(JSON.stringify(invalidPayloads[index]))
+    });
+    assert.strictEqual(result.success, false);
+    assert.strictEqual(result.error.code, "INVALID_TELEMETRY");
+    assert.deepStrictEqual(store.state.status, {});
+    assert.strictEqual(store.state.tracks.length, 0);
+    assert.strictEqual(store.state.alarms.length, 0);
+  }
 });
 
 test("rejects an invalid upload token", async () => {

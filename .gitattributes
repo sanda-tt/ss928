@@ -4,3 +4,6 @@
 在线仓库/ss928v100_clang-master/smp/a55_linux/mpp/sample/svp/ive/data/input/gmm2/gmm2_352x288_sp400_frm1000.yuv filter=lfs diff=lfs merge=lfs -text
 在线仓库/ss928v100_gcc-master/smp/a55_linux/mpp/sample/svp/ive/data/input/gmm2/gmm2_352x288_sp400_frm1000.yuv filter=lfs diff=lfs merge=lfs -text
 work/smartbag_alert_controller/*.sh text eol=lf
+work/dx_gp21_tracker/*.sh text eol=lf
+work/linux_bmi270_backpack/*.sh text eol=lf
+work/ss928_board_setup/scripts/*.sh text eol=lf

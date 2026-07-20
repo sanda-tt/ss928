@@ -1,6 +1,6 @@
 ---
 name: smartbag-cloud-upload
-description: Implement the SS928 smart safety backpack's minimal CloudBase upload path. Use when any board-side module needs to upload status, GNSS coordinates, IMU attitude, risk results, track points, or alarm events such as falls and collision warnings to the deployed smartbag-device-ingest HTTP Function. Also use when modifying upload helpers, simulator scripts, or event-triggered reporting code. Preserve existing BLE and local alert behavior; do not redesign the backend or add HMAC, nonce, user binding, or other non-MVP mechanisms.
+description: Implement the SS928 smart safety backpack's minimal CloudBase upload path. Use when a board-side module needs to upload DX-GP21-A GNSS tracks, processed BMI270 posture, daily posture totals, or final fall alarms to the deployed smartbag-device-ingest HTTP Function. Also use when modifying upload helpers, simulator scripts, or event-triggered reporting code. Preserve existing BLE and local alert behavior; do not redesign the backend or add HMAC, nonce, user binding, or other non-MVP mechanisms.
 ---
 
 # Smartbag Cloud Upload
@@ -102,7 +102,9 @@ IDs as success.
 
 1. Find the point where the module confirms a valid event or has a new sample to upload.
 2. Reuse or add one small HTTP helper instead of embedding request logic throughout the detection code.
-3. Build one telemetry JSON object using the contract in `references/upload-contract.md`.
+3. Build one telemetry JSON object with the shared
+   `work/smartbag_cloud_uploader/telemetry_client.py` builders and the contract
+   in `references/upload-contract.md`.
 4. Send the request with a short timeout, normally 5 seconds.
 5. On upload failure, log one concise error and continue the local detection loop.
 6. Do not change BLE broadcasting, local vibration, sound, LED, or the original detection algorithm unless the user explicitly asks.
@@ -153,7 +155,8 @@ Use these destinations:
 
 - Current device snapshot -> `status` -> updates `device_status`
 - GNSS history point -> `trackPoints` -> appends to `track_points`
-- Fall, collision, danger, or other event -> `alarms` -> appends to `alarm_history`
+- Final `FALL_ALARM` only -> `alarms` -> appends to `alarm_history`
+- Processed posture daily totals -> `postureDaily` -> overwrites `posture_daily_stats/bag001_<date>`
 
 One upload may contain all three.
 
@@ -169,10 +172,10 @@ One upload may contain all three.
 
 ## Fall detection integration
 
-At the final confirmed-fall branch, call a helper shaped like:
+At the final confirmed-fall branch, pass the existing event to a helper shaped like:
 
 ```python
-report_fall_event(latitude, longitude, roll, pitch, yaw)
+report_fall(event, fresh_dx_gp21_location)
 ```
 
 Use:
@@ -183,7 +186,9 @@ riskLevel = 3
 message = 检测到用户摔倒
 ```
 
-The complete example is in `references/upload-contract.md`.
+Reject any event whose `signal` is not `FALL_ALARM` or whose `alarmType` is
+not `fall_detected`. Camera/MR20 warnings remain local and are not part of this
+upload contract. The complete example is in `references/upload-contract.md`.
 
 ## Completion checklist
 
@@ -193,6 +198,8 @@ Before declaring the integration done, verify only these items:
 - The payload matches the deployed validator.
 - Each `trackPoints` item has a unique `requestId`.
 - A failed network request does not terminate the sensor or detection process.
-- A real local simulator request returns HTTP 200 and MCP confirms the expected `device_status` and `track_points` records.
-- `smartbag-app-api:getTrackPoints` returns the uploaded points, proving the Mini Program service path can read them.
+- A real local simulator request returns HTTP 200 and MCP confirms the expected
+  `device_status`, `track_points`, `posture_daily_stats`, and `alarm_history` records.
+- `smartbag-app-api` returns the uploaded records through `getRealtimePosture`,
+  `getDailyPosture`, `getTrackPoints`, and `getAlarmHistory`.
 - Existing BLE and local alerts still run.

@@ -89,6 +89,62 @@ class TrackStoreTests(unittest.TestCase):
             self.assertEqual(json.loads(line)["lat"], 31.23042)
 
 
+class CloudUploadIntegrationTests(unittest.TestCase):
+    def test_valid_stored_point_is_uploaded_once_and_cached(self):
+        class FakeTelemetryClient:
+            def __init__(self):
+                self.events = []
+
+            def submit_event(self, payload):
+                self.events.append(payload)
+                return True
+
+        with tempfile.TemporaryDirectory() as temp:
+            cfg = gnss.deep_merge(gnss.DEFAULT_CONFIG, {
+                "track": {"data_dir": str(Path(temp) / "tracks")},
+                "cloud_upload": {
+                    "enabled": True,
+                    "latest_location_path": str(Path(temp) / "latest-location.json"),
+                },
+                "output": {"console": False, "ble_enabled": False},
+            })
+            cloud = FakeTelemetryClient()
+            app = gnss.TrackerApp(cfg, telemetry_client=cloud)
+
+            app.handle_nmea_line("$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47")
+            point = app.handle_nmea_line("$GPRMC,123519,A,4807.038,N,01131.000,E,022.4,084.4,230394,003.1,W*6A")
+
+            self.assertIsNotNone(point)
+            self.assertEqual(len(cloud.events), 1)
+            self.assertEqual(cloud.events[0]["trackPoints"][0]["source"], "dx_gp21")
+            cached = json.loads((Path(temp) / "latest-location.json").read_text(encoding="utf-8"))
+            self.assertEqual(cached["location"]["latitude"], point["lat"])
+            self.assertEqual(len(list((Path(temp) / "tracks").glob("*.jsonl"))), 1)
+
+    def test_invalid_fix_does_not_upload(self):
+        class FakeTelemetryClient:
+            def __init__(self):
+                self.events = []
+
+            def submit_event(self, payload):
+                self.events.append(payload)
+                return True
+
+        with tempfile.TemporaryDirectory() as temp:
+            cfg = gnss.deep_merge(gnss.DEFAULT_CONFIG, {
+                "track": {"data_dir": temp},
+                "cloud_upload": {"enabled": True},
+                "output": {"console": False, "ble_enabled": False},
+            })
+            cloud = FakeTelemetryClient()
+            app = gnss.TrackerApp(cfg, telemetry_client=cloud)
+
+            point = app.handle_nmea_line("$GPRMC,123519,V,4807.038,N,01131.000,E,000.0,000.0,230394,003.1,W*71")
+
+            self.assertIsNone(point)
+            self.assertEqual(cloud.events, [])
+
+
 class SerialReaderTests(unittest.TestCase):
     def test_reader_waits_when_nonblocking_serial_has_no_data_yet(self):
         original_read = gnss.os.read

@@ -96,3 +96,13 @@ USB-TTL 逻辑电平选 3.3V，插到 SS928 后把配置或参数改成 `/dev/tt
 ```sh
 python3 ./dx_gp21_tracker.py --serial-device /dev/ttyUSB0 --baud 115200 --dump-nmea --no-ble
 ```
+
+## 微信云开发轨迹上传
+
+`config.ss928_uart4.json` 默认启用现有 CloudBase telemetry 上传。程序只在
+DX-GP21-A 产生有效 WGS84 定位、且本地 JSONL 已成功保存后，把单个轨迹点异步
+提交到 `smartbag-device-ingest`；MT5710 只提供联网能力，不参与定位。
+
+板端启动前通过服务环境设置 `SMARTBAG_UPLOAD_TOKEN`，不要把令牌写入配置或日志。
+断网、超时或未配置令牌不会终止 GNSS、本地轨迹或 BLE。最新有效坐标会原子写入
+`/tmp/smartbag_latest_location.json`，仅供最终摔倒事件在位置仍新鲜时引用。

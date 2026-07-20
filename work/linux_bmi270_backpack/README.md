@@ -313,3 +313,22 @@ python3 bmi270_backpack.py --backend i2c --i2c-bus 0 --i2c-addr 0x68 --no-ble
 ```
 
 用户态 I2C 模式需要 `bmi270_config.bin` 和 `bmi270_backpack.py` 放在同一个目录下。这个二进制配置文件已经从 STM32 示例里的 `BMI270_config.h` 生成，用来初始化 BMI270 内部特性固件。
+
+## 微信云开发姿态与摔倒上传
+
+`config.ss928_ble.json` 启用现有 CloudBase telemetry 上传。BMI270 仍以 50 Hz
+执行本地姿态和摔倒处理，但只按 5 秒低频上传处理后的姿态快照：
+
+- `posture_status`：`good` 或 `bad`；
+- `bad` 严格复用当前 HUNCH 阈值、运动门控和 3 秒持续判定；
+- `attitude`：安装校准后的 roll、pitch、yaw；
+- 不上传原始加速度、角速度数组或 50 Hz 样本流；
+- 每日良好/不良姿态秒数保存到本地状态文件，并以上传绝对值的方式防止重试重复累计。
+
+只有现有融合代码最终产生的 `FALL_ALARM` 会上传 `fall_detected` 报警。摄像头、
+MR20 的普通预警和 IMU 中间事件不会上传。若 DX-GP21-A 的最新位置缓存仍在
+有效期内，摔倒报警附带该位置；无位置或位置过期时仍正常上传报警。
+
+令牌只从 `SMARTBAG_UPLOAD_TOKEN` 环境变量读取。网络失败不会终止 BMI270、BLE、
+本地提醒或摔倒 JSONL。当前未连接独立佩戴检测传感器，因此持续收到有效 BMI270
+样本时 `is_wearing=true`；这不等同于实物佩戴状态已经验证。

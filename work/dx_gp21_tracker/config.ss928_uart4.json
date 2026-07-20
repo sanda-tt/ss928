@@ -13,5 +13,11 @@
     "ble_enabled": true,
     "ble_name": "DX-GP21-Track",
     "live_hz": 1.0
+  },
+  "cloud_upload": {
+    "enabled": true,
+    "latest_location_path": "/tmp/smartbag_latest_location.json",
+    "timeout_s": 5.0,
+    "event_queue_size": 32
   }
 }

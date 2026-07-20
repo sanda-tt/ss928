@@ -1,5 +1,35 @@
 # SS928 Smart Backpack Mini Program
 
+## 板端统一 CloudBase telemetry 上传
+
+板端通过现有微信云开发 HTTP 云函数 `smartbag-device-ingest` 上传，固定设备
+ID 为 `bag001`。当前统一接口接收：
+
+- DX-GP21-A 的有效 GNSS 轨迹点；MT5710 只负责网络传输；
+- BMI270 已按现有 HUNCH 规则处理后的 `good` / `bad` 姿态、佩戴状态、提醒状态和每日绝对累计；
+- 现有摔倒检测器最终确认的 `FALL_ALARM` / `fall_detected` 信号。
+
+BMI270 的校准后 roll/pitch/yaw 仅作为诊断快照，原始加速度计和陀螺仪数组不上传。
+相机和 MR20 的普通预警信号不上传。摔倒记录只在最终规则触发时写一次，并在
+DX-GP21-A 位置缓存仍新鲜时附带位置。
+
+本地只检查 payload、不访问云端：
+
+```powershell
+python .\tools\simulate_device_upload.py --kind all --dry-run
+```
+
+通过当前 CloudBase 接口分别上传轨迹、姿态/日统计和摔倒测试记录：
+
+```powershell
+python .\tools\simulate_device_upload.py --kind all
+```
+
+令牌按顺序从 `SMARTBAG_UPLOAD_TOKEN`、`UPLOAD_TOKEN` 或 Git 忽略的
+`.local/device-access.md` 读取，脚本不会输出令牌。小程序仍通过
+`smartbag-app-api` 的 `getRealtimePosture`、`getDailyPosture`、
+`getTrackPoints` 和 `getAlarmHistory` 读取这些记录。
+
 这个原生微信小程序用于连接 SS928 板端 BLE Nordic UART Service 外设：
 
 - `DX-GP21-Track`：DX-GP21 GNSS 定位、实时位置和板端本地轨迹。

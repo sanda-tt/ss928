@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Mapping
 
 
@@ -214,3 +216,24 @@ class AlertState:
         if not normalized:
             raise ValueError("alert source must not be empty")
         return normalized
+
+
+def record_high_warning_marker(
+    event: AlertEvent,
+    path: str | Path,
+    now_wall: float | None = None,
+) -> bool:
+    imu_fall_dir = Path(__file__).resolve().parents[1] / "imu_fall_detector"
+    if str(imu_fall_dir) not in sys.path:
+        sys.path.insert(0, str(imu_fall_dir))
+    from fall_fusion import write_high_warning_marker
+
+    return write_high_warning_marker(
+        path,
+        {
+            "source": event.source,
+            "side": event.side,
+            "level": event.level,
+            "ts": time.time() if now_wall is None else float(now_wall),
+        },
+    )
