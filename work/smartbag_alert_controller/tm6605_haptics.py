@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping
@@ -41,6 +42,20 @@ class LinuxI2cBus:
     def __init__(self, device: Path, dry_run: bool = False) -> None:
         self.device = device
         self.dry_run = dry_run
+
+    @contextmanager
+    def transaction(self):
+        """Serialize mux selection with the separate BMI270 process."""
+        if self.dry_run or fcntl is None:
+            yield
+            return
+        lock_fd = os.open("/tmp/ss928-i2c0-mux.lock", os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            yield
+        finally:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
 
     def write_to(self, address: int, data: bytes, label: str) -> None:
         if self.dry_run:
@@ -156,8 +171,9 @@ class Tm6605Haptics:
         self.bus.write_to(self.mux_address, bytes((1 << self.channels[side],)), f"{side} TM6605 mux channel")
 
     def _write_register(self, side: str, register: int, value: int) -> None:
-        self._select_channel(side)
-        self.bus.write_to(TM6605_ADDRESS, bytes((register, value)), f"{side} TM6605 reg 0x{register:02X}")
+        with self.bus.transaction():
+            self._select_channel(side)
+            self.bus.write_to(TM6605_ADDRESS, bytes((register, value)), f"{side} TM6605 reg 0x{register:02X}")
 
     def _set_playback(self, side: str, enabled: bool) -> None:
         self._write_register(side, TM6605_PLAY_REGISTER, 1 if enabled else 0)

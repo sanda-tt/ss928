@@ -38,25 +38,22 @@ its `sleep_seconds` and `timeout_seconds`; otherwise it uses 5s and 13s.
 
 ## TM6605 / LRA Wiring
 
-Current hardware uses **only the left TM6605 and left LRA**. Connect the LRA
-only to the driver's motor connector; never connect an LRA directly to an SS928
-GPIO. The right TM6605 is not connected and the controller does not send it any
-I2C commands.
+Route all three I2C devices through one TCA9548A. Connect each LRA only to its
+own TM6605 motor connector; never connect an LRA directly to an SS928 GPIO.
 
-BMI270 already shares I2C0, which is correct: its address is `0x68`, whereas
-TM6605 uses fixed address `0x2D` (the datasheet write byte is `0x5A`). I2C
-devices with different addresses can share the same SDA/SCL pair.
-
-| SS928 40Pin | Left TM6605 | Notes |
+| SS928 40Pin | TCA9548A | Notes |
 |---:|---|---|
-| Pin2 or Pin4 5V | VCC | Module supply. |
-| Any GND | GND | Must share ground with the board and BMI270. |
-| Pin3 `I2C0_SDA` | SDA | Direct 3.3 V I2C signal; board pinmux: `bspmm 0x102F013c 0x2031`. |
-| Pin5 `I2C0_SCL` | SCL | Direct 3.3 V I2C signal; board pinmux: `bspmm 0x102F0140 0x2031`. |
+| Pin1 or Pin17 3.3V | VCC | TCA9548A logic supply. |
+| Any GND | GND | Common ground for board, BMI270 and both TM6605 modules. |
+| Pin3 `I2C0_SDA` | SDA | Board pinmux: `bspmm 0x102F013c 0x2031`. |
+| Pin5 `I2C0_SCL` | SCL | Board pinmux: `bspmm 0x102F0140 0x2031`. |
+| TCA9548A channel 0 | BMI270 SDA/SCL | BMI270 remains address `0x68`; VCC=3.3V, GND common, CSB=3.3V, SDO=GND. |
+| TCA9548A channel 1 | Left TM6605 SDA/SCL | TM6605 VCC=5V, GND common, signal level is 3.3V-compatible. |
+| TCA9548A channel 2 | Right TM6605 SDA/SCL | TM6605 VCC=5V, GND common, signal level is 3.3V-compatible. |
 
-This direct wiring uses the module's confirmed 3.3 V-compatible SDA/SCL. When
-adding the right module later, do not connect it in parallel: both drivers are
-address `0x2D`, so add a TCA9548A then.
+Tie TCA9548A address pins A0/A1/A2 to GND for address `0x70`; keep RESET high.
+BMI270 must move from the former direct Pin3/Pin5 wiring to channel 0, otherwise
+it becomes invisible whenever the controller selects a TM6605 channel.
 
 The old PWM signals on Pin7, Pin32, Pin35, and Pin37 are no longer used for
 vibration. Pin7 remains free for its former PWM/I2S alternate function.
@@ -163,9 +160,10 @@ For an I2C-device precheck only:
 python3 smartbag_alert_controller.py --preflight-only
 ```
 
-The default controller uses only the left TM6605 directly on `/dev/i2c-0`.
-The right side is deliberately idle. A future two-side setup needs
-`--tm6605-use-mux --enable-right-tm6605` plus a TCA9548A.
+The controller defaults to TCA9548A `0x70`: BMI270 channel 0, left TM6605
+channel 1, and right TM6605 channel 2. The BMI270 program re-selects channel 0
+for every I2C transaction, while the haptic program locks and selects its own
+channel before each write.
 
 For dry-run integration testing from stdin:
 

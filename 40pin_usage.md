@@ -6,8 +6,8 @@
 
 | 40Pin 索引 | 使用类型 | 板端功能 | 连接设备 | 设备引脚 | 用途/说明 | 来源 |
 |---|---|---|---|---|---|---|
-| Pin3 | `I2C0` | `I2C0_SDA` | BMI270 背包姿态模块 | `SDA` | I2C 数据线，对应 `/dev/i2c-0` | `work/linux_bmi270_backpack/README.md` |
-| Pin5 | `I2C0` | `I2C0_SCL` | BMI270 背包姿态模块 | `SCL` | I2C 时钟线，对应 `/dev/i2c-0` | `work/linux_bmi270_backpack/README.md` |
+| Pin3 | `I2C0` | `I2C0_SDA` | TCA9548A 主端 SDA | BMI270=CH0，左 TM6605=CH1，右 TM6605=CH2 | I2C 数据线，对应 `/dev/i2c-0` | `work/linux_bmi270_backpack/config.ss928_ble.json` |
+| Pin5 | `I2C0` | `I2C0_SCL` | TCA9548A 主端 SCL | BMI270=CH0，左 TM6605=CH1，右 TM6605=CH2 | I2C 时钟线，对应 `/dev/i2c-0` | `work/linux_bmi270_backpack/config.ss928_ble.json` |
 | Pin8 | `UART4` | `UART4_TXD` | DX-GP21-A GNSS 模块 | `RXD` | GNSS 串口输入，对应 `/dev/ttyAMA4` | `work/dx_gp21_tracker/README.md` |
 | Pin10 | `UART4` | `UART4_RXD` | DX-GP21-A GNSS 模块 | `TXD` | GNSS NMEA 串口输出，对应 `/dev/ttyAMA4` | `work/dx_gp21_tracker/README.md` |
 | Pin12 | `I2S` | `I2S_BCLK` | MAX98357 I2S 功放 | `BCLK` | I2S 位时钟 | 用户提供的 MAX98357 接线表 |

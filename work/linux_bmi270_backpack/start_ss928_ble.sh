@@ -7,12 +7,14 @@ BLE_SCRIPT=${BLE_SCRIPT:-"/opt/sample/ws73/ble.sh"}
 PYTHON=${PYTHON:-python3}
 I2C_BUS=${I2C_BUS:-0}
 I2C_ADDR=${I2C_ADDR:-0x68}
+I2C_MUX_ADDR=${I2C_MUX_ADDR:-0x70}
+I2C_MUX_CHANNEL=${I2C_MUX_CHANNEL:-0}
 PINMUX_I2C0=${PINMUX_I2C0:-1}
 START_BLE_STACK=${START_BLE_STACK:-auto}
 RESET_BLE_STACK=${RESET_BLE_STACK:-0}
 USE_BLE_SH_DBUS=${USE_BLE_SH_DBUS:-0}
 
-echo "BMI270 wiring for this startup: SDA/SCL on SS928 I2C0, CSB high, SDO low, addr=$I2C_ADDR"
+echo "BMI270 wiring for this startup: I2C0 -> TCA9548A channel $I2C_MUX_CHANNEL, CSB high, SDO low, addr=$I2C_ADDR"
 
 have_hci()
 {
@@ -154,4 +156,6 @@ exec "$PYTHON" "$SCRIPT_DIR/bmi270_backpack.py" \
   --backend i2c \
   --i2c-bus "$I2C_BUS" \
   --i2c-addr "$I2C_ADDR" \
+  --i2c-mux-addr "$I2C_MUX_ADDR" \
+  --i2c-mux-channel "$I2C_MUX_CHANNEL" \
   --ble

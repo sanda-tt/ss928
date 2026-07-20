@@ -3,7 +3,10 @@
   "ble_name": "SS928-SmartBag",
   "event_timeout_s": 1.0,
   "i2c_dev": "/dev/i2c-0",
-  "tm6605_connected_side": "left",
+  "tm6605_mux_addr": "0x70",
+  "bmi270_mux_channel": 0,
+  "left_tm6605_channel": 1,
+  "right_tm6605_channel": 2,
   "detector_cwd": "/root/vision_obstacle_tracker",
   "left_detector": "python3 vision_obstacle_tracker.py --camera-index 0 --no-display",
   "right_detector": "python3 vision_obstacle_tracker.py --camera-index 1 --no-display"

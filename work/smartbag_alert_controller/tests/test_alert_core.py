@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from contextlib import nullcontext
 from pathlib import Path
 
 
@@ -36,6 +37,9 @@ class FakeI2cBus:
 
     def write_to(self, address: int, data: bytes, label: str) -> None:
         self.writes.append((address, data, label))
+
+    def transaction(self):
+        return nullcontext()
 
 
 class FakePwm(LinuxSysfsPwm):
@@ -84,6 +88,19 @@ class AlertCoreTest(unittest.TestCase):
         haptics.set_levels({"right": 4}, now=10.0)
         haptics.tick(now=11.0)
         self.assertEqual(bus.writes, [])
+
+    def test_tca9548a_routes_left_and_right_to_separate_channels(self) -> None:
+        bus = FakeI2cBus()
+        haptics = Tm6605Haptics(
+            bus,
+            mux_address=0x70,
+            channels={"left": 1, "right": 2},
+            connected_sides=("left", "right"),
+        )
+        haptics.set_levels({"left": 3, "right": 4}, now=10.0)
+        mux_writes = [data for address, data, _label in bus.writes if address == 0x70]
+        self.assertIn(bytes((0x02,)), mux_writes)
+        self.assertIn(bytes((0x04,)), mux_writes)
 
     def test_level_three_light_is_50_percent_for_one_second(self) -> None:
         pwm = FakePwm()
