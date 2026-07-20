@@ -33,6 +33,9 @@ DX-GP21-A 轨迹、BMI270 处理后姿态/每日统计和最终摔倒告警。
 - 通过 5G 上传三类完整测试 telemetry，三次请求均 HTTP 200。
 - CloudBase 已回读 `sim-track-1784564090674`、`bag001_2026-07-20`、`sim-fall-1784564090674`，最新状态时间戳为 `1784564090674`。
 - `smartbag-app-api` 的实时姿态、每日统计、轨迹、摔倒历史四个 action 均匹配本次记录。
+- 已安装并启用 `smartbag-5g-upload.service`，旧 `bmi270-backpack.service` 已禁用。
+- 实际重启后 systemd 状态为 `running`，`multi-user.target` 在 7.633 秒到达，整个启动为 11.640 秒；5G 随后自动输出 `5G ready`，证明采集初始化没有阻塞系统启动。
+- DX/BMI 未连接时 BMI 返回 I/O error，统一服务按 `RestartSec=5` 自动重启，符合外设缺失时后台重试的设计。
 
 ## 未验证项
 
