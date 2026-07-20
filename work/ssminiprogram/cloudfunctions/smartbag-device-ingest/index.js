@@ -44,17 +44,30 @@ const readRawBody = (req) => new Promise((resolve, reject) => {
 });
 
 const createCloudStore = (database) => ({
-  async setStatus(document) {
+  async mergeStatus(document) {
     const documentId = document._id;
     const data = Object.assign({}, document);
     delete data._id;
-    await database.collection("device_status").doc(documentId).set(data);
+    const reference = database.collection("device_status").doc(documentId);
+    try {
+      await reference.update(data);
+    } catch (error) {
+      const code = error && (error.errCode || error.code);
+      if (code !== -502005 && code !== "DATABASE_DOCUMENT_NOT_EXIST") throw error;
+      await reference.set(data);
+    }
   },
   async insertTrackPoint(document) {
     await database.collection("track_points").add(document);
   },
   async insertAlarm(document) {
     await database.collection("alarm_history").add(document);
+  },
+  async setPostureDaily(document) {
+    const documentId = document._id;
+    const data = Object.assign({}, document);
+    delete data._id;
+    await database.collection("posture_daily_stats").doc(documentId).set(data);
   }
 });
 
