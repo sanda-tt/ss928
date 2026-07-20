@@ -15,6 +15,26 @@
     "ble_hz": 10.0,
     "ble_name": "BMI270-Backpack"
   },
+  "fall_detection": {
+    "enabled": true,
+    "detector_config": "/root/work/imu_fall_detector/config.ss928.json",
+    "warning_marker": "/tmp/smartbag_last_high_warning.json",
+    "alarm_log": "/root/data/smartbag_alert/logs/fall_alarm.jsonl",
+    "warning_window_s": 10.0,
+    "recovery_window_s": 7.0,
+    "standing_posture_deg": 25.0,
+    "standing_hold_s": 1.0
+  },
+  "cloud_upload": {
+    "enabled": true,
+    "interval_s": 5.0,
+    "timeout_s": 5.0,
+    "event_queue_size": 32,
+    "daily_state_path": "/root/data/smartbag_posture_daily.json",
+    "daily_max_gap_s": 10.0,
+    "latest_location_path": "/tmp/smartbag_latest_location.json",
+    "location_max_age_s": 120.0
+  },
   "calibration": {
     "data_dir": "/root/bmi270_calibration",
     "modes": {

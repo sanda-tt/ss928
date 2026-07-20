@@ -34,3 +34,10 @@
 
 - 不要把两个固定地址 `0x2D` 的 TM6605 直接并到同一 I2C 总线上。
 - 不要把 LRA 或 TM6605 误接到旧 PWM 输出，也不要将 5V I2C 上拉直接接入 3.3V SS928 I2C 引脚。
+
+## 2026-07-20 实机复测
+
+- 已通过 SSH 连接实物 SS928；I2C0 的 Pin3/Pin5 复用分别读回 `0x2031`，并实际向 `0x2D` 下发了左、右各自 L3（effect 15）与 L4（effect 14）控制帧。
+- 未经 TCA9548A 直接写 `0x2D` 时，左右控制均返回 `OSError: [Errno 5] Input/output error`；这证明当前实物不应使用直连模式。
+- 复测确认 TCA9548A 位于 `0x70`：通道 1 的左 TM6605、通道 2 的右 TM6605 均 ACK 三级 effect 15 和四级 effect 14 三脉冲。两块同址设备必须持续通过该多路器独立控制。
+- 启动脚本现已把 `SMARTBAG_TM6605_USE_MUX=1` 与 `SMARTBAG_ENABLE_RIGHT_TM6605=1` 传给控制器；`smartbag-alert.service` 已重新启动并保持 active。

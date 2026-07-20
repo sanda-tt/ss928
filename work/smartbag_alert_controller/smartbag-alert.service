@@ -1,7 +1,8 @@
 [Unit]
 Description=SS928 SmartBag alert controller
-After=bluetooth.service dbus.service
-Wants=bluetooth.service
+Requires=ws73-bluetooth-module.service
+After=ws73-bluetooth-module.service bluetooth.service dbus.service systemd-networkd.service network-online.target
+Wants=bluetooth.service systemd-networkd.service network-online.target
 
 [Service]
 Type=simple

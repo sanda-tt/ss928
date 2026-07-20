@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from contextlib import nullcontext
 from pathlib import Path
@@ -13,6 +14,7 @@ from alert_core import (  # noqa: E402
     AlertEvent,
     AlertState,
     parse_alert_command,
+    record_high_warning_marker,
 )
 from tm6605_haptics import (  # noqa: E402
     TM6605_EFFECT_REGISTER,
@@ -55,6 +57,25 @@ class FakePwm(LinuxSysfsPwm):
 
 
 class AlertCoreTest(unittest.TestCase):
+    def test_only_camera_or_radar_level_three_and_four_refresh_fall_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            marker = Path(temp) / "warning.json"
+
+            self.assertFalse(
+                record_high_warning_marker(
+                    AlertEvent(side="left", level=2, source="vision"), marker, now_wall=1000.0
+                )
+            )
+            self.assertFalse(marker.exists())
+            self.assertTrue(
+                record_high_warning_marker(
+                    AlertEvent(side="right", level=4, source="radar:right_rear"),
+                    marker,
+                    now_wall=1001.0,
+                )
+            )
+            self.assertIn('"level":4', marker.read_text(encoding="utf-8"))
+
     def test_levels_one_and_two_do_not_schedule_haptics(self) -> None:
         bus = FakeI2cBus()
         haptics = Tm6605Haptics(bus)

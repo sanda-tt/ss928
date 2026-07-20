@@ -27,6 +27,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
+
+WORK_DIR = Path(__file__).resolve().parents[1]
+if str(WORK_DIR) not in sys.path:
+    sys.path.insert(0, str(WORK_DIR))
+
+from smartbag_cloud_uploader import TelemetryClient  # noqa: E402
+
 try:
     import fcntl
 except ImportError:  # pragma: no cover - Windows simulation only.
@@ -91,6 +98,26 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "alert_inactive_value": "0",
         "alert_pulse_ms": 300,
         "alert_command": [],
+    },
+    "fall_detection": {
+        "enabled": False,
+        "detector_config": "",
+        "warning_marker": "/tmp/smartbag_last_high_warning.json",
+        "alarm_log": "/root/data/smartbag_alert/logs/fall_alarm.jsonl",
+        "warning_window_s": 10.0,
+        "recovery_window_s": 7.0,
+        "standing_posture_deg": 25.0,
+        "standing_hold_s": 1.0,
+    },
+    "cloud_upload": {
+        "enabled": False,
+        "interval_s": 5.0,
+        "timeout_s": 5.0,
+        "event_queue_size": 32,
+        "daily_state_path": "/root/data/smartbag_posture_daily.json",
+        "daily_max_gap_s": 10.0,
+        "latest_location_path": "/tmp/smartbag_latest_location.json",
+        "location_max_age_s": 120.0,
     },
     "calibration": {
         "data_dir": "/root/bmi270_calibration",
@@ -693,6 +720,10 @@ class AnomalyDetector:
         self.cfg = cfg
         self.hold_start: Dict[str, float] = {}
         self.last_emit: Dict[str, float] = {}
+        self.active_conditions: Dict[str, bool] = {}
+
+    def is_condition_active(self, code: str) -> bool:
+        return bool(self.active_conditions.get(str(code), False))
 
     def update(self, state: Dict[str, Any]) -> List[Dict[str, Any]]:
         th = self.cfg["thresholds"]
@@ -796,11 +827,15 @@ class AnomalyDetector:
         now = state["t_mono"]
         if not active:
             self.hold_start.pop(code, None)
+            self.active_conditions[code] = False
             return None
 
         start = self.hold_start.setdefault(code, now)
         if now - start < hold_s:
+            self.active_conditions[code] = False
             return None
+
+        self.active_conditions[code] = True
 
         cooldown = float(self.cfg["thresholds"]["alert_cooldown_s"])
         last = self.last_emit.get(code, -1e9)
@@ -1656,6 +1691,55 @@ def make_imu_source(cfg: Dict[str, Any], args: argparse.Namespace) -> Any:
     raise RuntimeError(f"Unknown device backend: {backend}")
 
 
+def make_fall_fusion_runtime(cfg: Dict[str, Any], cloud_alarm_sink: Any = None) -> Any:
+    fall_cfg = cfg.get("fall_detection", {})
+    if not bool(fall_cfg.get("enabled", False)):
+        return None
+
+    from fall_fusion_runtime import FallFusionConfig, FallFusionRuntime
+
+    fusion_config = FallFusionConfig(
+        warning_window_s=float(fall_cfg.get("warning_window_s", 10.0)),
+        recovery_window_s=float(fall_cfg.get("recovery_window_s", 7.0)),
+        standing_posture_deg=float(fall_cfg.get("standing_posture_deg", 25.0)),
+        standing_hold_s=float(fall_cfg.get("standing_hold_s", 1.0)),
+    )
+    detector_config = str(fall_cfg.get("detector_config", "")).strip() or None
+    return FallFusionRuntime(
+        warning_marker=str(fall_cfg.get("warning_marker", "/tmp/smartbag_last_high_warning.json")),
+        fusion_config=fusion_config,
+        detector_config_path=detector_config,
+        alarm_log=str(fall_cfg.get("alarm_log", "/root/data/smartbag_alert/logs/fall_alarm.jsonl")),
+        cloud_alarm_sink=cloud_alarm_sink,
+    )
+
+
+def make_posture_cloud_reporter(cfg: Dict[str, Any]) -> Any:
+    cloud_cfg = cfg.get("cloud_upload", {})
+    if not bool(cloud_cfg.get("enabled", False)):
+        return None
+
+    from posture_cloud import PostureCloudReporter, PostureDailyAccumulator
+
+    client = TelemetryClient(
+        timeout_s=float(cloud_cfg.get("timeout_s", 5.0)),
+        event_queue_size=int(cloud_cfg.get("event_queue_size", 32)),
+    )
+    accumulator = PostureDailyAccumulator(
+        str(cloud_cfg.get("daily_state_path", "/root/data/smartbag_posture_daily.json")),
+        max_gap_s=float(cloud_cfg.get("daily_max_gap_s", 10.0)),
+    )
+    return PostureCloudReporter(
+        client,
+        accumulator,
+        interval_s=float(cloud_cfg.get("interval_s", 5.0)),
+        latest_location_path=str(
+            cloud_cfg.get("latest_location_path", "/tmp/smartbag_latest_location.json")
+        ),
+        location_max_age_s=float(cloud_cfg.get("location_max_age_s", 120.0)),
+    )
+
+
 def run(args: argparse.Namespace) -> int:
     cfg = load_config(args.config)
     if args.no_ble:
@@ -1670,6 +1754,11 @@ def run(args: argparse.Namespace) -> int:
     estimator = MotionEstimator(cfg)
     detector = AnomalyDetector(cfg)
     alert_output = AlertOutput(cfg)
+    posture_cloud = make_posture_cloud_reporter(cfg)
+    fall_fusion = make_fall_fusion_runtime(
+        cfg,
+        cloud_alarm_sink=posture_cloud.report_fall if posture_cloud is not None else None,
+    )
     calibration_recorder = CalibrationRecorder(cfg)
     commands: "queue.Queue[str]" = queue.Queue()
 
@@ -1718,6 +1807,27 @@ def run(args: argparse.Namespace) -> int:
             time.sleep(0.2)
             continue
 
+        if fall_fusion is not None:
+            try:
+                fall_fusion.update(sample)
+            except Exception as exc:
+                print(f"WARN fall fusion failed: {exc}", file=sys.stderr, flush=True)
+
+        if posture_cloud is not None:
+            try:
+                posture_cloud.tick(
+                    state,
+                    hunch_active=detector.is_condition_active("HUNCH"),
+                    now_mono=now,
+                    now_wall=time.time(),
+                )
+            except Exception as exc:
+                print(
+                    f"WARN posture cloud reporting failed: {type(exc).__name__}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+
         while True:
             try:
                 process_command(commands.get_nowait(), cfg, estimator, ble, calibration_recorder)
@@ -1747,6 +1857,8 @@ def run(args: argparse.Namespace) -> int:
     calibration_recorder.close_if_active("shutdown")
     if ble is not None:
         ble.stop()
+    if posture_cloud is not None:
+        posture_cloud.telemetry_client.close()
     return 0
 
 

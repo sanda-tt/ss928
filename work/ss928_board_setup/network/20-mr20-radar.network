@@ -1,0 +1,20 @@
+# Dedicated MR20 radar link on eth1.
+# Radar: 192.168.1.200:2369; board receiver: 192.168.1.102:2368.
+# eth0 already owns 192.168.1.0/24, so use a host address and a precise route
+# to keep the management and radar cables as separate layer-3 networks.
+
+[Match]
+Name=eth1
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+Address=192.168.1.102/32
+LinkLocalAddressing=no
+IPv6AcceptRA=no
+ConfigureWithoutCarrier=yes
+
+[Route]
+Destination=192.168.1.200/32
+Scope=link

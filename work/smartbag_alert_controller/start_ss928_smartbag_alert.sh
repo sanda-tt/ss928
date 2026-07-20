@@ -19,6 +19,8 @@ I2C_DEV="${SMARTBAG_I2C_DEV:-/dev/i2c-0}"
 TM6605_MUX_ADDR="${SMARTBAG_TM6605_MUX_ADDR:-0x70}"
 LEFT_TM6605_CHANNEL="${SMARTBAG_LEFT_TM6605_CHANNEL:-0}"
 RIGHT_TM6605_CHANNEL="${SMARTBAG_RIGHT_TM6605_CHANNEL:-1}"
+TM6605_USE_MUX="${SMARTBAG_TM6605_USE_MUX:-0}"
+ENABLE_RIGHT_TM6605="${SMARTBAG_ENABLE_RIGHT_TM6605:-0}"
 LEFT_DETECTOR="${SMARTBAG_LEFT_DETECTOR:-}"
 RIGHT_DETECTOR="${SMARTBAG_RIGHT_DETECTOR:-}"
 MR20_CONFIG="${SMARTBAG_MR20_CONFIG:-$BASE_DIR/config/mr20_radar.json}"
@@ -50,6 +52,14 @@ set -- python3 main.py \
   --right-tm6605-channel "$RIGHT_TM6605_CHANNEL" \
   --left-detector "$LEFT_DETECTOR" \
   --right-detector "$RIGHT_DETECTOR"
+
+if [ "$TM6605_USE_MUX" = "1" ]; then
+  set -- "$@" --tm6605-use-mux
+fi
+
+if [ "$ENABLE_RIGHT_TM6605" = "1" ]; then
+  set -- "$@" --enable-right-tm6605
+fi
 
 if [ -f "$MR20_CONFIG" ]; then
   set -- "$@" --mr20-config "$MR20_CONFIG"

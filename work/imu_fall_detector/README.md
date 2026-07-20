@@ -125,6 +125,28 @@ Keep the first board test simple:
 These defaults are starting thresholds, not a medical or safety certification.
 Tune them with real falls, non-fall impacts, and ordinary use motion.
 
+## SS928 Competition Fusion MVP
+
+The board integration emits a fall alarm only when all three gates pass:
+
+1. The IMU state machine emits `FALL_CONFIRMED`.
+2. A camera or radar level-3/level-4 warning was recorded during the previous
+   10 seconds.
+3. During the following 7 seconds, posture does not remain within 25 degrees
+   of the pre-fall standing baseline for at least 1 second.
+
+The alert controller refreshes `/tmp/smartbag_last_high_warning.json` for a
+qualifying warning. The existing BMI270 50 Hz loop reads that marker and appends
+the final compact JSON alarm to:
+
+```text
+/root/data/smartbag_alert/logs/fall_alarm.jsonl
+```
+
+The event uses `type=fall_alarm`, `alarmType=fall_detected`, and
+`signal=FALL_ALARM`, ready for a later cloud uploader. Board thresholds live in
+`config.ss928.json` and `linux_bmi270_backpack/config.ss928_ble.json`.
+
 ## Tests
 
 ```sh
