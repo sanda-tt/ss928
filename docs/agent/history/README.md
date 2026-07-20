@@ -17,6 +17,7 @@
 - `smartbag-pwm-light-modules.md`：双侧小信号光模块的 PWM 引脚分配及三级/四级光效时序。
 - `ss928-new-board-migration-2026-07-20.md`: clean-board project restore, organized `/root` workspace, WS73 BlueZ startup, boot services, and persistent MR20 `eth1` network configuration.
 - `smartbag-board-cloud-upload.md`：DX-GP21-A 轨迹、BMI270 处理后姿态/每日统计、最终摔倒信号的统一 CloudBase 上传和小程序回读闭环。
+- `mt5710-smartbag-cloud-upload.md`：MT5710 电信 `ctnet` NCM 建链、5G 路由确认、完整 telemetry 上传和小程序服务层回读。
 
 ## 新增历史记录格式
 

@@ -8,6 +8,7 @@ import os
 import re
 import select
 import signal
+import shutil
 import socket
 import subprocess
 import sys
@@ -80,14 +81,38 @@ def _driver_name(interface_dir: Path) -> str:
     return ""
 
 
-def discover_ncm_interface(sys_class_net: Path = Path("/sys/class/net")) -> str:
-    candidates = sorted(
-        entry.name
-        for entry in sys_class_net.iterdir()
-        if entry.is_dir() and _driver_name(entry) == "cdc_ncm"
-    )
+def _usb_identity(device_path: Path) -> tuple[str, str] | None:
+    try:
+        resolved = device_path.resolve(strict=True)
+    except OSError:
+        resolved = device_path
+    for candidate in (resolved, *resolved.parents):
+        try:
+            vendor = (candidate / "idVendor").read_text(encoding="ascii").strip().lower()
+            product = (candidate / "idProduct").read_text(encoding="ascii").strip().lower()
+            if vendor and product:
+                return vendor, product
+        except OSError:
+            continue
+    return None
+
+
+def discover_ncm_interface(
+    sys_class_net: Path = Path("/sys/class/net"),
+    expected_usb_identity: tuple[str, str] | None = None,
+) -> str:
+    candidates = []
+    for entry in sys_class_net.iterdir():
+        if not entry.is_dir() or _driver_name(entry) != "cdc_ncm":
+            continue
+        identity = _usb_identity(entry / "device")
+        if expected_usb_identity is None or identity == expected_usb_identity:
+            candidates.append(entry.name)
+    candidates.sort()
     if not candidates:
         raise RuntimeError("MT5710 cdc_ncm interface not found")
+    if len(candidates) > 1:
+        raise RuntimeError("multiple cdc_ncm interfaces found; cannot identify MT5710")
     return candidates[0]
 
 
@@ -95,7 +120,7 @@ def route_uses_interface(route_text: str, interface: str) -> bool:
     return re.search(rf"(?:^|\s)dev\s+{re.escape(interface)}(?:\s|$)", route_text) is not None
 
 
-def _prefer_ncm_default_route(interface: str, command_runner: CommandRunner) -> None:
+def _add_ncm_host_route(interface: str, cloud_ip: str, command_runner: CommandRunner) -> None:
     default_result = command_runner(["ip", "route", "show", "default", "dev", interface], 10.0)
     _require_success(default_result, "NCM default route lookup")
     match = re.search(
@@ -104,11 +129,11 @@ def _prefer_ncm_default_route(interface: str, command_runner: CommandRunner) -> 
     )
     if not match:
         raise RuntimeError(f"DHCP did not install a default route for {interface}")
-    argv = ["ip", "route", "replace", "default"]
+    argv = ["ip", "route", "replace", f"{cloud_ip}/32"]
     if match.group(1):
         argv.extend(["via", match.group(1)])
-    argv.extend(["dev", interface, "metric", "10"])
-    _require_success(command_runner(argv, 10.0), "prefer NCM default route")
+    argv.extend(["dev", interface])
+    _require_success(command_runner(argv, 10.0), "CloudBase NCM host route")
 
 
 def build_sensor_commands(work_root: Path) -> tuple[list[str], list[str]]:
@@ -224,7 +249,13 @@ class AtSession:
             decoded = raw.decode("utf-8", errors="replace")
             lines = [item.strip() for item in re.split(r"[\r\n]+", decoded) if item.strip()]
             filtered = [line for line in lines if line != command]
-            if any(line in TERMINAL_LINES for line in filtered):
+            if any(
+                line in TERMINAL_LINES
+                or line.startswith("+CME ERROR")
+                or line.startswith("+CMS ERROR")
+                or line.startswith("ERROR:")
+                for line in filtered
+            ):
                 return filtered
         return [line for line in lines if line != command]
 
@@ -235,6 +266,7 @@ def prepare_network(
     sys_class_net: Path = Path("/sys/class/net"),
     resolver: Callable[[str], str] = socket.gethostbyname,
     apn_override: str = "",
+    expected_usb_identity: tuple[str, str] | None = None,
 ) -> dict[str, str]:
     at_lines: list[str] = []
     health = at_session.command("AT")
@@ -254,12 +286,17 @@ def prepare_network(
     apn = choose_apn(_extract_operator(operator_lines), _extract_imsi(imsi_lines), apn_override)
     dial_command = f'AT^NDISDUP=1,1,"{apn}"'
     dial_lines = at_session.command(dial_command, timeout_s=12.0)
-    if any("ERROR" in line or "NO NETWORK SERVICE" in line for line in dial_lines):
+    already_active = any(line == "ERROR: DUPLICATED" for line in dial_lines)
+    if not already_active and any("ERROR" in line or "NO NETWORK SERVICE" in line for line in dial_lines):
         raise RuntimeError("MT5710 NCM dial failed")
-    if "OK" not in dial_lines and not any("^NDISSTAT: 1,1" in line for line in dial_lines):
+    if (
+        not already_active
+        and "OK" not in dial_lines
+        and not any("^NDISSTAT: 1,1" in line for line in dial_lines)
+    ):
         raise RuntimeError("MT5710 NCM dial gave no success response")
 
-    interface = discover_ncm_interface(sys_class_net)
+    interface = discover_ncm_interface(sys_class_net, expected_usb_identity)
     _require_success(command_runner(["ip", "link", "set", interface, "up"], 10.0), "NCM link up")
     _require_success(
         command_runner(["udhcpc", "-i", interface, "-q", "-n", "-t", "8", "-T", "5"], 50.0),
@@ -268,13 +305,24 @@ def prepare_network(
     cloud_ip = resolver(CLOUDBASE_HOST)
     route_result = command_runner(["ip", "route", "get", cloud_ip], 10.0)
     _require_success(route_result, "CloudBase route lookup")
+    added_route = ""
     if not route_uses_interface(route_result.stdout, interface):
-        _prefer_ncm_default_route(interface, command_runner)
+        _add_ncm_host_route(interface, cloud_ip, command_runner)
+        added_route = cloud_ip
         route_result = command_runner(["ip", "route", "get", cloud_ip], 10.0)
         _require_success(route_result, "CloudBase route recheck")
         if not route_uses_interface(route_result.stdout, interface):
             raise RuntimeError(f"CloudBase route is not using {interface}")
-    return {"interface": interface, "apn": apn, "cloud_ip": cloud_ip}
+    return {"interface": interface, "apn": apn, "cloud_ip": cloud_ip, "added_route": added_route}
+
+
+def _cleanup_network_route(network: dict[str, str] | None, command_runner: CommandRunner) -> None:
+    if not network or not network.get("added_route"):
+        return
+    command_runner(
+        ["ip", "route", "del", f"{network['added_route']}/32", "dev", network["interface"]],
+        10.0,
+    )
 
 
 def _require_runtime_files(work_root: Path) -> None:
@@ -292,6 +340,9 @@ def _require_runtime_files(work_root: Path) -> None:
     for device in (Path("/dev/ttyAMA4"), Path("/dev/i2c-0")):
         if not device.exists():
             raise RuntimeError(f"missing device: {device}")
+    for executable in ("python3", "bspmm", "ip", "udhcpc"):
+        if shutil.which(executable) is None:
+            raise RuntimeError(f"missing executable: {executable}")
 
 
 def _configure_pinmux(command_runner: CommandRunner) -> None:
@@ -358,32 +409,59 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def run_application(
+    args: argparse.Namespace,
+    *,
+    environ: dict[str, str] | os._Environ[str] = os.environ,
+    prerequisite_checker: Callable[[Path], None] = _require_runtime_files,
+    network_preparer: Callable[..., dict[str, str]] = prepare_network,
+    at_factory: Callable[[str, int], object] = AtSession,
+    command_runner: CommandRunner = run_command,
+    pinmux_configurer: Callable[[CommandRunner], None] = _configure_pinmux,
+    supervisor: Callable[[Sequence[list[str]], Path], int] = _supervise,
+) -> int:
+    work_root = args.work_root.resolve()
+    if not args.check_only:
+        if not environ.get("SMARTBAG_UPLOAD_TOKEN", ""):
+            raise RuntimeError("SMARTBAG_UPLOAD_TOKEN is not set")
+        prerequisite_checker(work_root)
+
+    network: dict[str, str] | None = None
+    try:
+        if not args.skip_network:
+            if not Path(args.port).exists():
+                raise RuntimeError(f"missing MT5710 PCUI port: {args.port}")
+            tty_device = Path("/sys/class/tty") / Path(args.port).name / "device"
+            expected_identity = _usb_identity(tty_device)
+            with at_factory(args.port, args.baud) as at_session:
+                network = network_preparer(
+                    at_session,
+                    command_runner=command_runner,
+                    apn_override=args.apn,
+                    expected_usb_identity=expected_identity,
+                )
+            print(
+                f"5G ready: interface={network['interface']} apn_configured=yes "
+                f"cloud_ip={network['cloud_ip']}",
+                flush=True,
+            )
+        if args.check_only:
+            return 0
+        pinmux_configurer(command_runner)
+        commands = build_sensor_commands(work_root)
+        print("Starting real DX-GP21-A and BMI270 CloudBase producers", flush=True)
+        return supervisor(commands, work_root)
+    finally:
+        _cleanup_network_route(network, command_runner)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if hasattr(os, "geteuid") and os.geteuid() != 0:
         print("ERROR: run as root on BOARD-LINUX", file=sys.stderr)
         return 2
     try:
-        if not args.skip_network:
-            if not Path(args.port).exists():
-                raise RuntimeError(f"missing MT5710 PCUI port: {args.port}")
-            with AtSession(args.port, args.baud) as at_session:
-                network = prepare_network(at_session, apn_override=args.apn)
-            print(
-                f"5G ready: interface={network['interface']} apn={network['apn']} "
-                f"cloud_ip={network['cloud_ip']}",
-                flush=True,
-            )
-        if args.check_only:
-            return 0
-        if not os.environ.get("SMARTBAG_UPLOAD_TOKEN", ""):
-            raise RuntimeError("SMARTBAG_UPLOAD_TOKEN is not set")
-        work_root = args.work_root.resolve()
-        _require_runtime_files(work_root)
-        _configure_pinmux(run_command)
-        commands = build_sensor_commands(work_root)
-        print("Starting real DX-GP21-A and BMI270 CloudBase producers", flush=True)
-        return _supervise(commands, work_root)
+        return run_application(args)
     except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
         print(f"ERROR: {exc}", file=sys.stderr, flush=True)
         return 1

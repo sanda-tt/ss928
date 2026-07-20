@@ -232,3 +232,35 @@ Conclusion: data and voice work on the current `MT5710_CN V100R001C00B095` Mini 
 - Do not assume `/dev/ttyUSB3` streaming means GNSS works; verify actual NMEA output or `AT^GNSSGETINFO?`.
 - Do not apply RM500U commands blindly; this board uses TD Tech MT5710/MT571X.
 - `AT^NDISDUP=1,0` may return `ERROR: Invalid` when no active dial session exists; this is not a failure if the next dial succeeds.
+
+## SmartBag Cloud Upload MVP
+
+Use the repository launcher when the goal is to carry all existing SmartBag
+telemetry over MT5710 without changing the sensor programs:
+
+```sh
+# BOARD-LINUX
+cd /root/work/mt5710_5g_cloud_upload
+./start_ss928_5g_upload.sh
+```
+
+The launcher checks registration/attach, selects the APN, dials NCM, discovers
+the `cdc_ncm` interface dynamically, runs DHCP, and verifies that the resolved
+CloudBase address routes through NCM before starting DX-GP21-A and BMI270 with
+their existing cloud upload configuration. Use `--check-only` to stop after
+the network proof.
+
+Latest verified hardware result on 2026-07-21:
+
+- operator: `CHINA TELECOM`
+- APN: `ctnet`
+- interface: `enx2a5a7626cdfa`
+- DHCP IPv4: `10.118.237.237`
+- CloudBase route: `124.223.146.214 via 10.0.0.1 dev enx2a5a7626cdfa`
+- three complete test telemetry uploads: HTTP 200, with database and
+  `smartbag-app-api` readback confirmed
+
+The interface name and assigned addresses are observations, not constants.
+When an already connected module returns `ERROR: DUPLICATED` for the same
+`AT^NDISDUP=1,1,"<apn>"` request, reuse the active session and continue with
+DHCP and route verification; do not treat it as loss of network service.
