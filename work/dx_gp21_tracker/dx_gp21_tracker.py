@@ -21,6 +21,17 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple
 
 
+WORK_DIR = Path(__file__).resolve().parents[1]
+if str(WORK_DIR) not in sys.path:
+    sys.path.insert(0, str(WORK_DIR))
+
+from smartbag_cloud_uploader import (  # noqa: E402
+    TelemetryClient,
+    build_track_payload,
+    write_latest_location,
+)
+
+
 KNOT_TO_MPS = 0.514444
 DEFAULT_CONFIG: Dict[str, Any] = {
     "serial": {
@@ -37,6 +48,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "ble_enabled": True,
         "ble_name": "DX-GP21-Track",
         "live_hz": 1.0,
+    },
+    "cloud_upload": {
+        "enabled": False,
+        "latest_location_path": "/tmp/smartbag_latest_location.json",
+        "timeout_s": 5.0,
+        "event_queue_size": 32,
     },
 }
 
@@ -731,7 +748,7 @@ class SerialLineReader:
 
 
 class TrackerApp:
-    def __init__(self, cfg: Dict[str, Any]):
+    def __init__(self, cfg: Dict[str, Any], telemetry_client: Any = None):
         self.cfg = cfg
         self.serial_device = str(cfg["serial"]["device"])
         self.baud = int(cfg["serial"]["baud"])
@@ -742,6 +759,17 @@ class TrackerApp:
         self.last_live_emit = 0.0
         self.ble: Optional[BleNusServer] = None
         self.stop_requested = False
+        cloud_cfg = cfg.get("cloud_upload", {})
+        self.cloud_upload_enabled = bool(cloud_cfg.get("enabled", False))
+        self.latest_location_path = str(
+            cloud_cfg.get("latest_location_path", "/tmp/smartbag_latest_location.json")
+        )
+        self.telemetry_client = telemetry_client
+        if self.cloud_upload_enabled and self.telemetry_client is None:
+            self.telemetry_client = TelemetryClient(
+                timeout_s=float(cloud_cfg.get("timeout_s", 5.0)),
+                event_queue_size=int(cloud_cfg.get("event_queue_size", 32)),
+            )
 
     def start_ble(self) -> None:
         self.ble = BleNusServer(str(self.cfg["output"]["ble_name"]), self.handle_command)
@@ -795,7 +823,22 @@ class TrackerApp:
         point = self.location.update(line)
         if point is None:
             return None
-        self.store.append(point)
+        stored = self.store.append(point)
+        if stored and self.cloud_upload_enabled and self.telemetry_client is not None:
+            try:
+                payload = build_track_payload(point)
+                self.telemetry_client.submit_event(payload)
+                write_latest_location(
+                    self.latest_location_path,
+                    payload["status"]["location"],
+                    payload["reportedAt"],
+                )
+            except (OSError, TypeError, ValueError) as exc:
+                print(
+                    f"WARN GNSS cloud mapping failed: {type(exc).__name__}",
+                    file=sys.stderr,
+                    flush=True,
+                )
         live_hz = max(0.1, float(self.cfg["output"].get("live_hz", 1.0)))
         now = time.monotonic()
         if self.live_enabled and now - self.last_live_emit >= 1.0 / live_hz:
@@ -833,6 +876,8 @@ class TrackerApp:
         self.stop_requested = True
         if self.ble is not None:
             self.ble.stop()
+        if self.telemetry_client is not None and hasattr(self.telemetry_client, "close"):
+            self.telemetry_client.close()
 
 
 def apply_overrides(cfg: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
@@ -886,10 +931,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         except RuntimeError as exc:
             print(f"WARN BLE disabled: {exc}", file=sys.stderr, flush=True)
 
-    if args.simulate:
-        app.run_simulation(once=args.once)
-    else:
-        app.run_serial()
+    try:
+        if args.simulate:
+            app.run_simulation(once=args.once)
+        else:
+            app.run_serial()
+    finally:
+        app.stop()
     return 0
 
 
