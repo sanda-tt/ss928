@@ -150,23 +150,7 @@ def build_sensor_commands(work_root: Path) -> tuple[list[str], list[str]]:
         "115200",
         "--no-ble",
     ]
-    bmi_command = [
-        "python3",
-        str(bmi_dir / "bmi270_backpack.py"),
-        "--config",
-        str(bmi_dir / "config.ss928_ble.json"),
-        "--backend",
-        "i2c",
-        "--i2c-bus",
-        "0",
-        "--i2c-addr",
-        "0x68",
-        "--i2c-mux-addr",
-        "0x70",
-        "--i2c-mux-channel",
-        "0",
-        "--no-ble",
-    ]
+    bmi_command = ["/bin/sh", (bmi_dir / "start_ss928_ble.sh").as_posix()]
     return dx_command, bmi_command
 
 

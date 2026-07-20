@@ -1,0 +1,17 @@
+[Unit]
+Description=SmartBag MT5710 5G cloud upload
+After=systemd-udevd.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/root/work/mt5710_5g_cloud_upload
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/root/work/mt5710_5g_cloud_upload/start_ss928_5g_upload.sh
+Restart=always
+RestartSec=5
+TimeoutStopSec=10
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

@@ -68,8 +68,11 @@ class PolicyTests(unittest.TestCase):
         dx_command, bmi_command = build_sensor_commands(Path("/root/work"))
         joined = " ".join(dx_command + bmi_command)
         self.assertIn("dx_gp21_tracker.py", joined)
-        self.assertIn("bmi270_backpack.py", joined)
-        self.assertEqual(joined.count("--no-ble"), 2)
+        self.assertEqual(
+            bmi_command,
+            ["/bin/sh", "/root/work/linux_bmi270_backpack/start_ss928_ble.sh"],
+        )
+        self.assertEqual(dx_command.count("--no-ble"), 1)
         self.assertNotIn("--simulate", joined)
 
 
