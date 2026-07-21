@@ -5,6 +5,7 @@
     "pages/placeholder/index",
     "pages/index/index",
     "pages/monitor/index",
+    "pages/remote/index",
     "pages/example/index"
   ],
   "window": {

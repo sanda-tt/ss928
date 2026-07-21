@@ -52,3 +52,8 @@ DX-GP21-A 轨迹、BMI270 处理后姿态/每日统计和最终摔倒告警。
 - APN 属于 SIM/运营商；本次电信卡用 `ctnet`，不能继续照抄历史移动卡的 `cmnet`。
 - 不要把 MT5710 当定位源；轨迹只来自 DX-GP21-A。
 - 不要把令牌写入代码、仓库文档或命令日志。
+- 不要重新启动或启用旧 `bmi270-backpack.service`；它只保留作历史/独立
+  示例，当前整机必须为 `disabled`、`inactive`。
+- `smartbag-5g-upload.service` 运行时不要另开 `start_ss928_ble.sh`、
+  `bmi270_backpack.py --ble` 或 `/opt/sample/ws73/ble.sh 0`。统一服务已经
+  以 `START_BLE_STACK=0` 拉起唯一 BMI 进程，并复用系统 BlueZ。

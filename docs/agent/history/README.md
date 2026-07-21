@@ -7,7 +7,7 @@
 - `linux_bmi270_backpack-and-ssminiprogram.md`：BMI270 板端 BLE 与微信小程序实时姿态链路。
 - `ss928-mt5710-5g-validation.md`：MT5710 驻网、NCM、AT、语音和 GNSS 限制验证。
 - `imu_fall_detector.md`：纯 Python 摔倒/撞击状态机、板端三条件融合、测试与调参注意事项。
-- `ss928-max98357-audio-playback.md`：MAX98357 I2S、音频转换、pinmux 和 MPP Sample 播放。
+- `ss928-max98357-audio-playback.md`：MAX98357 I2S、音频转换、pinmux、MPP Sample 播放，以及 EULER_40PEXP U3 电平转换故障定位。
 - `dx_gp21_tracker-and-tracks.md`：DX-GP21-A GNSS、UART4、轨迹保存、BLE 与小程序地图。
 - `ssminiprogram-cloud-track-display.md`：小程序经 CloudBase Event Function 读取并显示云端 GNSS 历史轨迹。
 - `ssminiprogram-cloud-fall-alarm-display.md`：小程序经 CloudBase Event Function 读取并显示摔倒报警历史。

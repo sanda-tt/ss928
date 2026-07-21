@@ -58,6 +58,12 @@ cd /root/work/mt5710_5g_cloud_upload
 `bmi270-backpack.service`，避免两个进程同时读取 BMI270。BMI270 仍通过现有
 `start_ss928_ble.sh` 启动，因此保留 BLE 和 CloudBase 上传。
 
+> 单一入口约束：不要再手工启动 `bmi270-backpack.service`，也不要在本
+> 服务运行时另开 `start_ss928_ble.sh`、`bmi270_backpack.py --ble` 或
+> `/opt/sample/ws73/ble.sh 0`。这些旧/独立入口会产生第二个 BMI270 进程
+> 或第二个 `bluetoothd`。旧 unit 文件可以保留，但必须保持
+> `disabled`、`inactive`；系统 BlueZ 由 `bluetooth.service` 唯一管理。
+
 该服务是后台 `Type=simple` 服务，不等待 `network-online.target`，不会阻塞
 系统启动。MT5710 或传感器尚未就绪时，本次执行按有界超时退出，5 秒后自动重试。
 
@@ -65,6 +71,9 @@ cd /root/work/mt5710_5g_cloud_upload
 # BOARD-LINUX：查看状态和日志
 systemctl status smartbag-5g-upload.service --no-pager -l
 journalctl -u smartbag-5g-upload.service -b --no-pager -n 100
+systemctl is-enabled bmi270-backpack.service  # 期望 disabled
+systemctl is-active bmi270-backpack.service   # 期望 inactive
+pgrep -a -f 'bmi270_backpack.py|bluetoothd'   # 各自只应有一个
 
 # 如需取消自启动
 systemctl disable --now smartbag-5g-upload.service

@@ -138,7 +138,9 @@ if [ "$START_BLE_STACK" = "1" ]; then
   fi
 fi
 
-if wait_for_hci; then
+if [ "$START_BLE_STACK" = "0" ]; then
+  echo "Using configured system BlueZ without vendor fallback"
+elif wait_for_hci; then
   echo "BLE controller is visible"
 else
   echo "WARN: BLE controller still not visible before bluetoothctl"

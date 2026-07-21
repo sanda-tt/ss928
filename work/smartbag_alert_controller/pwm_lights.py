@@ -56,7 +56,9 @@ class LinuxSysfsPwm:
                 time.sleep(0.01)
             if not channel_dir.exists():
                 raise RuntimeError(f"timed out waiting for pwmchip{chip}/pwm{channel} after export")
-        self._write(channel_dir / "enable", "0", f"disable pwmchip{chip}/pwm{channel}")
+        enable_path = channel_dir / "enable"
+        if enable_path.read_text(encoding="ascii").strip() == "1":
+            self._write(enable_path, "0", f"disable pwmchip{chip}/pwm{channel}")
         self._write(channel_dir / "period", str(period_ns), f"set pwmchip{chip}/pwm{channel} period")
         self._write(channel_dir / "duty_cycle", "0", f"clear pwmchip{chip}/pwm{channel} duty")
 

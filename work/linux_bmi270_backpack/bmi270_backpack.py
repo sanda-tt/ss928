@@ -104,6 +104,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "detector_config": "",
         "warning_marker": "/tmp/smartbag_last_high_warning.json",
         "alarm_log": "/root/data/smartbag_alert/logs/fall_alarm.jsonl",
+        "manual_trigger_path": "/tmp/smartbag_manual_fall_trigger.json",
         "warning_window_s": 10.0,
         "recovery_window_s": 7.0,
         "standing_posture_deg": 25.0,
@@ -1711,6 +1712,7 @@ def make_fall_fusion_runtime(cfg: Dict[str, Any], cloud_alarm_sink: Any = None) 
         detector_config_path=detector_config,
         alarm_log=str(fall_cfg.get("alarm_log", "/root/data/smartbag_alert/logs/fall_alarm.jsonl")),
         cloud_alarm_sink=cloud_alarm_sink,
+        manual_trigger_path=str(fall_cfg.get("manual_trigger_path", "/tmp/smartbag_manual_fall_trigger.json")),
     )
 
 
@@ -1810,6 +1812,7 @@ def run(args: argparse.Namespace) -> int:
         if fall_fusion is not None:
             try:
                 fall_fusion.update(sample)
+                fall_fusion.consume_manual_trigger()
             except Exception as exc:
                 print(f"WARN fall fusion failed: {exc}", file=sys.stderr, flush=True)
 

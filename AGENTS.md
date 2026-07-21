@@ -24,6 +24,7 @@
 - 当前板端系统优先按 `Ubuntu 22.04` / Linux 用户态环境处理。
 - 先查本地资料；本地没有再查在线资料。高频入口见 `docs/agent/repository-map.md`。
 - 涉及板端网络、SSH、启动项、服务、pinmux、驱动或硬件状态修改时，先做只读探测；未经用户明确要求，不做破坏性或持久化修改。
+- 当前整机的 BMI270 唯一启动入口是 `smartbag-5g-upload.service`；禁止重新启动/启用旧 `bmi270-backpack.service`，禁止并行手工运行 `start_ss928_ble.sh`、`bmi270_backpack.py --ble` 或 `/opt/sample/ws73/ble.sh 0`。详细原因和恢复检查见 `work/ss928_board_setup/README.md` 的 “Do not revive superseded BMI/BlueZ entry points”。
 
 ## 3. 执行环境
 

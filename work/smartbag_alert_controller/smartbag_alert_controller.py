@@ -20,6 +20,7 @@ from alert_core import (
     parse_alert_command,
     parse_vision_alert_jsonl,
     record_high_warning_marker,
+    record_manual_fall_trigger,
 )
 from ble_nus import BleNusServer
 from mr20_radar import MR20RadarWorker, load_radar_configs
@@ -366,6 +367,11 @@ def run_controller(args: argparse.Namespace) -> int:
                     break
                 try:
                     command = parse_alert_command(command_text)
+                    if command.kind == "fall":
+                        request_id = record_manual_fall_trigger(args.manual_fall_trigger)
+                        if ble is not None:
+                            ble.send_line("OK AL FALL " + request_id)
+                        continue
                     if command.kind == "clear":
                         audio.clear()
                     output = state.apply_command(command)
@@ -416,6 +422,11 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         "--fall-warning-marker",
         default="/tmp/smartbag_last_high_warning.json",
         help="Marker refreshed by camera/radar level-3 or level-4 warnings.",
+    )
+    parser.add_argument(
+        "--manual-fall-trigger",
+        default="/tmp/smartbag_manual_fall_trigger.json",
+        help="One-shot BLE fall-test request consumed by the BMI fall runtime.",
     )
     parser.add_argument("--poll-interval", type=float, default=0.05, help="Controller loop sleep interval in seconds.")
     parser.add_argument("--audio-root", default=str(AUDIO_ROOT), help="Root containing L1..R4 audio folders.")

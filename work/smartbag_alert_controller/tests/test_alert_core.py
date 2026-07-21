@@ -56,7 +56,34 @@ class FakePwm(LinuxSysfsPwm):
         self.outputs.append((chip, channel, period_ns, duty_percent, enabled))
 
 
+class ZeroPeriodRejectingPwm(LinuxSysfsPwm):
+    """Match the board driver: redundant disable is invalid before period setup."""
+
+    def _write(self, path: Path, value: str, label: str) -> None:
+        if path.name == "enable" and value == "0":
+            period = path.parent / "period"
+            if path.read_text(encoding="ascii") == "0" and period.read_text(encoding="ascii") == "0":
+                raise OSError(22, "Invalid argument")
+        super()._write(path, value, label)
+
+
 class AlertCoreTest(unittest.TestCase):
+    def test_pwm_setup_skips_redundant_disable_before_initial_period(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            channel_dir = root / "pwmchip0" / "pwm10"
+            channel_dir.mkdir(parents=True)
+            (channel_dir / "enable").write_text("0", encoding="ascii")
+            (channel_dir / "period").write_text("0", encoding="ascii")
+            (channel_dir / "duty_cycle").write_text("0", encoding="ascii")
+
+            pwm = ZeroPeriodRejectingPwm(root=root)
+            pwm.setup_channel(0, 10, 1_000_000)
+
+            self.assertEqual((channel_dir / "enable").read_text(encoding="ascii"), "0")
+            self.assertEqual((channel_dir / "period").read_text(encoding="ascii"), "1000000")
+            self.assertEqual((channel_dir / "duty_cycle").read_text(encoding="ascii"), "0")
+
     def test_only_camera_or_radar_level_three_and_four_refresh_fall_marker(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             marker = Path(temp) / "warning.json"
@@ -149,6 +176,7 @@ class AlertCoreTest(unittest.TestCase):
         left = parse_alert_command("AL L1")
         right = parse_alert_command(" al r4 ")
         clear = parse_alert_command("AL CLEAR")
+        fall = parse_alert_command("AL FALL")
 
         self.assertEqual(left.kind, "alert")
         self.assertEqual(left.side, "left")
@@ -156,6 +184,7 @@ class AlertCoreTest(unittest.TestCase):
         self.assertEqual(right.side, "right")
         self.assertEqual(right.level, 4)
         self.assertEqual(clear.kind, "clear")
+        self.assertEqual(fall.kind, "fall")
 
     def test_invalid_alert_command_is_rejected(self) -> None:
         with self.assertRaises(ValueError):

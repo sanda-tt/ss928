@@ -1,5 +1,13 @@
 # BMI270 背包姿态检测与速度估算程序
 
+> **当前 SS928 整机入口警告（2026-07-21）**：比赛整机已经由
+> `smartbag-5g-upload.service` 统一启动本目录程序。不要再启动或启用
+> `bmi270-backpack.service`，不要在统一服务运行时手工执行
+> `start_ss928_ble.sh` / `bmi270_backpack.py --ble`，也不要运行厂商
+> `/opt/sample/ws73/ble.sh 0`。否则会产生两个 BMI270 进程和第二个
+> `bluetoothd`，造成 I2C/BlueZ 抢占。旧 unit 文件保留仅用于独立示例和
+> 历史兼容；当前板端必须保持 `disabled`、`inactive`。
+
 这个目录是一套板端 Linux 控制程序示例，目标是：
 
 - 通过 Linux IIO 读取 BMI270 的三轴加速度和三轴角速度。
@@ -16,7 +24,7 @@
 - `config.example.json`：可调阈值和输出配置。
 - `config.ss928_ble.json`：SS928 40Pin + 微信小程序 BLE 联调配置，按旧 BMI270 接线固定为 `/dev/i2c-0`、`0x68`。
 - `start_ss928_ble.sh`：SS928 上一键启动 I2C0 pinmux、ws73 BLE 栈和本程序 BLE 外设。
-- `bmi270-backpack.service`：systemd 自启动模板。
+- `bmi270-backpack.service`：独立演示用 systemd 模板；当前整机禁止启用。
 
 ## 板端依赖
 
@@ -66,7 +74,10 @@ sh ./start_ss928_ble.sh
 START_BLE_STACK=0 sh ./start_ss928_ble.sh
 ```
 
-如果换了系统、默认 BlueZ 没有控制器，再用 `START_BLE_STACK=1 sh ./start_ss928_ble.sh` 走 ws73 例程。若 `ble.sh` 没有把两行 `export DBUS_*_BUS_ADDRESS=...` 打出来，就先手动复制例程中绿色的两行 export 到当前终端，再运行。
+只有在另一块独立调试板、且明确没有系统 BlueZ 控制器时，才可用
+`START_BLE_STACK=1 sh ./start_ss928_ble.sh` 走 ws73 例程。当前整机禁止
+这样做。若独立调试板的 `ble.sh` 没有把两行
+`export DBUS_*_BUS_ADDRESS=...` 打出来，再按该板自己的例程处理。
 
 如果实测把 SDO 接到了 3.3V，或者 BMI270 在别的 I2C 总线上，只改 `config.ss928_ble.json` 里的 `i2c_addr` / `i2c_bus`，并用同样参数覆盖脚本：
 
@@ -243,7 +254,10 @@ SET pitch_forward_deg=40
 SET roll_right_deg=50
 ```
 
-## 建议安装到系统
+## 独立演示环境安装（当前整机禁止执行）
+
+下面命令只适用于没有 `smartbag-5g-upload.service` 的独立 BMI270 演示
+环境。当前集成板执行它们会重新启用已经舍弃的旧进程入口。
 
 ```bash
 sudo mkdir -p /opt/bmi270_backpack
@@ -253,6 +267,14 @@ sudo cp bmi270-backpack.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now bmi270-backpack
 journalctl -u bmi270-backpack -f
+```
+
+当前集成板应改为检查：
+
+```bash
+systemctl is-enabled bmi270-backpack.service  # 期望 disabled
+systemctl is-active bmi270-backpack.service   # 期望 inactive
+systemctl status smartbag-5g-upload.service --no-pager
 ```
 
 ## 调试建议

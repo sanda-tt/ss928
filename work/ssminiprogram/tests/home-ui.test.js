@@ -58,6 +58,11 @@ test("settings placeholder text matches the home entry", () => {
   assert.ok(placeholderJs.indexOf("板子健康数据") < 0);
 });
 
+test("home debug entry opens the SmartBag remote page", () => {
+  assert.ok(homeWxml.indexOf('data-route="/pages/remote/index"') >= 0);
+  assert.ok(homeWxml.indexOf('data-route="/pages/monitor/index"') < 0);
+});
+
 let failed = 0;
 
 for (let i = 0; i < tests.length; i += 1) {

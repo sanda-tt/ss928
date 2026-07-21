@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -83,6 +84,10 @@ def parse_alert_command(command: str) -> AlertCommand:
         if len(parts) != 2:
             raise ValueError(f"unsupported clear command: {command!r}")
         return AlertCommand(kind="clear")
+    if parts[1] == "FALL":
+        if len(parts) != 2:
+            raise ValueError(f"unsupported fall command: {command!r}")
+        return AlertCommand(kind="fall")
 
     if len(parts) == 2:
         target = parts[1]
@@ -237,3 +242,20 @@ def record_high_warning_marker(
             "ts": time.time() if now_wall is None else float(now_wall),
         },
     )
+
+
+def record_manual_fall_trigger(path: str | Path, now_wall: float | None = None) -> str:
+    """Atomically pass one BLE fall-test request to the BMI fall runtime."""
+    trigger = Path(path)
+    trigger.parent.mkdir(parents=True, exist_ok=True)
+    request_id = f"ble-{uuid.uuid4().hex}"
+    record = {
+        "type": "manual_fall_trigger",
+        "source": "ble_remote",
+        "requestId": request_id,
+        "ts": time.time() if now_wall is None else float(now_wall),
+    }
+    temporary = trigger.with_name(trigger.name + ".tmp")
+    temporary.write_text(json.dumps(record, separators=(",", ":")), encoding="utf-8")
+    temporary.replace(trigger)
+    return request_id

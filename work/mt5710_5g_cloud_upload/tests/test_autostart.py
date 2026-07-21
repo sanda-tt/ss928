@@ -17,6 +17,7 @@ class AutostartUnitTests(unittest.TestCase):
             "RestartSec=5",
             "TimeoutStopSec=10",
             "KillMode=control-group",
+            "Environment=START_BLE_STACK=0",
             "ExecStart=/root/work/mt5710_5g_cloud_upload/start_ss928_5g_upload.sh",
             "WantedBy=multi-user.target",
         ):
@@ -35,6 +36,14 @@ class AutostartUnitTests(unittest.TestCase):
         ):
             self.assertIn(required, installer)
         self.assertNotIn("smartbag-alert.service", installer)
+
+    def test_system_bluez_mode_skips_vendor_controller_wait(self) -> None:
+        launcher = (APP_DIR.parent / "linux_bmi270_backpack" / "start_ss928_ble.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('if [ "$START_BLE_STACK" = "0" ]; then', launcher)
+        self.assertIn("Using configured system BlueZ without vendor fallback", launcher)
 
 
 if __name__ == "__main__":

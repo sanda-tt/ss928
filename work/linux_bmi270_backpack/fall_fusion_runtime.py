@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import json
 import sys
 import time
 from pathlib import Path
@@ -51,6 +52,7 @@ class FallFusionRuntime:
         alarm_log: str | Path | None = None,
         alarm_sink: Callable[[Mapping[str, Any]], None] | None = None,
         cloud_alarm_sink: Callable[[Mapping[str, Any]], Any] | None = None,
+        manual_trigger_path: str | Path | None = None,
         wall_clock: Callable[[], float] = time.time,
     ) -> None:
         self.fusion_config = fusion_config or FallFusionConfig()
@@ -67,6 +69,7 @@ class FallFusionRuntime:
         self.alarm_log = Path(alarm_log) if alarm_log else None
         self.alarm_sink = alarm_sink or self._emit_alarm
         self.cloud_alarm_sink = cloud_alarm_sink
+        self.manual_trigger_path = Path(manual_trigger_path) if manual_trigger_path else None
         self.wall_clock = wall_clock
 
     def update(self, sample: Any) -> dict[str, Any] | None:
@@ -91,17 +94,49 @@ class FallFusionRuntime:
             now_wall=now_wall,
         )
         if alarm is not None:
-            self.alarm_sink(alarm)
-            if self.cloud_alarm_sink is not None:
-                try:
-                    self.cloud_alarm_sink(alarm)
-                except Exception as exc:
-                    print(
-                        f"WARN fall cloud upload failed: {type(exc).__name__}",
-                        file=sys.stderr,
-                        flush=True,
-                    )
+            self._deliver_alarm(alarm)
         return alarm
+
+    def consume_manual_trigger(self) -> dict[str, Any] | None:
+        """Consume one BLE test request without changing normal fusion behavior."""
+        if self.manual_trigger_path is None:
+            return None
+        try:
+            request = json.loads(self.manual_trigger_path.read_text(encoding="utf-8"))
+            self.manual_trigger_path.unlink()
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+        if not isinstance(request, dict) or request.get("type") != "manual_fall_trigger":
+            return None
+        now_wall = float(self.wall_clock())
+        alarm = {
+            "type": "fall_alarm",
+            "alarmType": "fall_detected",
+            "signal": "FALL_ALARM",
+            "severity": "high",
+            "ts": now_wall,
+            "deviceTimestampMs": int(now_wall * 1000),
+            "conditions": {"manual_ble_trigger": True},
+            "evidence": {
+                "source": "ble_remote",
+                "requestId": str(request.get("requestId", "")),
+                "requestedAt": request.get("ts"),
+            },
+        }
+        self._deliver_alarm(alarm)
+        return alarm
+
+    def _deliver_alarm(self, alarm: Mapping[str, Any]) -> None:
+        self.alarm_sink(alarm)
+        if self.cloud_alarm_sink is not None:
+            try:
+                self.cloud_alarm_sink(alarm)
+            except Exception as exc:
+                print(
+                    f"WARN fall cloud upload failed: {type(exc).__name__}",
+                    file=sys.stderr,
+                    flush=True,
+                )
 
     def _emit_alarm(self, event: Mapping[str, Any]) -> None:
         payload = event_to_json(event)

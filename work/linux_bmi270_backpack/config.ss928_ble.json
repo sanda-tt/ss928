@@ -20,6 +20,7 @@
     "detector_config": "/root/work/imu_fall_detector/config.ss928.json",
     "warning_marker": "/tmp/smartbag_last_high_warning.json",
     "alarm_log": "/root/data/smartbag_alert/logs/fall_alarm.jsonl",
+    "manual_trigger_path": "/tmp/smartbag_manual_fall_trigger.json",
     "warning_window_s": 10.0,
     "recovery_window_s": 7.0,
     "standing_posture_deg": 25.0,

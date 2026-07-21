@@ -16,6 +16,8 @@ SS928 board without modifying the vendor samples under `/opt/sample`.
 |   |-- imx347_mipi_preview/
 |   |-- max98357_i2s_test/
 |   |-- mt5710_voice_call/
+|   |-- mt5710_5g_cloud_upload/
+|   |-- smartbag_cloud_uploader/
 |   `-- radar/
 |-- config/
 |   `-- smartbag_alert/
@@ -47,27 +49,64 @@ Compatibility links retain the previously verified paths
 - `ws73-bluetooth-module.service` loads the vendor WS73 kernel modules before
   the system `bluetooth.service`. It deliberately does not use the private
   DBus instance created by the vendor `ble.sh` helper.
-- `smartbag-alert.service` and `bmi270-backpack.service` retain their historical
-  runtime paths and start after the WS73 controller is visible.
+- `smartbag-5g-upload.service` is the single telemetry coordinator. It waits for
+  MT5710 with bounded timeouts, then starts DX-GP21 and BMI270 and uploads their
+  current state. The unit is `Type=simple`, retries after five seconds, and has
+  a ten-second stop timeout, so it does not block the rest of boot.
+- `smartbag-alert.service` independently owns the one-sided MR20 warning path,
+  PWM lights, TCA9548A/TM6605 haptics, audio, and the `SS928-SmartBag` BLE
+  advertisement.
+- `bmi270-backpack.service` is disabled to prevent a second process from
+  opening the same BMI270. BMI270 is launched by `smartbag-5g-upload.service`
+  and reuses the configured system BlueZ controller without starting the
+  vendor private D-Bus/bluetoothd stack.
+- The DX-GP21 tracker is also launched by `smartbag-5g-upload.service`; no
+  separate GNSS boot unit is needed.
 
-The GNSS tracker retains its verified manual command
-`cd /root/dx_gp21_tracker && sh ./start_ss928_gnss_track.sh`; it is not enabled
-as a separate boot service because no previous persistent unit was recorded.
+### Do not revive superseded BMI/BlueZ entry points
+
+On this integrated SmartBag board, `smartbag-5g-upload.service` is the **only**
+owner allowed to start `bmi270_backpack.py`. The following old or standalone
+entry points remain in the tree only for reference/compatibility and must not
+be started alongside it:
+
+- Do not run `systemctl start bmi270-backpack.service` or enable that unit. The
+  file may remain installed, but its required state is `disabled` and
+  `inactive`.
+- Do not manually launch `bmi270_backpack.py --ble` or
+  `start_ss928_ble.sh` while `smartbag-5g-upload.service` is active. The same
+  script is already invoked as a child of the unified service.
+- Do not run `/opt/sample/ws73/ble.sh 0` and do not set
+  `START_BLE_STACK=1` on this board. They start a second vendor D-Bus/
+  `bluetoothd` stack and conflict with the system BlueZ instance.
+
+The expected steady state is one BMI270 process in the
+`smartbag-5g-upload.service` cgroup and one system
+`/usr/lib/bluetooth/bluetoothd` process. If the old unit is found active, use:
+
+```sh
+systemctl disable --now bmi270-backpack.service
+systemctl restart smartbag-5g-upload.service
+```
+
+Do not delete the legacy unit or compatibility paths: keeping them disabled is
+intentional, and the source directory is still used by the unified service.
 
 ## Hardware-ready verification
 
-The migration was completed before the external modules were wired. The two
-business services are enabled for future boots but were intentionally left
-stopped after configuration so missing I2C/PWM devices do not create restart
-loops. After the wiring is complete, use:
+With the external modules connected, the persistent runtime is checked with:
 
 ```sh
-systemctl start smartbag-alert.service
-systemctl start bmi270-backpack.service
-systemctl status smartbag-alert.service bmi270-backpack.service --no-pager
+systemctl status smartbag-5g-upload.service smartbag-alert.service --no-pager
+systemctl is-enabled smartbag-5g-upload.service smartbag-alert.service \
+  ws73-bluetooth-module.service bluetooth.service bmi270-backpack.service
+systemctl is-active bmi270-backpack.service
+pgrep -a -f 'bmi270_backpack.py|bluetoothd'
 networkctl status eth1
 ip route get 192.168.1.200
 ```
 
-The GNSS tracker remains manual until its UART and BLE behavior is checked with
-the connected module. Do not change `eth1` to `/24` and do not add a gateway.
+The connected DX-GP21 currently emits no UART bytes at 9600, 38400, 57600, or
+115200 baud, so its process is running but no live GNSS fix is available yet.
+Check module power, common ground, and module TX to Pin10/UART4_RXD before
+changing software. Do not change `eth1` to `/24` and do not add a gateway.

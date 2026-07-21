@@ -36,6 +36,29 @@ def board_sample(t, ax=0.0, ay=0.0, az=1.0, gx=0.0, gy=0.0, gz=0.0):
 
 
 class FallFusionRuntimeTests(unittest.TestCase):
+    def test_manual_ble_trigger_uses_the_final_fall_alarm_sinks_once(self):
+        with tempfile.TemporaryDirectory() as temp:
+            trigger = Path(temp) / "manual-fall.json"
+            events = []
+            cloud_events = []
+            runtime = FallFusionRuntime(
+                warning_marker=Path(temp) / "warning.json",
+                alarm_sink=events.append,
+                cloud_alarm_sink=cloud_events.append,
+                manual_trigger_path=trigger,
+                wall_clock=lambda: 1000.0,
+            )
+            trigger.write_text('{"type":"manual_fall_trigger","requestId":"ble-1"}', encoding="utf-8")
+
+            alarm = runtime.consume_manual_trigger()
+
+            self.assertEqual(alarm["signal"], "FALL_ALARM")
+            self.assertEqual(alarm["alarmType"], "fall_detected")
+            self.assertTrue(alarm["conditions"]["manual_ble_trigger"])
+            self.assertEqual(len(events), 1)
+            self.assertEqual(len(cloud_events), 1)
+            self.assertFalse(trigger.exists())
+            self.assertIsNone(runtime.consume_manual_trigger())
     def test_board_units_are_converted_to_detector_units(self):
         converted = to_detector_sample(
             board_sample(2.0, ax=0.5, ay=-0.25, az=1.0, gx=1.0, gy=-0.5)
