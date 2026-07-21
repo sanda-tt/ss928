@@ -18,6 +18,7 @@ from mr20_radar import (  # noqa: E402
     RadarRiskEvaluator,
     RiskConfig,
     MR20RadarWorker,
+    load_radar_configs,
     parse_mr20_frame,
 )
 
@@ -96,6 +97,24 @@ class MR20RiskEvaluatorTest(unittest.TestCase):
 
             self.assertEqual([event.level for event in events], [0, 3])
             self.assertTrue((Path(temp_dir) / "mr20.jsonl").exists())
+
+
+class MR20DualRadarConfigTest(unittest.TestCase):
+    def test_example_config_enables_confirmed_eth0_left_radar(self) -> None:
+        config_path = PROJECT_DIR / "mr20_radar.example.json"
+        radars, _risk = load_radar_configs(config_path)
+
+        endpoints = {
+            radar.name: (radar.side, radar.bind_host, radar.port, radar.radar_ip)
+            for radar in radars
+        }
+        self.assertEqual(
+            endpoints,
+            {
+                "right_rear": ("right", "192.168.1.102", 2368, "192.168.1.200"),
+                "left_rear": ("left", "192.168.1.168", 2378, "192.168.1.201"),
+            },
+        )
 
 
 if __name__ == "__main__":

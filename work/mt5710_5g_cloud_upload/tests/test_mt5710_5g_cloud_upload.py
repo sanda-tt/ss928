@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 MODULE_DIR = Path(__file__).resolve().parents[1]
@@ -11,7 +12,10 @@ if str(MODULE_DIR) not in sys.path:
     sys.path.insert(0, str(MODULE_DIR))
 
 from mt5710_5g_cloud_upload import (  # noqa: E402
+    AtSession,
+    Mt5710SmsNotifier,
     RunResult,
+    build_ucs2_sms,
     build_sensor_commands,
     choose_apn,
     discover_ncm_interface,
@@ -75,6 +79,16 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(dx_command.count("--no-ble"), 1)
         self.assertNotIn("--simulate", joined)
 
+    def test_can_skip_unplugged_dx_gp21_without_skipping_bmi270(self) -> None:
+        commands = build_sensor_commands(Path("/root/work"), include_gnss=False)
+
+        joined = " ".join(part for command in commands for part in command)
+        self.assertNotIn("dx_gp21_tracker.py", joined)
+        self.assertEqual(
+            commands,
+            [["/bin/sh", "/root/work/linux_bmi270_backpack/start_ss928_ble.sh"]],
+        )
+
 
 class FakeAtSession:
     def __init__(self, responses: dict[str, list[str]]) -> None:
@@ -85,6 +99,93 @@ class FakeAtSession:
         del timeout_s
         self.commands.append(command)
         return list(self.responses.get(command, ["OK"]))
+
+
+class SmsTests(unittest.TestCase):
+    def test_builds_single_ucs2_pdu_message_for_chinese_alarm(self) -> None:
+        message = "检测到你的儿童遇到危险，可能发生严重摔倒，请立刻到小程序查看具体消息"
+
+        sms = build_ucs2_sms("15500001111", message)
+
+        self.assertEqual(sms.setup_commands, ("AT+CMGF=0",))
+        self.assertEqual(sms.submit_command, "AT+CMGS=82")
+        self.assertEqual(
+            sms.pdu_hex,
+            "0011000B815105001011F10008A744" + message.encode("utf-16-be").hex().upper(),
+        )
+
+    def test_at_session_sends_pdu_and_waits_for_message_reference(self) -> None:
+        class ScriptedSession(AtSession):
+            def __init__(self) -> None:
+                super().__init__("unused")
+                self.fd = 99
+                self.commands = []
+                self.responses = iter((b"\r\n> ", b"\r\n+CMGS: 42\r\n\r\nOK\r\n"))
+
+            def command(self, command: str, timeout_s: float = 4.0) -> list[str]:
+                del timeout_s
+                self.commands.append(command)
+                return ["OK"]
+
+            def _read_until(self, predicate, timeout_s: float) -> bytes:
+                del timeout_s
+                response = next(self.responses)
+                if not predicate(response):
+                    raise AssertionError("scripted response did not satisfy read predicate")
+                return response
+
+        session = ScriptedSession()
+        writes = []
+        with patch(
+            "mt5710_5g_cloud_upload.os.write",
+            side_effect=lambda fd, data: writes.append((fd, data)) or len(data),
+        ):
+            result = session.send_ucs2_sms("15500001111", "危险")
+
+        self.assertEqual(session.commands, ["AT", "AT+CMGF=0"])
+        self.assertEqual(writes[0], (99, b"AT+CMGS=18\r"))
+        self.assertEqual(
+            writes[1],
+            (
+                99,
+                (
+                    "0011000B815105001011F10008A704"
+                    + "危险".encode("utf-16-be").hex().upper()
+                ).encode("ascii")
+                + b"\x1a",
+            ),
+        )
+        self.assertIn("+CMGS: 42", result)
+
+    def test_notifier_only_sends_final_fall_alarm(self) -> None:
+        sent = []
+
+        class FakeSmsSession:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *items):
+                del items
+
+            def send_ucs2_sms(self, phone: str, message: str, timeout_s: float = 30.0):
+                sent.append((phone, message, timeout_s))
+                return ["+CMGS: 7", "OK"]
+
+        notifier = Mt5710SmsNotifier(
+            phone="15500001111",
+            message="报警",
+            timeout_s=20.0,
+            at_factory=lambda port, baud: FakeSmsSession(),
+        )
+
+        self.assertFalse(notifier({"signal": "HIGH_WARNING", "alarmType": "fall_detected"}))
+        self.assertFalse(notifier({"signal": "FALL_ALARM", "alarmType": "other"}))
+        self.assertTrue(notifier({"signal": "FALL_ALARM", "alarmType": "fall_detected"}))
+        self.assertEqual(sent, [("15500001111", "报警", 20.0)])
+
+    def test_sms_notifier_rejects_invalid_phone(self) -> None:
+        with self.assertRaisesRegex(ValueError, "SMS phone"):
+            Mt5710SmsNotifier(phone="not-a-phone", message="报警")
 
 
 class NetworkOrchestrationTests(unittest.TestCase):
@@ -248,6 +349,7 @@ class NetworkOrchestrationTests(unittest.TestCase):
             (),
             {
                 "skip_network": False,
+                "skip_gnss": False,
                 "check_only": False,
                 "port": "/dev/ttyUSB1",
                 "baud": 115200,
@@ -268,6 +370,36 @@ class NetworkOrchestrationTests(unittest.TestCase):
             )
 
         self.assertEqual(calls, [])
+
+    def test_runtime_skips_gnss_when_module_is_marked_unplugged(self) -> None:
+        captured: list[list[str]] = []
+        args = type(
+            "Args",
+            (),
+            {
+                "skip_network": True,
+                "skip_gnss": True,
+                "check_only": False,
+                "port": "/dev/ttyUSB1",
+                "baud": 115200,
+                "apn": "",
+                "work_root": Path("/root/work"),
+            },
+        )()
+
+        result = run_application(
+            args,
+            environ={"SMARTBAG_UPLOAD_TOKEN": "test"},
+            prerequisite_checker=lambda root, include_gnss=True: self.assertFalse(include_gnss),
+            pinmux_configurer=lambda runner, include_gnss=True: self.assertFalse(include_gnss),
+            supervisor=lambda commands, root: captured.extend(commands) or 0,
+        )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(
+            captured,
+            [["/bin/sh", (args.work_root.resolve() / "linux_bmi270_backpack" / "start_ss928_ble.sh").as_posix()]],
+        )
 
 
 if __name__ == "__main__":

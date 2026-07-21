@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -62,6 +64,54 @@ class HunchStateTests(unittest.TestCase):
 
         detector.update(posture_state(1.1, pitch=-5.0))
         self.assertFalse(detector.is_condition_active("HUNCH"))
+
+
+class SmsAlertConfigTests(unittest.TestCase):
+    def test_sms_sink_uses_root_only_environment_phone_and_configured_message(self):
+        cfg = copy.deepcopy(bmi.DEFAULT_CONFIG)
+        self.assertIsNone(bmi.make_sms_alarm_sink(cfg, environ={}))
+
+        cfg["sms_alert"].update(
+            {
+                "enabled": True,
+                "phone_env": "SMARTBAG_ALERT_PHONE",
+                "message": "检测到你的儿童遇到危险，可能发生严重摔倒，请立刻到小程序查看具体消息",
+            }
+        )
+        sink = bmi.make_sms_alarm_sink(
+            cfg,
+            environ={"SMARTBAG_ALERT_PHONE": "15500001111"},
+        )
+
+        self.assertEqual(sink.phone, "15500001111")
+        self.assertEqual(sink.message, cfg["sms_alert"]["message"])
+
+    def test_enabled_sms_sink_skips_missing_phone_without_stopping_service(self):
+        cfg = copy.deepcopy(bmi.DEFAULT_CONFIG)
+        cfg["sms_alert"]["enabled"] = True
+
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            sink = bmi.make_sms_alarm_sink(cfg, environ={})
+
+        self.assertIsNone(sink)
+        self.assertIn("SMARTBAG_ALERT_PHONE is not set", stderr.getvalue())
+
+    def test_enabled_sms_sink_skips_invalid_phone_without_logging_it(self):
+        cfg = copy.deepcopy(bmi.DEFAULT_CONFIG)
+        cfg["sms_alert"]["enabled"] = True
+        invalid_phone = "123;AT+CMGS=1"
+
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            sink = bmi.make_sms_alarm_sink(
+                cfg,
+                environ={"SMARTBAG_ALERT_PHONE": invalid_phone},
+            )
+
+        self.assertIsNone(sink)
+        self.assertIn("SMARTBAG_ALERT_PHONE is invalid", stderr.getvalue())
+        self.assertNotIn(invalid_phone, stderr.getvalue())
 
 
 class PostureDailyAccumulatorTests(unittest.TestCase):
@@ -130,7 +180,7 @@ class PostureCloudReporterTests(unittest.TestCase):
             self.assertNotIn("ax_g", serialized)
             self.assertNotIn("gx_dps", serialized)
 
-    def test_only_final_fall_is_uploaded_and_recent_location_is_optional(self):
+    def test_final_fall_uses_wangjiang_campus_when_location_is_stale(self):
         class FakeClient:
             def __init__(self):
                 self.events = []
@@ -166,7 +216,10 @@ class PostureCloudReporterTests(unittest.TestCase):
 
             client.events.clear()
             self.assertTrue(reporter.report_fall(final_event, now_ms=20_000))
-            self.assertNotIn("location", client.events[0]["alarms"][0])
+            fallback = client.events[0]["alarms"][0]["location"]
+            self.assertEqual(fallback["latitude"], 30.630838)
+            self.assertEqual(fallback["longitude"], 104.083932)
+            self.assertTrue(fallback["valid"])
 
 
 class FinalFallSinkTests(unittest.TestCase):
@@ -194,6 +247,7 @@ class FinalFallSinkTests(unittest.TestCase):
 
         local_events = []
         cloud_events = []
+        sms_events = []
         clock = [1000.0]
         with tempfile.TemporaryDirectory() as temp:
             marker = Path(temp) / "warning.json"
@@ -207,6 +261,7 @@ class FinalFallSinkTests(unittest.TestCase):
                 detector=FakeDetector(),
                 alarm_sink=local_events.append,
                 cloud_alarm_sink=cloud_events.append,
+                sms_alarm_sink=sms_events.append,
                 wall_clock=lambda: clock[0],
             )
 
@@ -217,6 +272,7 @@ class FinalFallSinkTests(unittest.TestCase):
         self.assertEqual(alarm["signal"], "FALL_ALARM")
         self.assertEqual(len(local_events), 1)
         self.assertEqual(len(cloud_events), 1)
+        self.assertEqual(len(sms_events), 1)
 
 
 if __name__ == "__main__":

@@ -12,7 +12,8 @@
 - `ssminiprogram-cloud-track-display.md`：小程序经 CloudBase Event Function 读取并显示云端 GNSS 历史轨迹。
 - `ssminiprogram-cloud-fall-alarm-display.md`：小程序经 CloudBase Event Function 读取并显示摔倒报警历史。
 - `mr20-udp-pc-validation.md`：MR20 Windows UDP 接收、0x60B 目标帧解析与 CSV 日志验证。
-- `mr20-smartbag-alert-integration.md`：MR20 网口雷达接入 SmartBag 四级右后预警、配置和板端网络验证。
+- `mr20-smartbag-alert-integration.md`：MR20 网口雷达接入 SmartBag 四级右后预警、最新优先语音抢占、双侧震动和板端网络验证。
+- `mr20-dual-eth0-integration-2026-07-22.md`：双侧 MR20 最终 IP/端口、eth0 SSH 复用与板端双 UDP 监听部署。
 - `tm6605-lra-haptic-alert.md`：TM6605 双 LRA 触觉驱动、I2C 复用与四级预警时序。
 - `smartbag-pwm-light-modules.md`：双侧小信号光模块的 PWM 引脚分配及三级/四级光效时序。
 - `ss928-new-board-migration-2026-07-20.md`: clean-board project restore, organized `/root` workspace, WS73 BlueZ startup, boot services, and persistent MR20 `eth1` network configuration.

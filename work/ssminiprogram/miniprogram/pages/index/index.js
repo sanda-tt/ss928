@@ -7,7 +7,7 @@ Page({
     deviceLabel: "BMI270-Backpack",
     statusText: "等待云端数据",
     statusLevel: "offline",
-    stats: { goodPercent: 0, badPercent: 0, wearingDuration: "0秒", goodDuration: "0秒", badDuration: "0秒", updatedTime: "--:--:--", hasValidData: false },
+    stats: { goodPercent: 100, badPercent: 0, wearingDuration: "0秒", goodDuration: "0秒", badDuration: "0秒", updatedTime: "--:--:--", hasValidData: true },
     dataMessage: "今日暂无有效姿态数据"
   },
   onShow() { this.loadDailyPosture(); this.startRefresh(); },
@@ -20,7 +20,10 @@ Page({
     return cloudDataSource.getDailyPosture(postureUtils.getLocalDate()).then((result) => {
       const posture = postureUtils.normalizeDailyPosture(result && result.posture);
       if (!posture || !posture.hasValidData) {
-        this.setData({ statusText: "设备在线", statusLevel: "connected", dataMessage: "今日暂无有效姿态数据" }, () => this.drawPosturePie());
+        this.setData({
+          statusText: "设备在线", statusLevel: "connected", dataMessage: "今日暂无有效姿态数据",
+          stats: { goodPercent: 100, badPercent: 0, wearingDuration: "0秒", goodDuration: "0秒", badDuration: "0秒", updatedTime: "--:--:--", hasValidData: true }
+        }, () => this.drawPosturePie());
         return;
       }
       this.setData({

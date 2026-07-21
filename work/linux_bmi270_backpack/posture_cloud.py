@@ -9,9 +9,17 @@ from typing import Any, Mapping
 
 from smartbag_cloud_uploader import (
     build_fall_payload,
+    build_hunch_reminder_payload,
     build_posture_payload,
     read_fresh_location,
 )
+
+
+DEFAULT_FALL_LOCATION = {
+    "latitude": 30.630838,
+    "longitude": 104.083932,
+    "valid": True,
+}
 
 
 class PostureDailyAccumulator:
@@ -144,5 +152,12 @@ class PostureCloudReporter:
             now_ms=event_time_ms,
             max_age_ms=self.location_max_age_ms,
         )
+        if location is None:
+            location = DEFAULT_FALL_LOCATION
         self.telemetry_client.submit_event(build_fall_payload(event, location))
+        return True
+
+    def report_hunch_reminder(self, state: Mapping[str, Any], reminder: Mapping[str, Any]) -> bool:
+        payload = build_hunch_reminder_payload(state, reminder)
+        self.telemetry_client.submit_event(payload)
         return True

@@ -78,6 +78,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "hunch_enabled": True,
         "hunch_pitch_deg": -15.5,
         "hunch_hold_s": 3.0,
+        "hunch_reminder_required_s": 15.0,
+        "hunch_reminder_window_s": 20.0,
         "hunch_max_gyro_dps": 30.0,
         "hunch_accel_min_g": 0.75,
         "hunch_accel_max_g": 1.25,
@@ -119,6 +121,14 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "daily_max_gap_s": 10.0,
         "latest_location_path": "/tmp/smartbag_latest_location.json",
         "location_max_age_s": 120.0,
+    },
+    "sms_alert": {
+        "enabled": False,
+        "port": "/dev/ttyUSB1",
+        "baud": 115200,
+        "phone_env": "SMARTBAG_ALERT_PHONE",
+        "message": "检测到你的儿童遇到危险，可能发生严重摔倒，请立刻到小程序查看具体消息",
+        "timeout_s": 30.0,
     },
     "calibration": {
         "data_dir": "/root/bmi270_calibration",
@@ -722,6 +732,7 @@ class AnomalyDetector:
         self.hold_start: Dict[str, float] = {}
         self.last_emit: Dict[str, float] = {}
         self.active_conditions: Dict[str, bool] = {}
+        self.hunch_candidate = False
 
     def is_condition_active(self, code: str) -> bool:
         return bool(self.active_conditions.get(str(code), False))
@@ -739,6 +750,7 @@ class AnomalyDetector:
                 and accel_g >= float(th.get("hunch_accel_min_g", 0.75))
                 and accel_g <= float(th.get("hunch_accel_max_g", 1.25))
             )
+            self.hunch_candidate = hunch_active
             checks.append(
                 (
                     "HUNCH",
@@ -1692,7 +1704,11 @@ def make_imu_source(cfg: Dict[str, Any], args: argparse.Namespace) -> Any:
     raise RuntimeError(f"Unknown device backend: {backend}")
 
 
-def make_fall_fusion_runtime(cfg: Dict[str, Any], cloud_alarm_sink: Any = None) -> Any:
+def make_fall_fusion_runtime(
+    cfg: Dict[str, Any],
+    cloud_alarm_sink: Any = None,
+    sms_alarm_sink: Any = None,
+) -> Any:
     fall_cfg = cfg.get("fall_detection", {})
     if not bool(fall_cfg.get("enabled", False)):
         return None
@@ -1712,6 +1728,7 @@ def make_fall_fusion_runtime(cfg: Dict[str, Any], cloud_alarm_sink: Any = None) 
         detector_config_path=detector_config,
         alarm_log=str(fall_cfg.get("alarm_log", "/root/data/smartbag_alert/logs/fall_alarm.jsonl")),
         cloud_alarm_sink=cloud_alarm_sink,
+        sms_alarm_sink=sms_alarm_sink,
         manual_trigger_path=str(fall_cfg.get("manual_trigger_path", "/tmp/smartbag_manual_fall_trigger.json")),
     )
 
@@ -1742,6 +1759,42 @@ def make_posture_cloud_reporter(cfg: Dict[str, Any]) -> Any:
     )
 
 
+def make_sms_alarm_sink(
+    cfg: Dict[str, Any],
+    environ: Mapping[str, str] = os.environ,
+) -> Any:
+    sms_cfg = cfg.get("sms_alert", {})
+    if not bool(sms_cfg.get("enabled", False)):
+        return None
+
+    from mt5710_5g_cloud_upload.mt5710_5g_cloud_upload import Mt5710SmsNotifier
+
+    phone_env = str(sms_cfg.get("phone_env", "SMARTBAG_ALERT_PHONE"))
+    phone = str(environ.get(phone_env, "")).strip()
+    if not phone:
+        print(
+            f"WARN SMS alert disabled: {phone_env} is not set",
+            file=sys.stderr,
+            flush=True,
+        )
+        return None
+    try:
+        return Mt5710SmsNotifier(
+            phone=phone,
+            message=str(sms_cfg.get("message", "")),
+            port=str(sms_cfg.get("port", "/dev/ttyUSB1")),
+            baud=int(sms_cfg.get("baud", 115200)),
+            timeout_s=float(sms_cfg.get("timeout_s", 30.0)),
+        )
+    except ValueError:
+        print(
+            f"WARN SMS alert disabled: {phone_env} is invalid",
+            file=sys.stderr,
+            flush=True,
+        )
+        return None
+
+
 def run(args: argparse.Namespace) -> int:
     cfg = load_config(args.config)
     if args.no_ble:
@@ -1757,9 +1810,17 @@ def run(args: argparse.Namespace) -> int:
     detector = AnomalyDetector(cfg)
     alert_output = AlertOutput(cfg)
     posture_cloud = make_posture_cloud_reporter(cfg)
+    from posture_reminder import CumulativeHunchReminder, write_reminder_trigger
+    thresholds = cfg["thresholds"]
+    hunch_reminder = CumulativeHunchReminder(
+        thresholds.get("hunch_reminder_required_s", 15.0),
+        thresholds.get("hunch_reminder_window_s", 20.0),
+    )
+    sms_alarm_sink = make_sms_alarm_sink(cfg)
     fall_fusion = make_fall_fusion_runtime(
         cfg,
         cloud_alarm_sink=posture_cloud.report_fall if posture_cloud is not None else None,
+        sms_alarm_sink=sms_alarm_sink,
     )
     calibration_recorder = CalibrationRecorder(cfg)
     commands: "queue.Queue[str]" = queue.Queue()
@@ -1830,6 +1891,15 @@ def run(args: argparse.Namespace) -> int:
                     file=sys.stderr,
                     flush=True,
                 )
+
+        if hunch_reminder.update(detector.hunch_candidate, now):
+            reminder = write_reminder_trigger("/tmp/smartbag_posture_reminder.json", now_wall=time.time())
+            print("REMINDER,HUNCH,level=light,duration=5", flush=True)
+            if posture_cloud is not None:
+                try:
+                    posture_cloud.report_hunch_reminder(state, reminder)
+                except Exception as exc:
+                    print(f"WARN posture reminder upload failed: {type(exc).__name__}", file=sys.stderr, flush=True)
 
         while True:
             try:

@@ -61,6 +61,9 @@ test("settings placeholder text matches the home entry", () => {
 test("home debug entry opens the SmartBag remote page", () => {
   assert.ok(homeWxml.indexOf('data-route="/pages/remote/index"') >= 0);
   assert.ok(homeWxml.indexOf('data-route="/pages/monitor/index"') < 0);
+  assert.ok(homeWxml.indexOf("SS928-SmartBag 调试入口") < 0);
+  assert.ok(homeWxss.indexOf("border-radius: 50%") >= 0);
+  assert.ok(homeWxss.indexOf("background: rgba(151, 160, 171, 0.1)") >= 0);
 });
 
 let failed = 0;

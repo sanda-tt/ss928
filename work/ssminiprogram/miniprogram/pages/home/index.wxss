@@ -275,48 +275,22 @@ page {
 .smartbag-debug-entry {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20rpx;
+  justify-content: center;
   box-sizing: border-box;
-  min-height: 132rpx;
-  margin-top: 24rpx;
-  padding: 22rpx 26rpx;
-  border-radius: 8rpx;
-  background: #101820;
-  color: #ffffff;
-  box-shadow: 0 12rpx 28rpx rgba(16, 24, 32, 0.18);
+  width: 52rpx;
+  height: 52rpx;
+  margin: 34rpx 12rpx 10rpx auto;
+  border: 1rpx solid rgba(151, 160, 171, 0.16);
+  border-radius: 50%;
+  background: rgba(151, 160, 171, 0.1);
+  box-shadow: inset 0 1rpx 3rpx rgba(255, 255, 255, 0.38);
 }
 
-.smartbag-debug-entry__main {
-  min-width: 0;
-  flex: 1;
-}
-
-.smartbag-debug-entry__title {
-  font-size: 30rpx;
-  font-weight: 700;
-  line-height: 40rpx;
-  word-break: break-all;
-}
-
-.smartbag-debug-entry__subtitle {
-  margin-top: 8rpx;
-  color: #c7d2df;
-  font-size: 23rpx;
-  line-height: 32rpx;
-  word-break: break-all;
-}
-
-.smartbag-debug-entry__action {
-  flex: 0 0 96rpx;
-  height: 56rpx;
-  border-radius: 8rpx;
-  background: #0b7f78;
-  color: #ffffff;
-  font-size: 24rpx;
-  font-weight: 700;
-  line-height: 56rpx;
-  text-align: center;
+.smartbag-debug-entry__dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: rgba(151, 160, 171, 0.28);
 }
 
 @media (max-width: 360px) {

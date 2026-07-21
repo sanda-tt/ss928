@@ -50,6 +50,8 @@ const validateStatus = (status) => {
   if (status.posture_status !== undefined && !["good", "bad"].includes(status.posture_status)) return false;
   if (status.is_wearing !== undefined && typeof status.is_wearing !== "boolean") return false;
   if (status.reminder_active !== undefined && typeof status.reminder_active !== "boolean") return false;
+  if (status.reminder_type !== undefined && status.reminder_type !== "hunch_vibration_voice") return false;
+  if (status.reminder_reported_at !== undefined && !isTimestampMs(status.reminder_reported_at)) return false;
   return true;
 };
 
@@ -64,7 +66,7 @@ const validateAlarm = (alarm) => (
   isObject(alarm) &&
   isRequestId(alarm.requestId) &&
   isTimestampMs(alarm.reportedAt) &&
-  alarm.alarmType === "fall_detected" &&
+  ["fall_detected", "posture_hunch_reminder"].includes(alarm.alarmType) &&
   Number.isInteger(alarm.riskLevel) &&
   alarm.riskLevel >= 1 &&
   alarm.riskLevel <= 4 &&

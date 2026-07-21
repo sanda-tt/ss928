@@ -7,7 +7,10 @@ const toTimestampMs = (value) => {
   if (value instanceof Date) return value.getTime();
   if (typeof value === "number") return value < 100000000000 ? value * 1000 : value;
   if (typeof value === "string") {
-    const timestamp = Date.parse(value.replace(/-/g, "/"));
+    // CloudBase serializes Date values as ISO-8601 strings.  Keep the ISO
+    // separators intact; replacing them for the iOS local-date workaround
+    // makes strings with `T`/`Z` invalid and falsely marks the device offline.
+    const timestamp = Date.parse(value.includes("T") ? value : value.replace(/-/g, "/"));
     return Number.isFinite(timestamp) ? timestamp : 0;
   }
   if (value && typeof value.getTime === "function") return value.getTime();
@@ -40,8 +43,15 @@ const normalizeRealtimePosture = (record) => {
     postureStatus: rawStatus === "good" || rawStatus === "bad" ? rawStatus : "unknown",
     isWearing: record.is_wearing === true || record.isWearing === true,
     reminderActive: record.reminder_active === true || record.reminderActive === true,
+    reminderType: record.reminder_type || record.reminderType || "",
     updatedAtMs: toTimestampMs(record.updated_at || record.updatedAt || record.receivedAt)
   };
+};
+const normalizeHunchReminder = (record) => {
+  if (!record || record.alarmType !== "posture_hunch_reminder") return null;
+  const timestampMs = toTimestampMs(record.reportedAt || record.receivedAt);
+  if (!timestampMs) return null;
+  return { id: record.alarmId || record.requestId || String(timestampMs), timeText: formatClock(timestampMs), message: "已轻微震动 5 秒并播放语音提醒" };
 };
 const toRealtimeDisplay = (posture, nowMs, offlineAfterMs) => {
   const stale = !posture || !posture.updatedAtMs || nowMs - posture.updatedAtMs > offlineAfterMs;
@@ -60,4 +70,4 @@ const normalizeDailyPosture = (record) => {
   const goodPercent = hasValidData ? clamp(Math.round(goodSeconds / wearingSeconds * 100), 0, 100) : 0;
   return { deviceId: record.device_id || record.deviceId || "bag001", date: record.date || "", wearingSeconds, goodSeconds, badSeconds, goodPercent, badPercent: hasValidData ? 100 - goodPercent : 0, updatedAtMs: toTimestampMs(record.updated_at || record.updatedAt || record.receivedAt), hasValidData };
 };
-module.exports = { formatClock, formatDuration, getLocalDate, normalizeDailyPosture, normalizeRealtimePosture, toRealtimeDisplay };
+module.exports = { formatClock, formatDuration, getLocalDate, normalizeDailyPosture, normalizeHunchReminder, normalizeRealtimePosture, toRealtimeDisplay };

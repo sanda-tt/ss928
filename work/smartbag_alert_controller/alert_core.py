@@ -66,7 +66,7 @@ def normalize_level(level: Any, *, allow_zero: bool = True) -> int:
 def audio_clip_for(side: str, level: int) -> str | None:
     normalized_side = normalize_side(side)
     normalized_level = normalize_level(level)
-    if normalized_level <= 0:
+    if normalized_level < 3:
         return None
     prefix = "L" if normalized_side == "left" else "R"
     return f"{prefix}{normalized_level}"

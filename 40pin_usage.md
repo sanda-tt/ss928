@@ -1,6 +1,6 @@
 # SS928 40Pin 引脚占用表
 
-最后更新：2026-07-20
+最后更新：2026-07-22
 
 本表只记录当前项目已经占用的 40Pin 信号脚，用于后续增加设备前检查冲突。电源脚、GND、接 VIN/GND/悬空的模块控制脚，以及直接接喇叭的输出端不计入本表。
 
@@ -8,8 +8,8 @@
 |---|---|---|---|---|---|---|
 | Pin3 | `I2C0` | `I2C0_SDA` | TCA9548A 主端 SDA | BMI270=CH0，左 TM6605=CH1，右 TM6605=CH2 | I2C 数据线，对应 `/dev/i2c-0` | `work/linux_bmi270_backpack/config.ss928_ble.json` |
 | Pin5 | `I2C0` | `I2C0_SCL` | TCA9548A 主端 SCL | BMI270=CH0，左 TM6605=CH1，右 TM6605=CH2 | I2C 时钟线，对应 `/dev/i2c-0` | `work/linux_bmi270_backpack/config.ss928_ble.json` |
-| Pin8 | `UART4` | `UART4_TXD` | DX-GP21-A GNSS 模块 | `RXD` | GNSS 串口输入，对应 `/dev/ttyAMA4` | `work/dx_gp21_tracker/README.md` |
-| Pin10 | `UART4` | `UART4_RXD` | DX-GP21-A GNSS 模块 | `TXD` | GNSS NMEA 串口输出，对应 `/dev/ttyAMA4` | `work/dx_gp21_tracker/README.md` |
+| Pin8 | `UART4` | `UART4_TXD` | DX-GP21-A GNSS 模块（已拔除） | `RXD` | 当前预留未接；定位模块故障期间不启动 GNSS、不作为其他流程前置条件 | `work/dx_gp21_tracker/README.md` |
+| Pin10 | `UART4` | `UART4_RXD` | DX-GP21-A GNSS 模块（已拔除） | `TXD` | 当前预留未接；定位模块故障期间不启动 GNSS、不作为其他流程前置条件 | `work/dx_gp21_tracker/README.md` |
 | Pin12 | `I2S` | `I2S_BCLK` | MAX98357 I2S 功放 | `BCLK` | I2S 位时钟 | 用户提供的 MAX98357 接线表 |
 | Pin38 | `I2S` | `I2S_WS` | MAX98357 I2S 功放 | `LRC` | I2S 左右声道时钟，也叫 `LRCLK`/`WS` | 用户提供的 MAX98357 接线表 |
 | Pin40 | `I2S` | `I2S_SD_TX` | MAX98357 I2S 功放 | `DIN` | SS928 音频数据输出，注意不是 `SD_RX` | 用户提供的 MAX98357 接线表 |
@@ -25,8 +25,8 @@
 | I2C0 数据 | Pin3 `I2C0_SDA` | `J6`（OLED）-3，`I2C0_SDA` | TCA9548A `SDA` | 已占用 |
 | I2C0 时钟 | Pin5 `I2C0_SCL` | `J6`（OLED）-4，`I2C0_SCL` | TCA9548A `SCL` | 已占用 |
 | I2C0 电源/地 | Pin1/17、GND | `J6`-1 `3V3`、`J6`-2 `GND` | TCA9548A `VCC`、`GND` | 已占用 |
-| GNSS 发送 | Pin8 `UART4_TXD` | `J8`-4，`T4` | DX-GP21-A `RXD` | 已占用 |
-| GNSS 接收 | Pin10 `UART4_RXD` | `J8`-6，`R4` | DX-GP21-A `TXD` | 已占用 |
+| GNSS 发送 | Pin8 `UART4_TXD` | `J8`-4，`T4` | DX-GP21-A `RXD` | 模块已拔除，预留未接 |
+| GNSS 接收 | Pin10 `UART4_RXD` | `J8`-6，`R4` | DX-GP21-A `TXD` | 模块已拔除，预留未接 |
 | I2S 位时钟 | Pin12 `I2S_BCLK` | `J7`-4，`TDO` | MAX98357 `BCLK` | 已占用 |
 | I2S 声道时钟 | Pin38 `I2S_WS` | `J7`-7，JTAG 组 `CK` | MAX98357 `LRC` / `WS` | 已占用 |
 | I2S 音频数据 | Pin40 `I2S_SD_TX` | `J7`-1，JTAG 组 `RST` / `TRSTN` | MAX98357 `DIN` | 已占用 |

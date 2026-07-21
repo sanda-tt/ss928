@@ -57,3 +57,58 @@ DX-GP21-A 轨迹、BMI270 处理后姿态/每日统计和最终摔倒告警。
 - `smartbag-5g-upload.service` 运行时不要另开 `start_ss928_ble.sh`、
   `bmi270_backpack.py --ble` 或 `/opt/sample/ws73/ble.sh 0`。统一服务已经
   以 `START_BLE_STACK=0` 拉起唯一 BMI 进程，并复用系统 BlueZ。
+- 2026-07-22：DX-GP21-A 已因模块故障拔除。统一服务固定传入 `--skip-gnss`，
+  因此不检查 UART4、不设置 GNSS pinmux、不启动 GNSS；5G、BMI270 和摔倒链路
+  必须继续独立运行。模块修复前不要把无 GNSS 数据当作其他流程故障。
+
+## 2026-07-22 阶段性语音电话告警（已被短信方案取代）
+
+- 最终 `FALL_ALARM/fall_detected` 在保留本地告警和 CloudBase 上传后，独立调用
+  MT5710 `ATD<号码>;` 发起语音呼叫；普通预警不拨号。
+- 已删除本轮新增的短信、PDU、`AT+CMGS` 路径，不再发送报警短信。
+- 电话号码仅从 root-only 服务环境变量读取，仓库配置和日志不保存真实号码。
+- 本地 MT5710/BMI270/跌倒融合测试分别为 19/20/11 项通过；板端 MT5710 和
+  BMI270 测试分别为 19/20 项通过，部署文件 SHA-256 与本地一致。
+- `smartbag-5g-upload.service` 重启后一次因 PCUI 瞬时无响应自动重试，随后稳定
+  输出 `5G ready`、BMI270 连续采样、BLE GATT 和广播成功；旧 BMI unit 保持
+  `disabled`、`inactive`。
+- 按用户要求本阶段只写拨号逻辑，没有制造最终摔倒事件或真实拨号。板端探测为
+  `no soundcards`，电话接通后的录音播放仍需结合 MT5710 PCM/语音硬件通道验证。
+- 缺失或非法电话号码会在打开 PCUI 前仅禁用电话 notifier，日志不包含号码，
+  BMI270、本地告警和 CloudBase 路径继续运行。
+
+## 2026-07-22 最终严重摔倒短信告警
+
+- 用户最终选择短信提醒，取消语音电话和音频播放。只有最终
+  `FALL_ALARM/fall_detected` 在本地告警和 CloudBase 上传后独立发送一条中文
+  短信；普通预警、原始阈值事件和其他 `alarmType` 不发送，也不拨号。
+- MT5710 使用 PDU 模式：`AT+CMGF=0`、等待 `AT+CMGS` 提示符、发送 DCS `08`
+  的 UTF-16BE UCS2 PDU 与 Ctrl-Z；`CMGS` 长度不含 SMSC 长度字节。只有同时
+  收到 `+CMGS:` 和 `OK` 才算提交成功，结果不确定时不自动重试。
+- 号码仍只从 root-only 服务环境变量读取。仓库、测试、日志和本文档均不保存真实
+  号码或完整 PDU；号码缺失或非法只禁用短信路径，不影响本地或云端流程。
+- 用户确认此前已实际收到同一 PDU 中文报警短信，可作为该硬件短信通道的既有物理
+  证据；本次切换部署没有再次制造严重摔倒事件或发送短信，避免重复提醒。
+- LOCAL-WIN 的 MT5710/BMI270/跌倒融合测试分别为 20/20/11 项通过；
+  BOARD-LINUX 的 MT5710/BMI270 测试分别为 20/20 项通过，7 个部署文件的
+  SHA-256 与本地全部一致。
+- `smartbag-5g-upload.service` 重启后保持 `active`、`NRestarts=0`，5G ready、
+  BMI270 producer、BLE GATT 与广播均正常；旧 `bmi270-backpack.service` 保持
+  `disabled`、`inactive`。
+- 后续实机触发暴露出冷 PCUI 直接以 `AT+CMGF=0` 作为首命令时会出现立即失败。
+  加入无副作用的 `AT` 唤醒/健康检查后，脱敏诊断实发同时收到 `+CMGS:` 和 `OK`，
+  用户确认手机端实际收到报警短信。修复经本地与板端 MT5710 测试各 20 项通过，
+  同步文件哈希一致，唯一服务重启后保持 `active`、`NRestarts=0`。
+
+## 2026-07-22 摔倒告警默认位置与 HTTP 400 复核
+
+- 线上 `smartbag-device-ingest` 当前校验契约允许告警不带 `location`，因此此前
+  `HTTP 400` 不是缺少定位直接造成。唯一服务重启并加载当前载荷代码后，姿态探测
+  请求恢复 `HTTP 200`，最近运行日志不再出现 `HTTP 400`。
+- 按用户要求，`PostureCloudReporter.report_fall()` 在最新定位不存在、非法或过期时
+  回退到四川大学望江校区中心点 `30.630838, 104.083932`；存在新鲜定位时仍优先
+  使用真实位置。
+- 本地 uploader/BMI270 测试分别 5/20 项通过，板端 BMI270 测试 20 项通过；部署
+  文件 SHA-256 与本地一致。无定位的真实 HTTPS 摔倒告警返回 `HTTP 200`，随后
+  CloudBase MCP 从 `alarm_history` 回读到同一 `requestId`、`fall_detected` 和上述
+  默认坐标。该验证只上传云端记录，没有再次发送短信。

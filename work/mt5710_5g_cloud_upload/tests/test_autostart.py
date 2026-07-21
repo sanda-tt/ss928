@@ -18,7 +18,7 @@ class AutostartUnitTests(unittest.TestCase):
             "TimeoutStopSec=10",
             "KillMode=control-group",
             "Environment=START_BLE_STACK=0",
-            "ExecStart=/root/work/mt5710_5g_cloud_upload/start_ss928_5g_upload.sh",
+            "ExecStart=/root/work/mt5710_5g_cloud_upload/start_ss928_5g_upload.sh --skip-gnss",
             "WantedBy=multi-user.target",
         ):
             self.assertIn(required, unit)

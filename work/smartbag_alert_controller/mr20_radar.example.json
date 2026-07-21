@@ -9,6 +9,6 @@
   },
   "radars": [
     {"name": "right_rear", "enabled": true, "side": "right", "bind_host": "192.168.1.102", "port": 2368, "radar_ip": "192.168.1.200", "lateral_min_m": -3.0, "lateral_max_m": 3.0, "longitudinal_min_m": 0.2, "longitudinal_max_m": 20.0, "approaching_velocity_sign": -1, "min_consecutive_frames": 2, "log_path": "/root/smartbag_alert/logs/mr20_right_rear.jsonl"},
-    {"name": "left_rear", "enabled": false, "side": "left", "bind_host": "192.168.2.102", "port": 2368, "radar_ip": "192.168.2.200", "lateral_min_m": -3.0, "lateral_max_m": 3.0, "longitudinal_min_m": 0.2, "longitudinal_max_m": 20.0, "approaching_velocity_sign": -1, "min_consecutive_frames": 2, "log_path": "/root/smartbag_alert/logs/mr20_left_rear.jsonl"}
+    {"name": "left_rear", "enabled": true, "side": "left", "bind_host": "192.168.1.168", "port": 2378, "radar_ip": "192.168.1.201", "lateral_min_m": -3.0, "lateral_max_m": 3.0, "longitudinal_min_m": 0.2, "longitudinal_max_m": 20.0, "approaching_velocity_sign": -1, "min_consecutive_frames": 2, "log_path": "/root/smartbag_alert/logs/mr20_left_rear.jsonl"}
   ]
 }

@@ -15,7 +15,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 
 CLOUDBASE_HOST = "cloud1-d7gdmg27139f4fbf2.service.tcloudbase.com"
@@ -30,6 +30,50 @@ class RunResult:
 
 
 CommandRunner = Callable[[list[str], float], RunResult]
+
+
+@dataclass(frozen=True)
+class Ucs2Sms:
+    setup_commands: tuple[str, ...]
+    submit_command: str
+    pdu_hex: str
+
+
+def build_ucs2_sms(phone: str, message: str) -> Ucs2Sms:
+    normalized_phone = phone.strip()
+    if not re.fullmatch(r"\+?\d{5,20}", normalized_phone):
+        raise ValueError("SMS phone must contain 5 to 20 digits with an optional leading plus")
+    if not message:
+        raise ValueError("SMS message must not be empty")
+    encoded_message = message.encode("utf-16-be")
+    if len(encoded_message) // 2 > 70:
+        raise ValueError("UCS2 SMS message exceeds one 70-character message")
+    international = normalized_phone.startswith("+")
+    digits = normalized_phone[1:] if international else normalized_phone
+    padded_digits = digits + ("F" if len(digits) % 2 else "")
+    swapped_digits = "".join(
+        padded_digits[index + 1] + padded_digits[index]
+        for index in range(0, len(padded_digits), 2)
+    )
+    address_type = "91" if international else "81"
+    user_data = encoded_message.hex().upper()
+    tpdu = (
+        "11"
+        "00"
+        f"{len(digits):02X}"
+        f"{address_type}"
+        f"{swapped_digits}"
+        "00"
+        "08"
+        "A7"
+        f"{len(encoded_message):02X}"
+        f"{user_data}"
+    )
+    return Ucs2Sms(
+        setup_commands=("AT+CMGF=0",),
+        submit_command=f"AT+CMGS={len(tpdu) // 2}",
+        pdu_hex="00" + tpdu,
+    )
 
 
 def choose_apn(operator: str, imsi: str, override: str) -> str:
@@ -136,7 +180,7 @@ def _add_ncm_host_route(interface: str, cloud_ip: str, command_runner: CommandRu
     _require_success(command_runner(argv, 10.0), "CloudBase NCM host route")
 
 
-def build_sensor_commands(work_root: Path) -> tuple[list[str], list[str]]:
+def build_sensor_commands(work_root: Path, include_gnss: bool = True) -> list[list[str]]:
     dx_dir = work_root / "dx_gp21_tracker"
     bmi_dir = work_root / "linux_bmi270_backpack"
     dx_command = [
@@ -151,7 +195,7 @@ def build_sensor_commands(work_root: Path) -> tuple[list[str], list[str]]:
         "--no-ble",
     ]
     bmi_command = ["/bin/sh", (bmi_dir / "start_ss928_ble.sh").as_posix()]
-    return dx_command, bmi_command
+    return [dx_command, bmi_command] if include_gnss else [bmi_command]
 
 
 def run_command(argv: list[str], timeout_s: float = 30.0) -> RunResult:
@@ -243,6 +287,80 @@ class AtSession:
                 return filtered
         return [line for line in lines if line != command]
 
+    def _read_until(self, predicate: Callable[[bytes], bool], timeout_s: float) -> bytes:
+        if self.fd is None:
+            raise RuntimeError("AT session is not open")
+        deadline = time.monotonic() + timeout_s
+        raw = bytearray()
+        while time.monotonic() < deadline:
+            readable, _, _ = select.select([self.fd], [], [], min(0.2, deadline - time.monotonic()))
+            if not readable:
+                continue
+            try:
+                raw.extend(os.read(self.fd, 4096))
+            except BlockingIOError:
+                continue
+            if predicate(bytes(raw)):
+                return bytes(raw)
+        return bytes(raw)
+
+    def send_ucs2_sms(self, phone: str, message: str, timeout_s: float = 30.0) -> list[str]:
+        if self.fd is None:
+            raise RuntimeError("AT session is not open")
+        sms = build_ucs2_sms(phone, message)
+        if "OK" not in self.command("AT"):
+            raise RuntimeError("MT5710 SMS PCUI health check failed")
+        for command in sms.setup_commands:
+            lines = self.command(command)
+            if "OK" not in lines:
+                raise RuntimeError("MT5710 SMS setup failed")
+
+        os.write(self.fd, (sms.submit_command + "\r").encode("ascii"))
+        prompt = self._read_until(
+            lambda raw: b">" in raw or b"ERROR" in raw,
+            min(timeout_s, 10.0),
+        )
+        if b">" not in prompt:
+            raise RuntimeError("MT5710 SMS prompt was not received")
+
+        os.write(self.fd, sms.pdu_hex.encode("ascii") + b"\x1a")
+        response = self._read_until(
+            lambda raw: b"\r\nOK\r\n" in raw or b"ERROR" in raw,
+            timeout_s,
+        )
+        text = response.decode("utf-8", errors="replace")
+        lines = [item.strip() for item in re.split(r"[\r\n]+", text) if item.strip()]
+        if not any(line.startswith("+CMGS:") for line in lines) or "OK" not in lines:
+            raise RuntimeError("MT5710 SMS send failed")
+        return lines
+
+
+class Mt5710SmsNotifier:
+    def __init__(
+        self,
+        phone: str,
+        message: str,
+        port: str = "/dev/ttyUSB1",
+        baud: int = 115200,
+        timeout_s: float = 30.0,
+        at_factory: Callable[[str, int], Any] = AtSession,
+    ) -> None:
+        build_ucs2_sms(phone, message)
+        self.phone = phone
+        self.message = message
+        self.port = port
+        self.baud = baud
+        self.timeout_s = timeout_s
+        self.at_factory = at_factory
+
+    def __call__(self, alarm: Mapping[str, Any]) -> bool:
+        if alarm.get("signal") != "FALL_ALARM" or alarm.get("alarmType") != "fall_detected":
+            return False
+        with self.at_factory(self.port, self.baud) as session:
+            session.send_ucs2_sms(self.phone, self.message, timeout_s=self.timeout_s)
+        print("MT5710 fall alarm SMS sent", flush=True)
+        return True
+
 
 def prepare_network(
     at_session: object,
@@ -309,19 +427,27 @@ def _cleanup_network_route(network: dict[str, str] | None, command_runner: Comma
     )
 
 
-def _require_runtime_files(work_root: Path) -> None:
+def _require_runtime_files(work_root: Path, include_gnss: bool = True) -> None:
     required = [
         work_root / "smartbag_cloud_uploader" / "telemetry_client.py",
-        work_root / "dx_gp21_tracker" / "dx_gp21_tracker.py",
-        work_root / "dx_gp21_tracker" / "config.ss928_uart4.json",
         work_root / "linux_bmi270_backpack" / "bmi270_backpack.py",
         work_root / "linux_bmi270_backpack" / "posture_cloud.py",
         work_root / "linux_bmi270_backpack" / "config.ss928_ble.json",
     ]
+    if include_gnss:
+        required.extend(
+            [
+                work_root / "dx_gp21_tracker" / "dx_gp21_tracker.py",
+                work_root / "dx_gp21_tracker" / "config.ss928_uart4.json",
+            ]
+        )
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
         raise RuntimeError("missing runtime file: " + missing[0])
-    for device in (Path("/dev/ttyAMA4"), Path("/dev/i2c-0")):
+    devices = [Path("/dev/i2c-0")]
+    if include_gnss:
+        devices.append(Path("/dev/ttyAMA4"))
+    for device in devices:
         if not device.exists():
             raise RuntimeError(f"missing device: {device}")
     for executable in ("python3", "bspmm", "ip", "udhcpc"):
@@ -329,13 +455,16 @@ def _require_runtime_files(work_root: Path) -> None:
             raise RuntimeError(f"missing executable: {executable}")
 
 
-def _configure_pinmux(command_runner: CommandRunner) -> None:
+def _configure_pinmux(command_runner: CommandRunner, include_gnss: bool = True) -> None:
     settings = [
-        ["bspmm", "0x102F0134", "0x1201"],
-        ["bspmm", "0x102F0138", "0x1201"],
         ["bspmm", "0x102F013c", "0x2031"],
         ["bspmm", "0x102F0140", "0x2031"],
     ]
+    if include_gnss:
+        settings[0:0] = [
+            ["bspmm", "0x102F0134", "0x1201"],
+            ["bspmm", "0x102F0138", "0x1201"],
+        ]
     for argv in settings:
         _require_success(command_runner(argv, 10.0), "SS928 pinmux")
 
@@ -389,6 +518,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Board work directory containing the existing producers",
     )
     parser.add_argument("--skip-network", action="store_true", help="Skip MT5710 dialing for local diagnosis")
+    parser.add_argument(
+        "--skip-gnss",
+        action="store_true",
+        help="Do not require or start the unplugged DX-GP21-A GNSS module",
+    )
     parser.add_argument("--check-only", action="store_true", help="Bring up and verify 5G, then exit")
     return parser
 
@@ -397,18 +531,19 @@ def run_application(
     args: argparse.Namespace,
     *,
     environ: dict[str, str] | os._Environ[str] = os.environ,
-    prerequisite_checker: Callable[[Path], None] = _require_runtime_files,
+    prerequisite_checker: Callable[[Path, bool], None] = _require_runtime_files,
     network_preparer: Callable[..., dict[str, str]] = prepare_network,
     at_factory: Callable[[str, int], object] = AtSession,
     command_runner: CommandRunner = run_command,
-    pinmux_configurer: Callable[[CommandRunner], None] = _configure_pinmux,
+    pinmux_configurer: Callable[[CommandRunner, bool], None] = _configure_pinmux,
     supervisor: Callable[[Sequence[list[str]], Path], int] = _supervise,
 ) -> int:
     work_root = args.work_root.resolve()
+    include_gnss = not args.skip_gnss
     if not args.check_only:
         if not environ.get("SMARTBAG_UPLOAD_TOKEN", ""):
             raise RuntimeError("SMARTBAG_UPLOAD_TOKEN is not set")
-        prerequisite_checker(work_root)
+        prerequisite_checker(work_root, include_gnss)
 
     network: dict[str, str] | None = None
     try:
@@ -431,9 +566,10 @@ def run_application(
             )
         if args.check_only:
             return 0
-        pinmux_configurer(command_runner)
-        commands = build_sensor_commands(work_root)
-        print("Starting real DX-GP21-A and BMI270 CloudBase producers", flush=True)
+        pinmux_configurer(command_runner, include_gnss)
+        commands = build_sensor_commands(work_root, include_gnss)
+        producer_names = "DX-GP21-A and BMI270" if include_gnss else "BMI270 (DX-GP21-A skipped)"
+        print(f"Starting real {producer_names} CloudBase producers", flush=True)
         return supervisor(commands, work_root)
     finally:
         _cleanup_network_route(network, command_runner)

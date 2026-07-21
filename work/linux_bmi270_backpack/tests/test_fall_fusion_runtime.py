@@ -41,10 +41,12 @@ class FallFusionRuntimeTests(unittest.TestCase):
             trigger = Path(temp) / "manual-fall.json"
             events = []
             cloud_events = []
+            sms_events = []
             runtime = FallFusionRuntime(
                 warning_marker=Path(temp) / "warning.json",
                 alarm_sink=events.append,
                 cloud_alarm_sink=cloud_events.append,
+                sms_alarm_sink=sms_events.append,
                 manual_trigger_path=trigger,
                 wall_clock=lambda: 1000.0,
             )
@@ -57,8 +59,35 @@ class FallFusionRuntimeTests(unittest.TestCase):
             self.assertTrue(alarm["conditions"]["manual_ble_trigger"])
             self.assertEqual(len(events), 1)
             self.assertEqual(len(cloud_events), 1)
+            self.assertEqual(len(sms_events), 1)
             self.assertFalse(trigger.exists())
             self.assertIsNone(runtime.consume_manual_trigger())
+
+    def test_sms_failure_does_not_break_local_or_cloud_alarm_delivery(self):
+        with tempfile.TemporaryDirectory() as temp:
+            trigger = Path(temp) / "manual-fall.json"
+            events = []
+            cloud_events = []
+
+            def fail_sms(event):
+                del event
+                raise RuntimeError("modem unavailable")
+
+            runtime = FallFusionRuntime(
+                warning_marker=Path(temp) / "warning.json",
+                alarm_sink=events.append,
+                cloud_alarm_sink=cloud_events.append,
+                sms_alarm_sink=fail_sms,
+                manual_trigger_path=trigger,
+                wall_clock=lambda: 1000.0,
+            )
+            trigger.write_text('{"type":"manual_fall_trigger"}', encoding="utf-8")
+
+            alarm = runtime.consume_manual_trigger()
+
+            self.assertEqual(alarm["signal"], "FALL_ALARM")
+            self.assertEqual(len(events), 1)
+            self.assertEqual(len(cloud_events), 1)
     def test_board_units_are_converted_to_detector_units(self):
         converted = to_detector_sample(
             board_sample(2.0, ax=0.5, ay=-0.25, az=1.0, gx=1.0, gy=-0.5)

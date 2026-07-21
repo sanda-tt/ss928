@@ -8,7 +8,7 @@ Type=simple
 WorkingDirectory=/root/work/mt5710_5g_cloud_upload
 Environment=PYTHONUNBUFFERED=1
 Environment=START_BLE_STACK=0
-ExecStart=/root/work/mt5710_5g_cloud_upload/start_ss928_5g_upload.sh
+ExecStart=/root/work/mt5710_5g_cloud_upload/start_ss928_5g_upload.sh --skip-gnss
 Restart=always
 RestartSec=5
 TimeoutStopSec=10

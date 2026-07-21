@@ -100,6 +100,8 @@ def build_posture_payload(
         "posture_status": posture_status,
         "is_wearing": bool(snapshot.get("is_wearing")),
         "reminder_active": bool(snapshot.get("reminder_active")),
+        **({"reminder_type": str(snapshot["reminder_type"])} if snapshot.get("reminder_type") else {}),
+        **({"reminder_reported_at": int(snapshot["reminder_reported_at"])} if snapshot.get("reminder_reported_at") else {}),
         "attitude": {
             "rollDeg": _finite(snapshot.get("rollDeg"), "rollDeg"),
             "pitchDeg": _finite(snapshot.get("pitchDeg"), "pitchDeg"),
@@ -157,6 +159,35 @@ def build_fall_payload(
     if normalized_location is not None:
         payload["status"]["location"] = normalized_location
     payload["alarms"] = [alarm]
+    return payload
+
+
+def build_hunch_reminder_payload(state: Mapping[str, Any], reminder: Mapping[str, Any]) -> dict[str, Any]:
+    reported_at_ms = int(reminder["reportedAt"])
+    request_id = str(reminder["requestId"])
+    payload = _base_payload(request_id, reported_at_ms)
+    payload["status"] = {
+        "reportedAt": reported_at_ms,
+        "posture_status": "bad",
+        "is_wearing": True,
+        "reminder_active": True,
+        "reminder_type": "hunch_vibration_voice",
+        "reminder_reported_at": reported_at_ms,
+        "attitude": {
+            "rollDeg": _finite(state["roll_deg"], "rollDeg"),
+            "pitchDeg": _finite(state["pitch_deg"], "pitchDeg"),
+            "yawDeg": _finite(state["yaw_deg"], "yawDeg"),
+        },
+    }
+    payload["alarms"] = [{
+        "requestId": request_id,
+        "alarmId": request_id,
+        "reportedAt": reported_at_ms,
+        "alarmType": "posture_hunch_reminder",
+        "riskLevel": 2,
+        "message": "检测到持续驼背，已震动并播放语音提醒",
+        "details": {"durationS": 5, "audioClip": "bad"},
+    }]
     return payload
 
 

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import argparse
-import itertools
+import json
 import queue
 import shlex
 import signal
@@ -60,8 +60,10 @@ class AudioPlayer:
         self.default_sleep_s = default_sleep_s
         self.default_timeout_s = default_timeout_s
         self.skip_pinmux = skip_pinmux
-        self._queue: "queue.PriorityQueue[tuple[int, int, str]]" = queue.PriorityQueue()
-        self._sequence = itertools.count()
+        self._condition = threading.Condition()
+        self._pending_clip: str | None = None
+        self._current_clip: str | None = None
+        self._interrupt_current = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._process_lock = threading.Lock()
@@ -85,21 +87,27 @@ class AudioPlayer:
     def request(self, clip: str | None) -> None:
         if not self.enabled or not clip:
             return
-        try:
-            level = int(clip[1:])
-        except ValueError:
-            level = 0
-        self._queue.put((-level, next(self._sequence), clip))
+        level = self._clip_level(clip)
+        with self._condition:
+            if self._stop.is_set():
+                return
+            if self._current_clip is not None:
+                current_level = self._clip_level(self._current_clip)
+                if level <= current_level:
+                    return
+            if self._pending_clip is not None:
+                pending_level = self._clip_level(self._pending_clip)
+                if level < pending_level:
+                    return
+            self._pending_clip = clip
+            self._condition.notify()
 
     def clear(self) -> None:
-        while True:
-            try:
-                self._queue.get_nowait()
-            except queue.Empty:
-                break
-        with self._process_lock:
-            if self._process is not None and self._process.poll() is None:
-                self._process.terminate()
+        with self._condition:
+            self._pending_clip = None
+            self._interrupt_current.set()
+            self._condition.notify_all()
+        self._terminate_process()
 
     def stop(self) -> None:
         self._stop.set()
@@ -108,12 +116,23 @@ class AudioPlayer:
             self._thread.join(timeout=2.0)
 
     def _worker(self) -> None:
-        while not self._stop.is_set():
+        while True:
+            with self._condition:
+                self._condition.wait_for(lambda: self._stop.is_set() or self._pending_clip is not None)
+                if self._stop.is_set():
+                    return
+                clip = self._pending_clip
+                self._pending_clip = None
+                self._current_clip = clip
+                self._interrupt_current.clear()
             try:
-                _priority, _sequence, clip = self._queue.get(timeout=0.2)
-            except queue.Empty:
-                continue
-            self._play(clip)
+                if clip is not None:
+                    self._play(clip)
+            finally:
+                with self._condition:
+                    if self._current_clip == clip:
+                        self._current_clip = None
+                    self._condition.notify_all()
 
     def _play(self, clip: str) -> None:
         clip_dir = self.audio_root / clip
@@ -123,6 +142,8 @@ class AudioPlayer:
             return
         if not audio_file.exists():
             eprint(f"WARN missing audio clip {audio_file}")
+            return
+        if self._interrupt_current.is_set():
             return
         sleep_s, timeout_s = self._timing_for(clip_dir)
         with self._process_lock:
@@ -137,16 +158,34 @@ class AudioPlayer:
         try:
             deadline = time.monotonic() + max(timeout_s, sleep_s + 1.0)
             while time.monotonic() < deadline and process.poll() is None:
+                if self._interrupt_current.is_set():
+                    process.terminate()
+                    break
                 if time.monotonic() >= deadline - max(timeout_s - sleep_s, 1.0):
                     break
                 time.sleep(0.1)
-            process.communicate(input=b"\n\n", timeout=max(timeout_s - sleep_s, 1.0))
+            if process.poll() is None:
+                process.communicate(input=b"\n\n", timeout=max(timeout_s - sleep_s, 1.0))
         except subprocess.TimeoutExpired:
             process.kill()
         finally:
             with self._process_lock:
                 if self._process is process:
                     self._process = None
+
+    @staticmethod
+    def _clip_level(clip: str) -> int:
+        if clip == "bad":
+            return 3
+        try:
+            return int(clip[1:])
+        except (TypeError, ValueError):
+            return 0
+
+    def _terminate_process(self) -> None:
+        with self._process_lock:
+            if self._process is not None and self._process.poll() is None:
+                self._process.terminate()
 
     def _timing_for(self, clip_dir: Path) -> tuple[float, float]:
         hint = clip_dir / "play_hint.txt"
@@ -291,6 +330,7 @@ def run_controller(args: argparse.Namespace) -> int:
     detectors: list[DetectorProcess] = []
     radars: list[MR20RadarWorker] = []
     ble: BleNusServer | None = None
+    last_posture_reminder_id = ""
 
     def _stop(_signum: int | None = None, _frame: object | None = None) -> None:
         stop_event.set()
@@ -348,6 +388,19 @@ def run_controller(args: argparse.Namespace) -> int:
             )
 
         while not stop_event.is_set() or not event_queue.empty() or not command_queue.empty():
+            try:
+                reminder = json.loads(Path(args.posture_reminder_trigger).read_text(encoding="utf-8"))
+                reminder_id = str(reminder.get("requestId", ""))
+                reminder_age_ms = int(time.time() * 1000) - int(reminder.get("reportedAt", 0))
+                if reminder.get("type") == "posture_hunch_reminder" and reminder_id and reminder_id != last_posture_reminder_id and 0 <= reminder_age_ms <= 30000:
+                    haptics.schedule_light_reminder(float(reminder.get("durationS", 5)))
+                    audio.request(str(reminder.get("audioClip", "bad")))
+                    last_posture_reminder_id = reminder_id
+                    eprint("POSTURE reminder applied " + reminder_id)
+            except FileNotFoundError:
+                pass
+            except Exception as exc:
+                eprint(f"WARN posture reminder ignored: {exc}")
             while True:
                 try:
                     event = event_queue.get_nowait()
@@ -366,6 +419,7 @@ def run_controller(args: argparse.Namespace) -> int:
                 except queue.Empty:
                     break
                 try:
+                    eprint("CMD received " + command_text.strip())
                     command = parse_alert_command(command_text)
                     if command.kind == "fall":
                         request_id = record_manual_fall_trigger(args.manual_fall_trigger)
@@ -376,6 +430,7 @@ def run_controller(args: argparse.Namespace) -> int:
                         audio.clear()
                     output = state.apply_command(command)
                     apply_output(output, haptics, lights, audio)
+                    eprint("CMD applied " + command_text.strip())
                     if ble is not None:
                         ble.send_line("OK " + command_text.strip())
                 except Exception as exc:
@@ -418,6 +473,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--right-tm6605-channel", type=int, default=1, help="TCA9548A channel for the right TM6605.")
     parser.add_argument("--enable-right-tm6605", action="store_true", help="Enable the right TM6605; requires a mux when both modules are connected.")
     parser.add_argument("--event-timeout", type=float, default=1.0, help="Seconds before stale side vibration is stopped.")
+    parser.add_argument("--posture-reminder-trigger", default="/tmp/smartbag_posture_reminder.json", help="Atomic BMI270 hunch reminder handoff file.")
     parser.add_argument(
         "--fall-warning-marker",
         default="/tmp/smartbag_last_high_warning.json",
@@ -429,7 +485,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         help="One-shot BLE fall-test request consumed by the BMI fall runtime.",
     )
     parser.add_argument("--poll-interval", type=float, default=0.05, help="Controller loop sleep interval in seconds.")
-    parser.add_argument("--audio-root", default=str(AUDIO_ROOT), help="Root containing L1..R4 audio folders.")
+    parser.add_argument("--audio-root", default=str(AUDIO_ROOT), help="Root containing L3/L4 and R3/R4 audio folders.")
     parser.add_argument("--sample-audio", default=SAMPLE_AUDIO, help="Path to sample_audio player.")
     parser.add_argument("--audio-sleep-s", type=float, default=5.0, help="Fallback seconds before sending ENTER to sample_audio.")
     parser.add_argument("--audio-timeout-s", type=float, default=13.0, help="Fallback sample_audio timeout seconds.")

@@ -26,15 +26,21 @@ imu_fall_detector/
 mt5710_5g_cloud_upload/
 ```
 
-把上传令牌放入不进入 Git 的 root-only 文件：
+把上传令牌和跌倒告警电话号码放入不进入 Git 的 root-only 文件：
 
 ```sh
 # BOARD-LINUX
 mkdir -p /root/config
 chmod 700 /root/config
 printf '%s\n' 'SMARTBAG_UPLOAD_TOKEN=<比赛上传令牌>' > /root/config/smartbag-upload.env
+printf '%s\n' 'SMARTBAG_ALERT_PHONE=<告警电话号码>' >> /root/config/smartbag-upload.env
 chmod 600 /root/config/smartbag-upload.env
 ```
+
+只有最终 `FALL_ALARM/fall_detected` 会额外通过 MT5710 发送一条 UCS2/PDU
+中文短信；普通预警不会发短信，也不会拨号。短信异常只记警告，不影响本地告警
+和原有 CloudBase 上传。未得到再次发送真实短信的授权时，只运行 fake AT 单元
+测试，不要创建手动跌倒触发文件。
 
 ## 一个命令运行
 
@@ -66,6 +72,12 @@ cd /root/work/mt5710_5g_cloud_upload
 
 该服务是后台 `Type=simple` 服务，不等待 `network-online.target`，不会阻塞
 系统启动。MT5710 或传感器尚未就绪时，本次执行按有界超时退出，5 秒后自动重试。
+
+> 当前 DX-GP21-A 已拔除并被标记为故障隔离：随附的
+> `smartbag-5g-upload.service` 固定使用 `--skip-gnss`，不会检查
+> `/dev/ttyAMA4`、设置 UART4 GNSS pinmux 或拉起 GNSS 进程；5G、BMI270、摔倒
+> 告警及其上传继续运行。模块修复并重新接线后，先单独完成 NMEA 验证，再移除 unit
+> 中的 `--skip-gnss` 并重启服务；不要在当前状态下反复调试 DX-GP21-A。
 
 ```sh
 # BOARD-LINUX：查看状态和日志
@@ -116,3 +128,22 @@ Started pid=...: bmi270_backpack.py
 
 `udhcpc` 可能临时改变板端默认路由和 DNS；拨号程序不写永久网络配置，只有明确运行
 `install_autostart.sh` 时才安装上述 systemd 自启动项。
+
+## 严重摔倒短信更新（2026-07-22）
+
+- 已撤销语音拨号和音频播放方案；最终严重摔倒改为向 root-only 环境变量中的
+  号码发送一条中文短信。
+- 中文短信使用 `AT+CMGF=0` 的 UCS2/PDU 模式；只有同时返回 `+CMGS:` 和 `OK`
+  才算提交成功。超时或结果不确定时不自动重试，避免重复报警。
+- LOCAL-WIN 的 MT5710、BMI270、跌倒融合测试分别为 20/20/11 项通过；
+  BOARD-LINUX 的 MT5710、BMI270 测试分别为 20/20 项通过。
+- 7 个部署文件的 SHA-256 全部一致，`smartbag-5g-upload.service` 已加载新代码并
+  稳定运行，5G、BMI270、BLE GATT 和广播日志正常；旧 BMI unit 仍为
+  `disabled`、`inactive`。
+- 用户已确认此前同一短信链路实际收到过中文报警短信。本次部署复核没有再次制造
+  严重摔倒事件或发送短信，避免重复提醒。
+- 号码缺失或格式非法时只禁用短信 notifier，并输出不含号码/PDU 的警告；
+  BMI270、本地告警和 CloudBase 上传继续运行。
+- 2026-07-22 实机触发发现冷 PCUI 直接从 `AT+CMGF=0` 开始可能立即失败；正式
+  路径现先发送 `AT` 做唤醒/健康检查。修复后脱敏实发同时获得 `+CMGS:` 与 `OK`，
+  且收件端确认实际收到报警短信。

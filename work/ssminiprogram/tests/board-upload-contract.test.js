@@ -23,6 +23,19 @@ test("processed BMI270 status maps to realtime good and bad posture", () => {
   assert.strictEqual(Object.prototype.hasOwnProperty.call(bad, "attitude"), false);
 });
 
+test("CloudBase ISO receivedAt remains a valid realtime timestamp", () => {
+  const receivedAt = "2026-07-21T18:00:06.410Z";
+  const posture = postureUtils.normalizeRealtimePosture({
+    deviceId: "bag001",
+    posture_status: "good",
+    is_wearing: true,
+    receivedAt
+  });
+  const display = postureUtils.toRealtimeDisplay(posture, Date.parse(receivedAt) + 5000, 60000);
+  assert.strictEqual(display.statusLevel, "connected");
+  assert.strictEqual(display.postureKey, "good");
+});
+
 test("absolute board daily totals map to the analysis percentages", () => {
   const daily = postureUtils.normalizeDailyPosture({
     device_id: "bag001",

@@ -10,11 +10,13 @@ const appJson = read(["app.json"]);
 
 assert.ok(appJson.indexOf('"pages/remote/index"') >= 0);
 assert.ok(remoteJs.indexOf('const TARGET_NAME = "SS928-SmartBag"') >= 0);
+assert.ok(remoteJs.indexOf("if (name !== TARGET_NAME) continue;") >= 0, "remote page must reject non-SmartBag NUS devices");
 [
-  "6E400001-B5A3-F393-E0A9-E50E24DCCA9E",
-  "6E400002-B5A3-F393-E0A9-E50E24DCCA9E",
-  "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+  "6E400101-B5A3-F393-E0A9-E50E24DCCA9E",
+  "6E400102-B5A3-F393-E0A9-E50E24DCCA9E",
+  "6E400103-B5A3-F393-E0A9-E50E24DCCA9E"
 ].forEach((uuid) => assert.ok(remoteJs.indexOf(uuid) >= 0));
+assert.strictEqual(remoteJs.indexOf("6E400001-B5A3-F393-E0A9-E50E24DCCA9E"), -1, "remote must not use BMI's standard NUS service");
 assert.ok(remoteJs.indexOf("if (!this.data.connected") >= 0);
 [
   "AL L1", "AL L2", "AL L3", "AL L4",

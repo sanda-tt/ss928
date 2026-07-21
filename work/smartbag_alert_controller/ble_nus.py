@@ -8,9 +8,11 @@ from typing import Any, Callable, Dict, Iterable, List, Optional
 class BleNusServer:
     """Minimal BlueZ GATT server exposing Nordic UART Service."""
 
-    NUS_SERVICE_UUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
-    NUS_RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
-    NUS_TX_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
+    # Dedicated UUIDs prevent this control channel from colliding with the
+    # BMI process's standard Nordic UART service on the same adapter.
+    NUS_SERVICE_UUID = "6E400101-B5A3-F393-E0A9-E50E24DCCA9E"
+    NUS_RX_UUID = "6E400102-B5A3-F393-E0A9-E50E24DCCA9E"
+    NUS_TX_UUID = "6E400103-B5A3-F393-E0A9-E50E24DCCA9E"
 
     def __init__(self, name: str, on_rx: Callable[[str], None]):
         self.name = name

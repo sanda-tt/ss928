@@ -23,18 +23,22 @@ path and is not treated as the source model for SmartBag.
 Put audio files here:
 
 ```text
-/root/smartbag_alert/audio/L1/audio_chn0.aac
-/root/smartbag_alert/audio/L2/audio_chn0.aac
 /root/smartbag_alert/audio/L3/audio_chn0.aac
 /root/smartbag_alert/audio/L4/audio_chn0.aac
-/root/smartbag_alert/audio/R1/audio_chn0.aac
-/root/smartbag_alert/audio/R2/audio_chn0.aac
 /root/smartbag_alert/audio/R3/audio_chn0.aac
 /root/smartbag_alert/audio/R4/audio_chn0.aac
 ```
 
+Levels 1/2 never request an audio clip; any existing L1/L2 folders are ignored.
+
 `play_hint.txt` is optional in each audio folder. If present, the controller uses
 its `sleep_seconds` and `timeout_seconds`; otherwise it uses 5s and 13s.
+
+Audio playback is latest-first rather than FIFO. Only one pending clip is kept:
+the higher warning level wins, and a newer clip replaces an older pending clip
+at the same level. A warning at the same or lower level is ignored while speech
+is already playing; a higher-level warning waits for the current sentence to
+finish. Only an explicit clear or service shutdown stops the current speech.
 
 ## TM6605 / LRA Wiring
 
@@ -77,9 +81,14 @@ pre-programmed effects rather than a GPIO PWM duty cycle:
 
 | Risk level | Haptic behaviour |
 |---:|---|
-| 1 / 2 | No vibration. |
-| 3 | Medium built-in alert (effect 15) repeated three times, about 2 s total; this is the 80% class. |
-| 4 | Strong built-in alert (effect 14) pulsed three times; this is the 100% class. |
+| 1 | One light impact (effect 7, about 130 ms). |
+| 2 | Two light impacts (effect 7 twice, starts 250 ms apart). |
+| 3 | Two medium alerts (effect 15), started 750 ms apart and naturally ending after about 1.48 s. |
+| 4 | Three rapid strong pulses (effect 14, starts 250 ms apart). |
+
+Left and right effects are started through separate TCA9548A channels and then
+run independently inside their TM6605 devices, so both sides can vibrate at the
+same time. The I2C start writes are sequential but only a few milliseconds apart.
 
 MAX98357 audio keeps only the three needed I2S pins:
 
@@ -107,12 +116,12 @@ command if those options are not already present.
 ## MR20 Ethernet Radar
 
 Copy `mr20_radar.example.json` to `/root/smartbag_alert/config/mr20_radar.json`.
-The provided configuration enables the first right-rear radar only. It receives
-`192.168.1.200:2369` traffic on board address `192.168.1.102:2368`; configure
-that address only on the radar-direct Ethernet interface, with no gateway or
-default-route change. The controller combines active camera and radar events by
-side and always drives the highest current level. MR20 records are appended as
-JSONL under `/root/smartbag_alert/logs/`.
+The provided configuration enables both rear radars: the unchanged right radar
+receives `192.168.1.200:2369` traffic on `192.168.1.102:2368` through eth1;
+the left radar receives `192.168.1.201:2379` traffic on eth0's existing
+`192.168.1.168:2378`. The controller combines active camera and radar events
+by side and always drives the highest current level. MR20 records are appended
+as JSONL under `/root/smartbag_alert/logs/`.
 
 For the competition-stage fall fusion, camera and radar level-3/level-4 events
 also refresh `/tmp/smartbag_last_high_warning.json`. Levels 1/2 and manual BLE

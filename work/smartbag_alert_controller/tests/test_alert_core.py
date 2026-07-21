@@ -13,12 +13,13 @@ sys.path.insert(0, str(PROJECT_DIR))
 from alert_core import (  # noqa: E402
     AlertEvent,
     AlertState,
+    audio_clip_for,
     parse_alert_command,
     record_high_warning_marker,
 )
 from tm6605_haptics import (  # noqa: E402
     TM6605_EFFECT_REGISTER,
-    TM6605_MEDIUM_DURATION_ALERT,
+    TM6605_LIGHT_IMPACT,
     TM6605_PLAY_REGISTER,
     TM6605_STRONG_ALERT,
     Tm6605Haptics,
@@ -103,13 +104,24 @@ class AlertCoreTest(unittest.TestCase):
             )
             self.assertIn('"level":4', marker.read_text(encoding="utf-8"))
 
-    def test_levels_one_and_two_do_not_schedule_haptics(self) -> None:
+    def test_level_one_is_one_light_haptic(self) -> None:
         bus = FakeI2cBus()
         haptics = Tm6605Haptics(bus)
-        haptics.set_levels({"left": 1, "right": 2}, now=10.0)
-        self.assertEqual(bus.writes, [])
+        haptics.set_levels({"left": 1}, now=10.0)
 
-    def test_level_three_is_three_medium_effects_over_two_seconds(self) -> None:
+        effect_writes = [data for address, data, _label in bus.writes if address == 0x2D and data[0] == TM6605_EFFECT_REGISTER]
+        self.assertEqual(effect_writes, [bytes((TM6605_EFFECT_REGISTER, TM6605_LIGHT_IMPACT))])
+
+    def test_level_two_is_two_light_haptics(self) -> None:
+        bus = FakeI2cBus()
+        haptics = Tm6605Haptics(bus)
+        haptics.set_levels({"left": 2}, now=10.0)
+        haptics.tick(now=10.25)
+
+        effect_writes = [data for address, data, _label in bus.writes if address == 0x2D and data[0] == TM6605_EFFECT_REGISTER]
+        self.assertEqual(effect_writes, [bytes((TM6605_EFFECT_REGISTER, TM6605_LIGHT_IMPACT))] * 2)
+
+    def test_level_three_is_two_730_ms_alerts_for_about_1_5_seconds(self) -> None:
         bus = FakeI2cBus()
         haptics = Tm6605Haptics(bus)
         haptics.set_levels({"left": 3}, now=10.0)
@@ -117,14 +129,16 @@ class AlertCoreTest(unittest.TestCase):
         haptics.tick(now=11.50)
 
         effect_writes = [data for address, data, _label in bus.writes if address == 0x2D and data[0] == TM6605_EFFECT_REGISTER]
-        self.assertEqual(effect_writes, [bytes((TM6605_EFFECT_REGISTER, TM6605_MEDIUM_DURATION_ALERT))] * 3)
+        self.assertEqual(effect_writes, [bytes((TM6605_EFFECT_REGISTER, 15))] * 2)
+        play_writes = [data for address, data, _label in bus.writes if address == 0x2D and data[0] == TM6605_PLAY_REGISTER]
+        self.assertEqual(play_writes, [bytes((TM6605_PLAY_REGISTER, 1))] * 2)
 
     def test_left_level_four_is_three_strong_pulses(self) -> None:
         bus = FakeI2cBus()
         haptics = Tm6605Haptics(bus)
         haptics.set_levels({"left": 4}, now=10.0)
-        haptics.tick(now=10.30)
-        haptics.tick(now=10.60)
+        haptics.tick(now=10.25)
+        haptics.tick(now=10.50)
 
         effect_writes = [data for address, data, _label in bus.writes if address == 0x2D and data[0] == TM6605_EFFECT_REGISTER]
         self.assertEqual(effect_writes, [bytes((TM6605_EFFECT_REGISTER, TM6605_STRONG_ALERT))] * 3)
@@ -150,6 +164,13 @@ class AlertCoreTest(unittest.TestCase):
         self.assertIn(bytes((0x02,)), mux_writes)
         self.assertIn(bytes((0x04,)), mux_writes)
 
+        started_sides = {
+            label.split()[0]
+            for address, data, label in bus.writes
+            if address == 0x2D and data == bytes((TM6605_PLAY_REGISTER, 1))
+        }
+        self.assertEqual(started_sides, {"left", "right"})
+
     def test_level_three_light_is_50_percent_for_one_second(self) -> None:
         pwm = FakePwm()
         lights = PwmLights(pwm)
@@ -171,6 +192,17 @@ class AlertCoreTest(unittest.TestCase):
         lights.tick(now=11.0)
         enabled = [entry for entry in pwm.outputs if entry[-1]]
         self.assertEqual([(entry[0], entry[1], entry[3]) for entry in enabled], [(0, 1, LEVEL4_DUTY_PERCENT)] * 3)
+
+    def test_levels_one_and_two_do_not_enable_lights_or_audio(self) -> None:
+        pwm = FakePwm()
+        lights = PwmLights(pwm)
+        lights.set_levels({"left": 1, "right": 2}, now=10.0)
+
+        self.assertFalse(any(entry[-1] for entry in pwm.outputs))
+        self.assertIsNone(audio_clip_for("left", 1))
+        self.assertIsNone(audio_clip_for("right", 2))
+        self.assertEqual(audio_clip_for("left", 3), "L3")
+        self.assertEqual(audio_clip_for("right", 4), "R4")
 
     def test_parse_ble_alert_commands(self) -> None:
         left = parse_alert_command("AL L1")

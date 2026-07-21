@@ -1,6 +1,6 @@
 ---
 name: ss928-mt5710-5g-validation
-description: Validate and operate the TD Tech MT5710/MT571X 5G RedCap module on the SS928 HiEuler Pi board. Use when the user asks to test 5G module USB enumeration, PCUI AT commands, China Mobile cmnet data dialing, cellular internet access, voice calling, GPS/GNSS positioning, or to troubleshoot MT5710 modem behavior on root@192.168.1.168.
+description: Use when validating or operating the TD Tech MT5710/MT571X 5G RedCap module on SS928, including USB enumeration, PCUI AT commands, cellular data, voice calling, SmartBag severe-fall SMS alerts, GPS/GNSS status, or modem troubleshooting.
 ---
 
 # SS928 MT5710 5G Validation
@@ -9,7 +9,8 @@ description: Validate and operate the TD Tech MT5710/MT571X 5G RedCap module on 
 
 - Workspace: `C:\Users\ASUS\Desktop\ss928`.
 - Board target: `root@192.168.1.168`.
-- Default board password in this workspace: `ebaina`.
+- Read board credentials only from `.local/device-access.md`; never copy them into
+  source, skills, logs, or reports.
 - Prefer Ethernet SSH for normal testing. Use serial only if SSH fails or boot logs are needed.
 - PCUI control port: `/dev/ttyUSB1`.
 - GPS/NMEA reserved port from docs: `/dev/ttyUSB3`.
@@ -172,12 +173,12 @@ ATH
 Observed successful call-signaling sequence:
 
 ```text
-ATD18180871724;
+ATD<number>;
 OK
 ^CCALLSTATE: 1,0,1
 ^CCALLSTATE: 1,1,1
-+CLCC: 1,0,3,0,0,"18180871724",161
-+CLCC: 1,0,0,0,0,"18180871724",161
++CLCC: 1,0,3,0,0,"<number>",161
++CLCC: 1,0,0,0,0,"<number>",161
 ATH
 OK
 ```
@@ -187,6 +188,45 @@ Interpretation:
 - `CLCC` status `3` is outgoing/ringing.
 - `CLCC` status `0` is active.
 - This validates voice call signaling. Audio path is not validated unless microphone/speaker or PCM audio wiring is present.
+
+## SmartBag Severe-Fall SMS
+
+The production alarm path keeps the local alarm and CloudBase upload, then
+independently sends one Chinese SMS through MT5710. It must not place a voice
+call.
+
+- Trigger only `signal=FALL_ALARM` with `alarmType=fall_detected`; warning states
+  and raw thresholds do not send SMS.
+- Use `build_ucs2_sms()`, `AtSession.send_ucs2_sms()`, and
+  `Mt5710SmsNotifier` in
+  `work/mt5710_5g_cloud_upload/mt5710_5g_cloud_upload.py`.
+- Read the destination only from `SMARTBAG_ALERT_PHONE` in the root-only service
+  environment file. Accept only `+` followed by digits or digits alone, with 5
+  to 20 digits total. A missing or invalid value disables only the SMS notifier
+  before opening the serial port; the BMI/local/CloudBase paths must keep running.
+  Never log the number, full PDU, or environment value.
+- Use PDU mode because text-mode Chinese SMS returned `+CMS ERROR: 305` on this
+  module: send `AT+CMGF=0`, then `AT+CMGS=<TPDU byte count>` where the count
+  excludes the SMSC-length byte, wait for `>`, and send the hexadecimal PDU plus
+  Ctrl-Z. Use DCS `08` with UTF-16BE UCS2 and keep one message to at most 70 UCS2
+  code units.
+- Treat delivery to the modem as successful only when the response contains both
+  `+CMGS:` and final `OK`. Do not automatically retry a timeout or uncertain
+  response, because that can send a duplicate alarm.
+- An SMS failure is isolated from local and CloudBase alarm delivery.
+- The whole device must still run only through `smartbag-5g-upload.service`.
+  Never enable the superseded `bmi270-backpack.service`, start a second BMI270
+  process, or let another process hold `/dev/ttyUSB1`.
+
+Safe no-send verification uses a fake AT session and a synthetic phone number.
+Assert that one final fall produces exactly one `AT+CMGF=0`, one `AT+CMGS`, and
+one PDU terminated by Ctrl-Z; non-final events produce none. Verify a fixed PDU
+vector, that local and CloudBase sinks each still run once when SMS raises, and
+that captured commands contain no `ATD`, `AT+CLCC`, or `ATH`. Tests must never
+open `/dev/ttyUSB1` or contain the real destination number. Upload with matching
+SHA-256 hashes, run board unit tests, restart the unique service, and check normal
+5G/BMI/BLE logs. Do not create a manual fall trigger or issue `AT+CMGS` on real
+hardware without explicit authorization for another live SMS.
 
 ## GNSS Positioning Status
 
@@ -243,6 +283,10 @@ telemetry over MT5710 without changing the sensor programs:
 cd /root/work/mt5710_5g_cloud_upload
 ./start_ss928_5g_upload.sh
 ```
+
+This direct launcher is for maintenance and foreground diagnosis only. Normal
+device operation must enter through `smartbag-5g-upload.service`; do not run the
+launcher beside the service.
 
 The launcher checks registration/attach, selects the APN, dials NCM, discovers
 the `cdc_ncm` interface dynamically, runs DHCP, and verifies that the resolved

@@ -25,6 +25,7 @@ test("posture analysis keeps the presentation layout and uses daily cloud statis
   assert.ok(analysisWxml.indexOf("今日姿态分析") >= 0);
   assert.ok(analysisWxml.indexOf("今日累计时长") >= 0);
   assert.ok(analysisJs.indexOf("getDailyPosture") >= 0);
+  assert.ok(analysisJs.indexOf("goodPercent: 100, badPercent: 0") >= 0);
   assert.strictEqual(analysisWxml.indexOf("最近姿态记录"), -1);
   assert.strictEqual(analysisJs.indexOf("pitchDeg"), -1);
 });

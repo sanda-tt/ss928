@@ -36,6 +36,14 @@
     "latest_location_path": "/tmp/smartbag_latest_location.json",
     "location_max_age_s": 120.0
   },
+  "sms_alert": {
+    "enabled": true,
+    "port": "/dev/ttyUSB1",
+    "baud": 115200,
+    "phone_env": "SMARTBAG_ALERT_PHONE",
+    "message": "检测到你的儿童遇到危险，可能发生严重摔倒，请立刻到小程序查看具体消息",
+    "timeout_s": 30.0
+  },
   "calibration": {
     "data_dir": "/root/bmi270_calibration",
     "modes": {
@@ -82,6 +90,8 @@
     "hunch_enabled": true,
     "hunch_pitch_deg": -15.5,
     "hunch_hold_s": 3.0,
+    "hunch_reminder_required_s": 15.0,
+    "hunch_reminder_window_s": 20.0,
     "hunch_max_gyro_dps": 30.0,
     "hunch_accel_min_g": 0.75,
     "hunch_accel_max_g": 1.25,

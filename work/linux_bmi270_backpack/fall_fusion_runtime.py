@@ -52,6 +52,7 @@ class FallFusionRuntime:
         alarm_log: str | Path | None = None,
         alarm_sink: Callable[[Mapping[str, Any]], None] | None = None,
         cloud_alarm_sink: Callable[[Mapping[str, Any]], Any] | None = None,
+        sms_alarm_sink: Callable[[Mapping[str, Any]], Any] | None = None,
         manual_trigger_path: str | Path | None = None,
         wall_clock: Callable[[], float] = time.time,
     ) -> None:
@@ -69,6 +70,7 @@ class FallFusionRuntime:
         self.alarm_log = Path(alarm_log) if alarm_log else None
         self.alarm_sink = alarm_sink or self._emit_alarm
         self.cloud_alarm_sink = cloud_alarm_sink
+        self.sms_alarm_sink = sms_alarm_sink
         self.manual_trigger_path = Path(manual_trigger_path) if manual_trigger_path else None
         self.wall_clock = wall_clock
 
@@ -134,6 +136,15 @@ class FallFusionRuntime:
             except Exception as exc:
                 print(
                     f"WARN fall cloud upload failed: {type(exc).__name__}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+        if self.sms_alarm_sink is not None:
+            try:
+                self.sms_alarm_sink(alarm)
+            except Exception as exc:
+                print(
+                    f"WARN fall SMS failed: {type(exc).__name__}",
                     file=sys.stderr,
                     flush=True,
                 )

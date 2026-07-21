@@ -50,9 +50,11 @@ Compatibility links retain the previously verified paths
   the system `bluetooth.service`. It deliberately does not use the private
   DBus instance created by the vendor `ble.sh` helper.
 - `smartbag-5g-upload.service` is the single telemetry coordinator. It waits for
-  MT5710 with bounded timeouts, then starts DX-GP21 and BMI270 and uploads their
-  current state. The unit is `Type=simple`, retries after five seconds, and has
-  a ten-second stop timeout, so it does not block the rest of boot.
+  MT5710 with bounded timeouts, then starts the enabled telemetry producers and
+  uploads their current state. DX-GP21-A is currently unplugged/fault-isolated,
+  so the installed unit uses `--skip-gnss` and starts BMI270 only. The unit is
+  `Type=simple`, retries after five seconds, and has a ten-second stop timeout,
+  so it does not block the rest of boot.
 - `smartbag-alert.service` independently owns the one-sided MR20 warning path,
   PWM lights, TCA9548A/TM6605 haptics, audio, and the `SS928-SmartBag` BLE
   advertisement.
@@ -60,8 +62,9 @@ Compatibility links retain the previously verified paths
   opening the same BMI270. BMI270 is launched by `smartbag-5g-upload.service`
   and reuses the configured system BlueZ controller without starting the
   vendor private D-Bus/bluetoothd stack.
-- The DX-GP21 tracker is also launched by `smartbag-5g-upload.service`; no
-  separate GNSS boot unit is needed.
+- The DX-GP21 tracker is normally launched by `smartbag-5g-upload.service`; no
+  separate GNSS boot unit is needed. It is intentionally disabled by the
+  current `--skip-gnss` service option until the unplugged module is repaired.
 
 ### Do not revive superseded BMI/BlueZ entry points
 
@@ -106,7 +109,7 @@ networkctl status eth1
 ip route get 192.168.1.200
 ```
 
-The connected DX-GP21 currently emits no UART bytes at 9600, 38400, 57600, or
-115200 baud, so its process is running but no live GNSS fix is available yet.
-Check module power, common ground, and module TX to Pin10/UART4_RXD before
-changing software. Do not change `eth1` to `/24` and do not add a gateway.
+DX-GP21-A is currently unplugged after a module fault. It is not a boot, 5G,
+BMI270, fall-alarm, or CloudBase prerequisite: do not run its tracker or spend
+time diagnosing UART4 until the module is repaired and deliberately restored.
+Do not change `eth1` to `/24` and do not add a gateway.

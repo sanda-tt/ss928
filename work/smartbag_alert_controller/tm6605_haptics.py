@@ -21,8 +21,12 @@ TM6605_ADDRESS = 0x2D  # 7-bit address; the datasheet's write byte is 0x5A.
 TCA9548A_DEFAULT_ADDRESS = 0x70
 TM6605_EFFECT_REGISTER = 0x04
 TM6605_PLAY_REGISTER = 0x0C
-TM6605_MEDIUM_DURATION_ALERT = 15  # Approx. 730 ms; the closest built-in medium effect.
+TM6605_LIGHT_IMPACT = 7  # Approx. 130 ms.
 TM6605_STRONG_ALERT = 14  # Approx. 190 ms.
+TM6605_MEDIUM_ALERT = 15  # Approx. 730 ms.
+LEVEL2_LIGHT_INTERVAL_S = 0.25
+LEVEL3_ALERT_INTERVAL_S = 0.75
+LEVEL4_STRONG_INTERVAL_S = 0.25
 I2C0_PINMUX = (
     ("0x102F013c", "0x2031", "Pin3 I2C0_SDA"),
     ("0x102F0140", "0x2031", "Pin5 I2C0_SCL"),
@@ -77,7 +81,7 @@ class Tm6605Haptics:
     """Schedules one-shot alert effects for one or two fixed-address TM6605 boards.
 
     A single left module can attach directly to I2C0.  Two modules need a
-    TCA9548A mux because both use address 0x2D. Levels 1/2 do not vibrate.
+    TCA9548A mux because both use address 0x2D.
     """
 
     def __init__(
@@ -132,20 +136,28 @@ class Tm6605Haptics:
                 self._levels[side] = new_level
                 continue
             self._pending = [effect for effect in self._pending if effect.side != side]
-            if self._levels[side] >= 3:
+            if self._levels[side] > 0:
                 self._set_playback(side, False)
             self._levels[side] = new_level
-            if new_level == 3:
-                # 3 x ~730 ms medium alerts: ~2 s total, no direct PWM is used.
+            if new_level == 1:
+                self._pending.append(ScheduledEffect(now, side, TM6605_LIGHT_IMPACT))
+            elif new_level == 2:
+                # Two distinct 130 ms light impacts with a short pause between them.
                 self._pending.extend(
-                    ScheduledEffect(now + offset, side, TM6605_MEDIUM_DURATION_ALERT)
-                    for offset in (0.0, 0.75, 1.50)
+                    ScheduledEffect(now + offset, side, TM6605_LIGHT_IMPACT)
+                    for offset in (0.0, LEVEL2_LIGHT_INTERVAL_S)
+                )
+            elif new_level == 3:
+                # Two 730 ms alerts naturally finish after about 1.48 seconds.
+                self._pending.extend(
+                    ScheduledEffect(now + offset, side, TM6605_MEDIUM_ALERT)
+                    for offset in (0.0, LEVEL3_ALERT_INTERVAL_S)
                 )
             elif new_level == 4:
-                # Three full-strength pulses, approximately 190 ms each.
+                # Three rapid full-strength pulses, approximately 190 ms each.
                 self._pending.extend(
                     ScheduledEffect(now + offset, side, TM6605_STRONG_ALERT)
-                    for offset in (0.0, 0.30, 0.60)
+                    for offset in (0.0, LEVEL4_STRONG_INTERVAL_S, LEVEL4_STRONG_INTERVAL_S * 2)
                 )
         self.tick(now)
 
@@ -164,6 +176,17 @@ class Tm6605Haptics:
         for side in VALID_SIDES:
             if side not in self.connected_sides:
                 self._levels[side] = 0
+
+    def schedule_light_reminder(self, duration_s: float = 5.0, now: float | None = None) -> None:
+        """Gentle, clearly perceptible five-second reminder without taking over alert state."""
+        now = self.clock() if now is None else now
+        end = now + max(0.1, float(duration_s))
+        for side in self.connected_sides:
+            at = now
+            while at < end:
+                self._pending.append(ScheduledEffect(at, side, TM6605_LIGHT_IMPACT))
+                at += 0.5
+        self.tick(now)
 
     def _select_channel(self, side: str) -> None:
         if self.mux_address is None:
